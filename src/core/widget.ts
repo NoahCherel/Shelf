@@ -25,6 +25,8 @@ export type ProviderError = {
 export interface Provider<D> {
   id: string;
   intervalMs: number;
+  /** Set false for values that are worthless later, like the time. */
+  cache?: boolean;
   /** True when the account isn't connected yet; the tile then shows its sample. */
   needsSetup?: () => Promise<boolean>;
   /** Throws ProviderError. */

@@ -15,7 +15,7 @@
         "label": "dock",
         "title": "Shelf",
         "url": "index.html?w=dock",
-        "width": 1200,
+        "width": 400,
         "height": 72,
         "decorations": false,
         "transparent": true,
