@@ -1,0 +1,11 @@
+:root[data-style="black"] {
+  --bar-fill: #181818;
+  --bar-rim: #ffffff14;
+}
+
+:root[data-style="black"][data-theme="light"] {
+  --fill: #ffffff0e;
+  --rim: #ffffff27;
+  --fg: #f5f5f7;
+  --muted: #98989d;
+}

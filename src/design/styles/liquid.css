@@ -1,0 +1,10 @@
+/* The bar itself is nearly clear: the shader behind it does the work (Task 14). */
+:root[data-style="liquid"] {
+  --bar-fill: #ffffff05;
+  --bar-rim: #ffffff2e;
+}
+
+:root[data-style="liquid"][data-theme="light"] {
+  --bar-fill: #ffffff0a;
+  --bar-rim: #00000014;
+}
