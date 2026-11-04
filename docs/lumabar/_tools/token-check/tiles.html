@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Token render check</title>
+<!-- Rebuilds sample tiles purely from 03-design-system.md tokens, at the capture's 154 px scale,
+     so they can be compared with Lumabar's published images. ?font= picks the candidate typeface. -->
+<style id="font"></style>
+<style>
+  :root { --T: 148px; --fg: #f5f5f7; --muted: #98989d; --good: #30d158; --track: #ffffff1f; --radius: calc(var(--T) * .24); }
+  html, body { margin: 0; background: #3a3e46; }
+  body { padding: 3px; font-family: var(--family); letter-spacing: .01em; -webkit-font-smoothing: antialiased; color: var(--fg); }
+  .tile { position: relative; box-sizing: border-box; height: var(--T); border-radius: var(--radius); background: #ffffff0e;
+    border: 2px solid #ffffff27; margin-bottom: 26px; overflow: hidden; }
+  .logo { position: absolute; left: 18px; top: 18px; width: 110px; height: 110px; border-radius: 24px; background: #d77655; }
+  .label { font-size: calc(var(--T) * .17); font-weight: 700; line-height: 1; }
+  .second { font-size: calc(var(--T) * .17); color: var(--muted); line-height: 1; }
+  .value { font-size: calc(var(--T) * .24); font-weight: 700; line-height: 1; }
+  .hero { font-size: calc(var(--T) * .32); font-weight: 700; line-height: 1; }
+  .abs { position: absolute; white-space: nowrap; }
+  .bar { position: absolute; height: 14px; border-radius: 7px; background: var(--good); }
+</style>
+<div class="tile" id="claude-usage" style="width: 417px">
+  <div class="logo"></div>
+  <div class="abs label" style="left: 152px; top: 20px">Session</div>
+  <div class="abs second" style="right: 20px; top: 20px">1h 25m</div>
+  <div class="abs value" style="left: 152px; top: 62px">100%</div>
+  <div class="bar" style="left: 152px; right: 20px; top: 112px"></div>
+</div>
+<div class="tile" id="stripe-chart" style="width: 475px">
+  <div class="abs label" style="left: 58px; top: 15px">Net revenue</div>
+  <div class="abs value" style="right: 28px; top: 13px; font-size: calc(var(--T) * .22)">$2,980</div>
+  <div class="abs" style="right: 28px; top: 50px; color: var(--good); font-size: calc(var(--T) * .15); font-weight: 600">▲ 31%</div>
+</div>
+<div class="tile" id="date" style="width: 462px">
+  <div class="abs second" style="left: 38px; top: 30px; font-size: calc(var(--T) * .19); font-weight: 600">Thursday</div>
+  <div class="abs hero" style="left: 38px; top: 67px; letter-spacing: -.02em">October 1</div>
+</div>
+<script>
+  const family = new URLSearchParams(location.search).get("font") || "sf";
+  const css = {
+    sf: `@font-face{font-family:C;font-weight:400;src:url(https://lumabar.xyz/fonts/sf-pro-display-regular-latin.woff2)}
+         @font-face{font-family:C;font-weight:500;src:url(https://lumabar.xyz/fonts/sf-pro-display-medium-latin.woff2)}
+         @font-face{font-family:C;font-weight:600 800;src:url(https://lumabar.xyz/fonts/sf-pro-display-bold-latin.woff2)}`,
+    inter: `@import url(https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=block);`,
+    segoe: ``,
+  }[family];
+  document.getElementById("font").textContent = css + `:root{--family:${family === "segoe" ? '"Segoe UI Variable Display","Segoe UI"' : family === "inter" ? "Inter" : "C"}}`;
+</script>
