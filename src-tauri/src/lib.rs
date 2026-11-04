@@ -2,6 +2,7 @@
 
 mod apps;
 mod claude_usage;
+mod glass;
 mod net;
 mod secrets;
 mod shell;
@@ -109,6 +110,9 @@ pub fn run() {
             shell::windows::open_window,
             shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,
+            glass::glass_start,
+            glass::glass_stop,
+            glass::glass_frame,
             system::system_stats,
             system::autostart_get,
             system::autostart_set,

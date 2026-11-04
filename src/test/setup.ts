@@ -9,3 +9,6 @@ globalThis.ResizeObserver = class {
   unobserve() {}
   disconnect() {}
 };
+
+// jsdom has no WebGL. Without this it logs "not implemented" for every dock it renders.
+HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;

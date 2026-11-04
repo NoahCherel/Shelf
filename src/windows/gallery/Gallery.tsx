@@ -1,4 +1,5 @@
 import { widgets } from "../../core/registry";
+import { GlassBench } from "./GlassBench";
 import { widthOf, type WidgetDef } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
 import { Bar } from "../../design/parts/Bar";
@@ -26,6 +27,7 @@ export function Gallery() {
   setDockSize(Number(q.get("t") ?? 50));
   if (q.get("font") === "inter") document.documentElement.style.setProperty("--font", '"Inter Variable"');
   if (q.get("theme")) document.documentElement.dataset.theme = q.get("theme")!;
+  if (q.get("glass")) return <GlassBench />;
   if (q.get("all")) {
     return (
       <div className="gallery gallery--all">

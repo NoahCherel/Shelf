@@ -16,6 +16,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     RegisterWindowMessageW, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_POWERBROADCAST, WM_WTSSESSION_CHANGE,
 };
 
+use crate::glass::{self, capture::Region};
+
 use super::appbar;
 use super::events;
 use super::taskbar::{Mode, TASKBAR};
@@ -25,6 +27,8 @@ const PBT_APMRESUMEAUTOMATIC: usize = 0x12;
 const WTS_SESSION_LOCK: usize = 0x7;
 const WTS_SESSION_UNLOCK: usize = 0x8;
 const ABN_POSCHANGED: usize = 0x1;
+/// Space under the bar, inside the window.
+const GAP_BELOW: f64 = 17.0;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Rect {
@@ -56,6 +60,7 @@ pub enum Action {
     KeepTaskbar,
     RegisterAppbar,
     PlaceDock,
+    RestartGlass,
     ShowDock,
     HideDock,
     Announce,
@@ -82,9 +87,10 @@ pub fn fullscreen_now(fg: Foreground, previous_still_covers: bool) -> bool {
 pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
     use Action::*;
     match event {
-        ShellEvent::TaskbarCreated | ShellEvent::DisplayChange => vec![KeepTaskbar, RegisterAppbar, PlaceDock],
+        ShellEvent::TaskbarCreated => vec![KeepTaskbar, RegisterAppbar, PlaceDock],
+        ShellEvent::DisplayChange => vec![KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass],
         ShellEvent::Resume => {
-            let mut actions = vec![KeepTaskbar, RegisterAppbar, PlaceDock];
+            let mut actions = vec![KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass];
             if !state.fullscreen {
                 actions.push(ShowDock);
             }
@@ -96,7 +102,7 @@ pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
         }
         ShellEvent::Unlock => {
             state.locked = false;
-            vec![KeepTaskbar, RegisterAppbar, PlaceDock, Announce]
+            vec![KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass, Announce]
         }
         ShellEvent::Tick { fullscreen } => {
             let mut actions = vec![KeepTaskbar];
@@ -132,6 +138,8 @@ fn place(dock: &WebviewWindow) {
     let r = dock_rect(monitor, scale, width, height);
     let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
     let _ = dock.set_position(PhysicalPosition::new(r.x, r.y));
+    let bar_height = r.h - (GAP_BELOW * scale).round() as i32;
+    glass::set_region(dock.app_handle(), Region { x: r.x, y: r.y, w: r.w, h: bar_height.max(1) });
 }
 
 /// The reserved edge stays the monitor's full width, so maximized windows
@@ -157,8 +165,11 @@ fn run_action(app: &AppHandle, action: Action) {
         Action::HideDock => {
             let _ = dock.hide();
         }
+        Action::RestartGlass => glass::restart(app),
         Action::Announce => {
-            let _ = app.emit("shell-changed", events::status());
+            let status = events::status();
+            glass::shell_changed(app, status.fullscreen, status.locked);
+            let _ = app.emit("shell-changed", status);
         }
         Action::KeepTaskbar => {}
     }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { byId } from "../../core/registry";
@@ -8,6 +8,7 @@ import { usePicker, useShell } from "../../core/shell";
 import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
+import { GlassLayer } from "../../design/glass/GlassLayer";
 import "./dock.css";
 
 const DEFAULT_CARD_WIDTH = 340;
@@ -94,6 +95,11 @@ function openMenu(e: MouseEvent<HTMLDivElement>) {
 export function DockBar() {
   const ids = useLayout((s) => s.ids);
   const fullscreen = useShell((s) => s.fullscreen);
+  const locked = useShell((s) => s.locked);
+  const style = useSettings((s) => s.style);
+  const [glassFailed, setGlassFailed] = useState(false);
+  const onGlassUnavailable = useCallback(() => setGlassFailed(true), []);
+  const glass = style === "liquid" && !fullscreen && !locked && !glassFailed;
   const bar = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
 
@@ -112,7 +118,15 @@ export function DockBar() {
 
   return (
     // Limited by the screen, not the window, which is always only as wide as the bar.
-    <div className="dock" data-testid="bar" ref={bar} style={{ maxWidth: window.screen.width }} onContextMenu={openMenu}>
+    <div
+      className="dock"
+      data-testid="bar"
+      data-glass={glass}
+      ref={bar}
+      style={{ maxWidth: window.screen.width }}
+      onContextMenu={openMenu}
+    >
+      <GlassLayer active={glass} onUnavailable={onGlassUnavailable} />
       {!fullscreen && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={ids} strategy={horizontalListSortingStrategy}>

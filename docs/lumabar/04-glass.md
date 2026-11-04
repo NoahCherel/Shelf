@@ -51,6 +51,28 @@ An inferred model to test, not a known implementation [I]:
 7. Draw tiles on top.
 8. When a frame is unchanged, skip the work.
 
+## What we built
+
+Windows.Graphics.Capture on the primary monitor, excluded from itself with `WDA_EXCLUDEFROMCAPTURE`, cropped to the bar and handed to a WebGL shader. It runs at up to 30 frames a second, and skips frames whose pixels match the last one [M: resources.ps1].
+
+Measured on the owner's PC, release build, Shelf's own process tree only: 0.15% of the machine at rest, 2.14% with a moving colourful window behind the dock, 242 MB private [M: resources.ps1].
+
+Tuned by eye against `lg-02` and `lg-04`, with T in logical px [M: glass bench]:
+
+| Value | Setting |
+| --- | --- |
+| Lens band | 24 px from the edge |
+| Lens strength | 22 px at the rim, cubic falloff |
+| Softening under tiles | 2.6 px kernel |
+| Tile darkening, dark theme | 46% of the brightness behind |
+| Tile wash, light theme | 62% toward white |
+| Tint | 2% white |
+| Rim | 58% toward a mostly white copy of what's behind, stronger on top and bottom and at corners |
+
+The reference's images show something the widget captures couldn't: on glass, tiles darken what's behind them to about half brightness [O: lg-02]. Their 5.5% white fill sits on top of that [I].
+
+**Side effect:** while Liquid Glass is on, the dock is invisible to anything that captures the screen, including ordinary screenshots and recordings. Black doesn't have this, as it needs no capture [M: moving.png].
+
 ## Costs and bugs to avoid
 
 | Problem | Source |
