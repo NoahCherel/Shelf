@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core permissions for the dock and panel windows",
-  "windows": ["dock", "panel"],
+  "description": "Core permissions for the Shelf windows",
+  "windows": ["*"],
   "permissions": ["core:default"]
 }

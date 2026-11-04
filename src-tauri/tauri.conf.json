@@ -4,17 +4,19 @@
   "version": "0.1.0",
   "identifier": "dev.personal.shelf",
   "build": {
-    "frontendDist": "../src"
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist",
+    "beforeDevCommand": "npm run vite",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
         "label": "dock",
         "title": "Shelf",
-        "url": "index.html",
+        "url": "index.html?w=dock",
         "width": 1200,
-        "height": 68,
+        "height": 72,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
@@ -25,24 +27,6 @@
         "shadow": false,
         "visible": false,
         "focus": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-timer-throttling --disable-renderer-backgrounding"
-      },
-      {
-        "label": "panel",
-        "title": "Shelf panel",
-        "focus": false,
-        "url": "panel.html",
-        "width": 380,
-        "height": 480,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "maximizable": false,
-        "minimizable": false,
-        "shadow": false,
-        "visible": false,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-timer-throttling --disable-renderer-backgrounding"
       }
     ],
