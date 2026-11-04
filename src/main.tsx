@@ -17,6 +17,7 @@ const views: Record<string, View> = {
     syncLayout();
     return import("./windows/picker/PickerWindow").then((m) => m.PickerWindow);
   },
+  settings: () => import("./windows/settings/SettingsWindow").then((m) => m.SettingsWindow),
   gallery: () => import("./windows/gallery/Gallery").then((m) => m.Gallery),
 };
 
