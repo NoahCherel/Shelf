@@ -8,7 +8,9 @@ vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi
 const T = widget.Tile;
 const NOON = new Date(2026, 9, 11, 17, 49).getTime();
 
-beforeEach(() => useSettings.setState({ ...defaults(), hour24: false }));
+beforeEach(() => {
+  useSettings.setState({ ...defaults(), hour24: false });
+});
 
 it("shows time in the red block", () => {
   const { container } = render(<T data={NOON} status="ready" preview />);

@@ -9,7 +9,9 @@ vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi
 const T = widget.Tile;
 const WHEN = new Date(2026, 9, 11, 17, 43, 59).getTime();
 
-beforeEach(() => useSettings.setState({ ...defaults(), hour24: false, seconds: true }));
+beforeEach(() => {
+  useSettings.setState({ ...defaults(), hour24: false, seconds: true });
+});
 
 it("shows time, seconds, suffix and date", () => {
   render(<T data={WHEN} status="ready" />);

@@ -1,0 +1,26 @@
+.st {
+  justify-content: center;
+  gap: calc(var(--T) * 0.09);
+  padding: 0 calc(var(--T) * 0.14);
+  line-height: 1;
+}
+
+.st__logo {
+  position: absolute;
+  top: calc(var(--T) * 0.16);
+  right: calc(var(--T) * 0.15);
+  width: calc(var(--T) * 0.31);
+  height: calc(var(--T) * 0.31);
+}
+
+.st__amount {
+  font-size: var(--fs-large);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.st__label {
+  color: var(--muted);
+  font-size: var(--fs-second);
+  white-space: nowrap;
+}

@@ -62,7 +62,9 @@ describe("text", () => {
 
 describe("provider", () => {
   const mockInvoke = vi.mocked(invoke);
-  beforeEach(() => mockInvoke.mockReset());
+  beforeEach(() => {
+  mockInvoke.mockReset();
+});
 
   it("needs setup until connected", async () => {
     mockInvoke.mockResolvedValue({ connected: false, usage: null });

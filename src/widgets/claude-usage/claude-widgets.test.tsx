@@ -15,7 +15,9 @@ const DATA: ClaudeData = {
   updatedMs: 1,
 };
 
-beforeEach(() => mockInvoke.mockClear());
+beforeEach(() => {
+  mockInvoke.mockClear();
+});
 
 describe("Claude Usage tile", () => {
   const T = usage.Tile;

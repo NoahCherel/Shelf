@@ -8,7 +8,9 @@ vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi
 const T = widget.Tile;
 const WHEN = new Date(2026, 9, 1, 17, 4).getTime();
 
-beforeEach(() => useSettings.setState({ ...defaults(), hour24: false }));
+beforeEach(() => {
+  useSettings.setState({ ...defaults(), hour24: false });
+});
 
 it("matches its entry: red weekday, date, time, weather", () => {
   const { container } = render(<T data={WHEN} status="ready" preview />);

@@ -1,0 +1,59 @@
+.gh {
+  justify-content: center;
+  gap: calc(var(--T) * 0.07);
+  padding: 0 calc(var(--T) * 0.14);
+  line-height: 1;
+}
+
+.gh__stats {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--fs-second);
+  white-space: nowrap;
+}
+
+.gh__stats b {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.gh__flame {
+  width: calc(var(--T) * 0.1);
+  height: calc(var(--T) * 0.135);
+  vertical-align: -0.1em;
+}
+
+.gh__grid {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  grid-template-rows: repeat(3, calc(var(--T) * 0.135));
+  grid-auto-flow: column;
+  gap: calc(var(--T) * 0.05);
+}
+
+.gh__cell {
+  display: block;
+  border-radius: calc(var(--T) * 0.03);
+  background: var(--track);
+}
+
+.gh__cell[data-level="1"] {
+  background: #0d4a26;
+}
+
+.gh__cell[data-level="2"] {
+  background: #006e32;
+}
+
+.gh__cell[data-level="3"] {
+  background: #26a642;
+}
+
+.gh__cell[data-level="4"] {
+  background: #3ad254;
+}
+
+.gh-card {
+  --T: 96px;
+}

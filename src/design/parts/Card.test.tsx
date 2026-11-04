@@ -12,7 +12,9 @@ const FIELDS = [
   { id: "name", label: "Account name", placeholder: "", secret: false },
 ];
 
-beforeEach(() => mockInvoke.mockClear());
+beforeEach(() => {
+  mockInvoke.mockClear();
+});
 
 describe("Card", () => {
   it("renders header, body, footer note and action", () => {

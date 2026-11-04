@@ -15,7 +15,9 @@ const app = (key: string, open = false, active = false): AppEntry => ({
   windows: open ? [{ hwnd: 1, title: `${key} window` }] : [],
 });
 
-beforeEach(() => mockInvoke.mockClear());
+beforeEach(() => {
+  mockInvoke.mockClear();
+});
 
 it("keeps a stable order when focus changes", () => {
   const before = [app("a"), app("b"), app("c")];
