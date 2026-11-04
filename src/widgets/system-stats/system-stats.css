@@ -1,0 +1,26 @@
+.stats {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--T) * 0.12);
+}
+
+.stats__text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--T) * 0.025);
+  line-height: 1;
+}
+
+.stats__value {
+  font-size: calc(var(--T) * 0.19);
+  font-weight: 700;
+}
+
+.stats__label {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}

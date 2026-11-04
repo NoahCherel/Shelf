@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import type { ComponentType } from "react";
 import "./design";
+import { followLook } from "./core/look";
+import { syncSettings } from "./core/settings";
 
 type View = () => Promise<ComponentType>;
 
@@ -13,6 +15,12 @@ const views: Record<string, View> = {
 
 const name = new URLSearchParams(location.search).get("w") ?? "dock";
 
-(views[name] ?? views.dock)().then((View) => {
-  createRoot(document.getElementById("root")!).render(<View />);
-});
+// Settings first: providers need them, and the first paint should already be right.
+syncSettings()
+  .then(() => {
+    followLook();
+    return (views[name] ?? views.dock)();
+  })
+  .then((View) => {
+    createRoot(document.getElementById("root")!).render(<View />);
+  });

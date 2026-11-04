@@ -1,0 +1,128 @@
+.battery {
+  --water-top: #5ac8fe;
+  --water-bottom: #148dfd;
+}
+
+.battery--low {
+  --water-top: #ffb340;
+  --water-bottom: #ff9500;
+}
+
+.battery--none {
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--T) * 0.1);
+  color: var(--muted);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.battery__water {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(var(--water-top), var(--water-bottom));
+  transition: height 600ms ease-out;
+}
+
+.battery__wave {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% - 1px);
+  width: 200%;
+  height: calc(var(--T) * 0.08);
+  fill: var(--water-top);
+}
+
+.battery__wave--back {
+  opacity: 0.55;
+  transform: translateX(-25%);
+}
+
+.battery__bubble {
+  position: absolute;
+  bottom: 8%;
+  left: 30%;
+  width: calc(var(--T) * 0.05);
+  height: calc(var(--T) * 0.05);
+  border-radius: 50%;
+  background: #ffffffa8;
+  opacity: 0;
+}
+
+.battery__bubble--2 {
+  left: 66%;
+  width: calc(var(--T) * 0.035);
+  height: calc(var(--T) * 0.035);
+}
+
+/* Moves only while charging or hovered, so an idle dock costs nothing. */
+.battery--live .battery__wave,
+.battery:hover .battery__wave {
+  animation: battery-wave 6s linear infinite;
+}
+
+.battery--live .battery__wave--back,
+.battery:hover .battery__wave--back {
+  animation: battery-wave-back 9s linear infinite;
+}
+
+.battery--live .battery__bubble,
+.battery:hover .battery__bubble {
+  animation: battery-bubble 3.4s ease-in infinite;
+}
+
+.battery--live .battery__bubble--2,
+.battery:hover .battery__bubble--2 {
+  animation-delay: 1.3s;
+}
+
+@keyframes battery-wave {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes battery-wave-back {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes battery-bubble {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(calc(var(--T) * -0.5)) scale(1);
+    opacity: 0;
+  }
+}
+
+.battery__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--T) * 0.04);
+  color: #fff;
+  font-size: calc(var(--T) * 0.24);
+  font-weight: 700;
+  text-shadow: 0 1px 2px #0000002e;
+}
+
+.battery__bolt {
+  width: calc(var(--T) * 0.12);
+  height: calc(var(--T) * 0.2);
+}

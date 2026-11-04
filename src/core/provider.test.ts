@@ -225,3 +225,13 @@ it("no provider just shows the sample", async () => {
   expect(result.current.data).toBe(7);
   expect(result.current.status).toBe("sample");
 });
+
+it("doesn't redraw when a new value equals the last one", async () => {
+  const { useProvider } = await fresh();
+  const p: Provider<{ a: number }> = { id: "demo", intervalMs: 1_000, cache: false, fetch: async () => ({ a: 1 }) };
+  const { result } = renderHook(() => useProvider(p));
+  await flush();
+  const first = result.current.data;
+  await advance(1_000);
+  expect(result.current.data).toBe(first);
+});

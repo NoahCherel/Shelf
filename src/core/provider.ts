@@ -35,7 +35,7 @@ function entryFor<D>(provider: Provider<D>, sample?: D): Entry<D> {
     entry = {
       provider,
       sample,
-      state: { data: sample ?? null, status: "loading" },
+      state: { data: null, status: "loading" },
       listeners: new Set(),
       inFlight: false,
       lastAt: 0,
@@ -73,7 +73,9 @@ async function run<D>(entry: Entry<D>) {
     const known = entry.state.status === "sample" ? null : entry.state.data;
     const value = await provider.fetch(known);
     entry.lastAt = Date.now();
-    publish(entry, { data: value, status: "ready" });
+    // Equal values keep the old object, so nothing redraws.
+    const unchanged = entry.state.status === "ready" && JSON.stringify(value) === JSON.stringify(known);
+    if (!unchanged) publish(entry, { data: value, status: "ready" });
     if (provider.cache !== false) {
       const cached: Cached<D> = { value, at: entry.lastAt };
       invoke("store_save", { name: `cache-${provider.id}`, value: cached }).catch(() => {});
@@ -122,9 +124,15 @@ export function snapshot<D>(provider: Provider<D>, sample?: D): Snapshot<D> {
   return entryFor(provider, sample).state;
 }
 
+/** Runs a provider now, in this window, if anything here is using it. */
+export function runNow<D>(provider: Provider<D>): void {
+  const entry = entries.get(provider.id) as Entry<D> | undefined;
+  if (entry && entry.listeners.size > 0) void run(entry);
+}
+
 /** Runs a provider now, here and in every other window. */
 export function refresh<D>(provider: Provider<D>): void {
-  void run(entryFor(provider));
+  runNow(provider);
   emit("provider-refresh", provider.id).catch(() => {});
 }
 
