@@ -108,9 +108,10 @@ pub fn run() {
             system::autostart_get,
             system::autostart_set,
             system::open_url,
-            apps::list_windows,
-            apps::focus_window,
-            apps::open_start,
+            apps::apps_list,
+            apps::apps_icon,
+            apps::apps_activate,
+            apps::start_menu,
             claude_usage,
             claude_connect,
             quit,
@@ -127,6 +128,7 @@ pub fn run() {
         })
         .setup(|app| {
             shell::dock::start(app.handle())?;
+            apps::watch_foreground(app.handle());
             build_tray(app.handle())?;
             Ok(())
         })
