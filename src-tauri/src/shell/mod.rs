@@ -1,6 +1,7 @@
 //! The Windows shell: taskbar, appbar and the events around them.
 
 pub mod appbar;
+pub mod card;
 pub mod dock;
 pub mod events;
 pub mod taskbar;

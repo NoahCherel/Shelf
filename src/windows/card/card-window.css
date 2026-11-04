@@ -1,0 +1,17 @@
+/* Scrolls only on a screen too small for the card. */
+.card-window {
+  height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.card-slide {
+  animation: card-in 200ms ease-out;
+}
+
+@keyframes card-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}

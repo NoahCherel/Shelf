@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { byId } from "../../core/registry";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
@@ -7,14 +7,28 @@ import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import "./dock.css";
 
+const DEFAULT_CARD_WIDTH = 340;
+const DEFAULT_CARD_HEIGHT = 300;
+
 /** Space under the bar, inside the window. */
 const GAP_BELOW = 17;
 
 function Slot({ def }: { def: WidgetDef }) {
   const T = def.Tile;
   const { data, status, error, refresh } = useProvider(def.provider, def.sample);
+  const openCard = (e: MouseEvent<HTMLDivElement>) => {
+    if (!def.Card) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    invoke("open_card", {
+      widgetId: def.id,
+      tileX: r.left,
+      tileWidth: r.width,
+      width: def.cardWidth ?? DEFAULT_CARD_WIDTH,
+      height: def.cardHeight ?? DEFAULT_CARD_HEIGHT,
+    }).catch(() => {});
+  };
   return (
-    <div className={def.id === "apps" ? "slot slot--shrink" : "slot"} data-widget-id={def.id} data-status={status}>
+    <div className={def.id === "apps" ? "slot slot--shrink" : "slot"} data-widget-id={def.id} data-status={status} onClick={openCard}>
       <T data={data} status={status} error={error} refresh={refresh} />
     </div>
   );

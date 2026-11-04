@@ -99,6 +99,10 @@ pub fn run() {
             net::http_get,
             events::shell_status,
             shell::dock::set_dock_width,
+            shell::card::open_card,
+            shell::card::fit_card,
+            shell::card::card_current,
+            shell::card::close_card,
             shell::taskbar::set_taskbar_mode,
             system::system_stats,
             system::autostart_get,
@@ -111,11 +115,15 @@ pub fn run() {
             claude_connect,
             quit,
         ])
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match (event, window.label()) {
             // Alt+F4 must not take the dock down with the taskbar still hidden.
-            if let (WindowEvent::CloseRequested { api, .. }, "dock") = (event, window.label()) {
+            (WindowEvent::CloseRequested { api, .. }, "dock") => api.prevent_close(),
+            (WindowEvent::CloseRequested { api, .. }, "card") => {
                 api.prevent_close();
+                shell::card::on_blur(window);
             }
+            (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
+            _ => {}
         })
         .setup(|app| {
             shell::dock::start(app.handle())?;

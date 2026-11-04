@@ -1,5 +1,5 @@
 import { beforeEach, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { DockBar } from "./Bar";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
@@ -51,4 +51,17 @@ it("skips an id with no widget instead of breaking", () => {
   useLayout.setState({ ids: ["clock", "missing"] });
   const { container } = render(<DockBar />);
   expect(slots(container).map((s) => s.dataset.widgetId)).toEqual(["clock"]);
+});
+
+it("opens a card over its tile on click, only for widgets that have one", async () => {
+  const { invoke } = await import("../../core/tauri");
+  const { byId } = await import("../../core/registry");
+  (byId("clock") as { Card?: unknown }).Card = () => null;
+  const { container } = render(<DockBar />);
+  const [clock, apps] = slots(container);
+  vi.mocked(invoke).mockClear();
+  fireEvent.click(apps);
+  expect(invoke).not.toHaveBeenCalledWith("open_card", expect.anything());
+  fireEvent.click(clock);
+  expect(invoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "clock" }));
 });

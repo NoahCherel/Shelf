@@ -7,6 +7,7 @@ type View = () => Promise<ComponentType>;
 // Each window only loads the code for its own view.
 const views: Record<string, View> = {
   dock: () => import("./windows/dock/DockWindow").then((m) => m.DockWindow),
+  card: () => import("./windows/card/CardWindow").then((m) => m.CardWindow),
   gallery: () => import("./windows/gallery/Gallery").then((m) => m.Gallery),
 };
 
