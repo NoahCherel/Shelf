@@ -164,7 +164,7 @@ export const STRIPE_SAMPLE: StripeData = {
   today: 184,
   week: 2980,
   month30: 5336,
-  daily: [210, 380, 300, 290, 285, 360, 345, 330, 390, 395, 370, 400, 410, 340],
+  daily: [290, 390, 325, 322, 320, 372, 362, 352, 395, 400, 385, 402, 420, 360],
   change: 31,
   testMode: false,
   payments: { today: 2, week: 11, month30: 40 },

@@ -1,3 +1,5 @@
+import { widgets } from "../../core/registry";
+import { widthOf, type WidgetDef } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
 import { Bar } from "../../design/parts/Bar";
 import { setDockSize } from "../../design/theme";
@@ -5,12 +7,34 @@ import "./gallery.css";
 
 const T = (x: number) => `calc(var(--T) * ${x})`;
 
-/** Sample tiles for visual checks. Opened with ?w=gallery&t=148, and &font=inter to force a candidate. */
+function SampleTile({ def }: { def: WidgetDef }) {
+  const C = def.Tile;
+  return (
+    <div className="gallery__item" style={{ width: T(widthOf(def, def.sample ?? null)) }} data-widget-id={def.id}>
+      <C data={def.sample ?? null} status="sample" preview />
+    </div>
+  );
+}
+
+/**
+ * Visual checks, with no provider running. ?t=148 sets the tile height, &font=inter forces a
+ * candidate font, and &all=1 shows every widget's sample instead of the fixed token samples.
+ */
 export function Gallery() {
   const q = new URLSearchParams(location.search);
   // Sizes derive from T at the root, so it has to be set there, as the dock does.
   setDockSize(Number(q.get("t") ?? 50));
   if (q.get("font") === "inter") document.documentElement.style.setProperty("--font", '"Inter Variable"');
+  if (q.get("theme")) document.documentElement.dataset.theme = q.get("theme")!;
+  if (q.get("all")) {
+    return (
+      <div className="gallery gallery--all">
+        {widgets.map((def) => (
+          <SampleTile key={def.id} def={def} />
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="gallery">
       <Tile width={2.82}>

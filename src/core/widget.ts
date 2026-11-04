@@ -46,6 +46,7 @@ export interface MenuItem {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  checked?: boolean;
 }
 
 export interface MenuCtx {

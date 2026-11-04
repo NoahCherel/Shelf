@@ -3,7 +3,7 @@ import { vi } from "vitest";
 import { Tile } from "./Tile";
 import { Ring } from "./Ring";
 import { Bar, levelFor } from "./Bar";
-import { Sparkline, sparkPath } from "./Sparkline";
+import { endY, smoothPath, Sparkline, sparkPath } from "./Sparkline";
 import { RoundButton } from "./RoundButton";
 import { Row } from "./Row";
 import { setDockSize, setStyle, setTheme } from "../theme";
@@ -82,9 +82,26 @@ describe("Sparkline", () => {
     expect(container.querySelector("path")).toBeNull();
   });
 
-  it("adds an area only when asked", () => {
+  it("adds an area and end dot only when asked", () => {
     const { container } = render(<Sparkline values={[1, 2]} color="red" fill />);
     expect(container.querySelectorAll("path").length).toBe(2);
+    expect(container.querySelector(".spark__dot")).toBeTruthy();
+    const plain = render(<Sparkline values={[1, 2]} color="red" />);
+    expect(plain.container.querySelector(".spark__dot")).toBeNull();
+  });
+});
+
+describe("smoothPath", () => {
+  it("passes through the first and last points, keeping headroom above the line", () => {
+    const path = smoothPath([0, 10, 5]);
+    expect(path.startsWith("M0 ")).toBe(true);
+    expect(path.includes("C")).toBe(true);
+    expect(path.endsWith(` 100 ${endY([0, 10, 5])}`)).toBe(true);
+    expect(endY([0, 10])).toBeLessThan(endY([10, 0]));
+  });
+
+  it("is empty for no values", () => {
+    expect(smoothPath([])).toBe("");
   });
 });
 

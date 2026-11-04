@@ -1,8 +1,11 @@
 import { createRoot } from "react-dom/client";
 import type { ComponentType } from "react";
 import "./design";
+import { syncLayout } from "./core/layout";
 import { followLook } from "./core/look";
 import { syncSettings } from "./core/settings";
+
+const PICKER_T = 62;
 
 type View = () => Promise<ComponentType>;
 
@@ -10,15 +13,25 @@ type View = () => Promise<ComponentType>;
 const views: Record<string, View> = {
   dock: () => import("./windows/dock/DockWindow").then((m) => m.DockWindow),
   card: () => import("./windows/card/CardWindow").then((m) => m.CardWindow),
+  picker: () => {
+    syncLayout();
+    return import("./windows/picker/PickerWindow").then((m) => m.PickerWindow);
+  },
   gallery: () => import("./windows/gallery/Gallery").then((m) => m.Gallery),
 };
 
 const name = new URLSearchParams(location.search).get("w") ?? "dock";
 
+// The browser's own menu has no place in an app, except where text can be edited.
+document.addEventListener("contextmenu", (e) => {
+  if (!(e.target as HTMLElement).closest("input, textarea")) e.preventDefault();
+});
+
 // Settings first: providers need them, and the first paint should already be right.
 syncSettings()
   .then(() => {
-    followLook();
+    // The picker's tiles stay one size whatever size the dock is.
+    followLook(name === "picker" ? PICKER_T : undefined);
     return (views[name] ?? views.dock)();
   })
   .then((View) => {

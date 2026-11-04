@@ -31,14 +31,17 @@ fn quit(app: AppHandle) {
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+    let widgets = MenuItem::with_id(app, "picker", "Widgets…", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Shelf", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&quit])?;
+    let menu = Menu::with_items(app, &[&widgets, &settings, &quit])?;
     let mut tray = TrayIconBuilder::new()
         .menu(&menu)
         .tooltip("Shelf")
-        .on_menu_event(|app, event| {
-            if event.id.as_ref() == "quit" {
-                app.exit(0);
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "quit" => app.exit(0),
+            kind => {
+                let _ = shell::windows::open_window(app.clone(), kind.to_string());
             }
         });
     if let Some(icon) = app.default_window_icon() {
@@ -103,6 +106,8 @@ pub fn run() {
             shell::card::fit_card,
             shell::card::card_current,
             shell::card::close_card,
+            shell::windows::open_window,
+            shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,
             system::system_stats,
             system::autostart_get,
@@ -124,6 +129,7 @@ pub fn run() {
                 shell::card::on_blur(window);
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
+            (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
             _ => {}
         })
         .setup(|app| {

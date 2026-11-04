@@ -1,0 +1,34 @@
+.menu {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: var(--radius-menu);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 13px;
+}
+
+.menu__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 14px;
+  text-align: left;
+}
+
+/* No transition: rows highlight at once. */
+.menu__row:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.menu__row--danger {
+  color: var(--error);
+}
+
+.menu__tick {
+  width: 12px;
+  height: 12px;
+}

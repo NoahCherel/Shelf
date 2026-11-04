@@ -25,7 +25,7 @@ function ClaudeUsageTile({ data }: TileProps<ClaudeData>) {
           {win?.resetsAt && <span className="cu__time">{durationText(win.resetsAt - Date.now())}</span>}
         </div>
         <span className="cu__value">{win ? `${Math.round(win.percent)}%` : "–"}</span>
-        <Bar percent={win?.percent ?? 0} />
+        <Bar percent={win?.percent ?? 0} level="good" />
       </div>
     </Tile>
   );

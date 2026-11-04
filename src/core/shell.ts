@@ -9,6 +9,9 @@ interface ShellStatus {
 
 export const useShell = create<ShellStatus>(() => ({ fullscreen: false, locked: false }));
 
+/** The dock shows − badges and allows dragging while the picker is open. */
+export const usePicker = create<{ open: boolean }>(() => ({ open: false }));
+
 const apply = ({ fullscreen, locked }: ShellStatus) => {
   useShell.setState({ fullscreen, locked });
   setPaused(fullscreen || locked);
@@ -18,4 +21,5 @@ const apply = ({ fullscreen, locked }: ShellStatus) => {
 export function syncShell(): void {
   invoke<ShellStatus>("shell_status").then(apply, () => {});
   listen<ShellStatus>("shell-changed", apply);
+  listen<boolean>("picker-open", (open) => usePicker.setState({ open }));
 }

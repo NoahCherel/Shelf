@@ -30,8 +30,8 @@ describe("Claude Usage tile", () => {
     expect(screen.getByText("41%")).toBeTruthy();
   });
 
-  it("has a green bar under 70", () => {
-    const { container } = render(<T data={DATA} status="ready" />);
+  it("keeps its bar green even when full, as only the card shows levels", () => {
+    const { container } = render(<T data={{ ...DATA, session: { percent: 100, resetsAt: inMs(60_000) } }} status="ready" />);
     expect(container.querySelector("[data-level]")?.getAttribute("data-level")).toBe("good");
   });
 

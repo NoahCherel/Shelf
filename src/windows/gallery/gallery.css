@@ -47,3 +47,15 @@ body,
   font-size: var(--fs-large);
   font-weight: 700;
 }
+
+.gallery--all {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px;
+}
+
+.gallery__item {
+  position: relative;
+  flex: none;
+}

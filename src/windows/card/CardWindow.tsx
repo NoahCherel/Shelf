@@ -1,32 +1,51 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { refresh } from "../../core/provider";
 import { byId } from "../../core/registry";
 import { invoke, listen } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
+import { dockMenuItems, Menu } from "../menu/Menu";
 import "./card-window.css";
 
 const DEFAULT_CARD_WIDTH = 340;
+const MENU_WIDTH = 210;
+const MENU_PREFIX = "__menu:";
 
-function CardBody({ def }: { def: WidgetDef }) {
-  const C = def.Card!;
-  const { data, status, error, refresh } = useProvider(def.provider, def.sample);
+/** Height fits what's shown; Rust keeps it on the screen. */
+function Fitted({ width, children }: { width: number; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
-
-  // Height fits what the card shows; Rust keeps it on the screen.
   useEffect(() => {
     const el = box.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      invoke("fit_card", { width: def.cardWidth ?? DEFAULT_CARD_WIDTH, height: el.offsetHeight }).catch(() => {});
+      invoke("fit_card", { width, height: el.offsetHeight }).catch(() => {});
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [def]);
-
+  }, [width]);
   return (
     <div className="card-slide" ref={box}>
-      <C data={data} status={status} error={error} refresh={refresh} />
+      {children}
     </div>
+  );
+}
+
+function CardBody({ def }: { def: WidgetDef }) {
+  const C = def.Card!;
+  const { data, status, error, refresh: reload } = useProvider(def.provider, def.sample);
+  return (
+    <Fitted width={def.cardWidth ?? DEFAULT_CARD_WIDTH}>
+      <C data={data} status={status} error={error} refresh={reload} />
+    </Fitted>
+  );
+}
+
+function MenuBody({ def }: { def: WidgetDef | undefined }) {
+  const own = def?.menu?.({ refresh: () => def.provider && refresh(def.provider) }) ?? [];
+  return (
+    <Fitted width={MENU_WIDTH}>
+      <Menu items={dockMenuItems(own)} />
+    </Fitted>
   );
 }
 
@@ -50,11 +69,19 @@ export function CardWindow() {
     };
   }, []);
 
-  const def = shown && byId(shown.id);
+  if (!shown) return null;
+  if (shown.id.startsWith(MENU_PREFIX)) {
+    return (
+      <div className="card-window">
+        <MenuBody key={shown.n} def={byId(shown.id.slice(MENU_PREFIX.length))} />
+      </div>
+    );
+  }
+  const def = byId(shown.id);
   if (!def?.Card) return null;
   return (
     <div className="card-window">
-      <CardBody key={shown!.n} def={def} />
+      <CardBody key={shown.n} def={def} />
     </div>
   );
 }

@@ -16,7 +16,7 @@ function PlanRow({ label, win, reset }: { label: string; win: LimitWindow | null
   return (
     <div className="plan__row">
       <span className="plan__label">{label}</span>
-      <Bar percent={win?.percent ?? 0} thickness="calc(var(--T) * 0.065)" />
+      <Bar percent={win?.percent ?? 0} level="good" thickness="calc(var(--T) * 0.065)" />
       <span className="plan__reset">{win?.resetsAt ? reset(win.resetsAt) : ""}</span>
       <span className="plan__value">{win ? `${Math.round(win.percent)}%` : "–"}</span>
     </div>
