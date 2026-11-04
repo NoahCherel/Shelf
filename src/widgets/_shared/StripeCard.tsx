@@ -77,3 +77,5 @@ function disconnect(setConnected: (on: boolean) => void) {
       refresh(stripeProvider);
     });
 }
+
+export const stripeMenu = () => [{ label: "Logout", danger: true, onClick: () => disconnect(() => {}) }];

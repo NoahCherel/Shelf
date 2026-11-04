@@ -21,7 +21,9 @@ use merge::{click_plan, merge, AppEntry, Click};
 pub use windows::watch_foreground;
 
 /// Sent once per icon, so the icons aren't copied to the page on every refresh.
-static ICONS: Mutex<Option<HashMap<String, Option<String>>>> = Mutex::new(None);
+static ICONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+/// The shell's icon lookups aren't dependable when several run at once.
+static ONE_LOOKUP: Mutex<()> = Mutex::new(());
 static SOURCES: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 
 /// Shell objects need their own COM apartment, so they get their own short-lived thread.
@@ -51,14 +53,18 @@ pub fn apps_list() -> Result<Vec<AppEntry>, String> {
 
 #[tauri::command(async)]
 pub fn apps_icon(key: String) -> Result<Option<String>, String> {
+    let _one = ONE_LOOKUP.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(known) = ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&key)) {
-        return Ok(known.clone());
+        return Ok(Some(known.clone()));
     }
     let source = SOURCES.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&key).cloned());
     let Some(source) = source else { return Ok(None) };
     let icon = on_com_thread(move || icons::icon(&source))?;
-    let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
-    cache.get_or_insert_with(HashMap::new).insert(key, icon.clone());
+    // A miss isn't remembered: the page asks again.
+    if let Some(found) = &icon {
+        let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
+        cache.get_or_insert_with(HashMap::new).insert(key, found.clone());
+    }
     Ok(icon)
 }
 

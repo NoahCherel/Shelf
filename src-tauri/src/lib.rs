@@ -42,7 +42,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "quit" => app.exit(0),
             kind => {
-                let _ = shell::windows::open_window(app.clone(), kind.to_string());
+                // Off this thread: making a window in a menu handler deadlocks WebView2 on Windows.
+                let (app, kind) = (app.clone(), kind.to_string());
+                std::thread::spawn(move || {
+                    let _ = shell::windows::open_window(app, kind);
+                });
             }
         });
     if let Some(icon) = app.default_window_icon() {
@@ -78,6 +82,10 @@ pub fn run() {
         if let Some(pid) = args.get(i + 1).and_then(|p| p.parse().ok()) {
             shell::taskbar::watch_parent(pid);
         }
+        return;
+    }
+    if args.iter().any(|a| a == "--quit") {
+        shell::ask_to_quit();
         return;
     }
     if shell::already_running() {
@@ -116,7 +124,6 @@ pub fn run() {
             system::system_stats,
             system::autostart_get,
             system::autostart_set,
-            system::open_url,
             apps::apps_list,
             apps::apps_icon,
             apps::apps_activate,
@@ -130,7 +137,7 @@ pub fn run() {
             (WindowEvent::CloseRequested { api, .. }, "dock") => api.prevent_close(),
             (WindowEvent::CloseRequested { api, .. }, "card") => {
                 api.prevent_close();
-                shell::card::on_blur(window);
+                shell::card::on_close(window);
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
@@ -140,6 +147,7 @@ pub fn run() {
             shell::dock::start(app.handle())?;
             apps::watch_foreground(app.handle());
             build_tray(app.handle())?;
+            shell::listen_for_quit(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())

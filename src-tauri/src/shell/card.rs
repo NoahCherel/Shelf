@@ -11,6 +11,8 @@ const MARGIN: f64 = 8.0;
 /// A click on a tile blurs the card before the click itself arrives, so a card
 /// closed this recently was closed by the very click being handled.
 const REOPEN_GUARD_MS: u64 = 250;
+/// Windows moves focus from the window into its web view as it opens, which looks like clicking away.
+const SETTLE_MS: u64 = 250;
 
 #[derive(Clone, Copy, Default)]
 pub struct Span {
@@ -42,6 +44,7 @@ pub struct CardState {
     pub open: Option<String>,
     last: Option<String>,
     closed_at: u64,
+    opened_at: u64,
 }
 
 impl CardState {
@@ -54,7 +57,17 @@ impl CardState {
             return CardMove::Ignore;
         }
         self.open = Some(id.to_string());
+        self.opened_at = now;
         CardMove::Open
+    }
+
+    /// True when losing focus really does mean the card should close.
+    pub fn blur_closes(&mut self, now: u64) -> bool {
+        if now.saturating_sub(self.opened_at) < SETTLE_MS {
+            return false;
+        }
+        self.closed(now);
+        true
     }
 
     pub fn closed(&mut self, now: u64) {
@@ -150,6 +163,12 @@ pub fn close_card(app: AppHandle) -> Result<(), String> {
 
 /// Clicking away closes the card.
 pub fn on_blur(window: &tauri::Window) {
+    if with_state(|s| s.blur_closes(now())) {
+        let _ = window.hide();
+    }
+}
+
+pub fn on_close(window: &tauri::Window) {
     with_state(|s| s.closed(now()));
     let _ = window.hide();
 }
@@ -206,6 +225,16 @@ mod tests {
         s.closed(1000); // clicking the tile blurs the card before the click arrives
         assert_eq!(s.request("clock", 1100), CardMove::Ignore);
         assert_eq!(s.request("clock", 1400), CardMove::Open, "a later click is real");
+    }
+
+    #[test]
+    fn the_focus_settling_right_after_opening_does_not_close_it() {
+        let mut s = CardState::default();
+        s.request("clock", 1000);
+        assert!(!s.blur_closes(1100), "Windows moves focus into the web view as it opens");
+        assert!(s.open.is_some());
+        assert!(s.blur_closes(1400), "clicking away later does close it");
+        assert!(s.open.is_none());
     }
 
     #[test]

@@ -1,5 +1,5 @@
 import { beforeEach, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { invoke } from "../../core/tauri";
 import { AppsTile, stableOrder, type AppEntry } from "./Tile";
 
@@ -55,6 +55,18 @@ it("asks for each icon once, however often it redraws", () => {
   const { rerender } = render(<AppsTile data={data} status="ready" />);
   rerender(<AppsTile data={[...data]} status="ready" />);
   expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_icon").length).toBeLessThanOrEqual(1);
+});
+
+it("asks again when an icon isn't ready yet", async () => {
+  vi.useFakeTimers();
+  mockInvoke.mockImplementation(async (cmd) => (cmd === "apps_icon" ? null : null));
+  const { container } = render(<AppsTile data={[app("late", true)]} status="ready" />);
+  await act(() => vi.advanceTimersByTimeAsync(0));
+  expect(container.querySelector("img")).toBeNull();
+  mockInvoke.mockImplementation(async (cmd) => (cmd === "apps_icon" ? "data:image/png;base64,AA" : null));
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  expect(container.querySelector("img")?.getAttribute("src")).toContain("data:image/png");
+  vi.useRealTimers();
 });
 
 it("does nothing when clicked in the picker", () => {

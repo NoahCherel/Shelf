@@ -73,10 +73,6 @@ impl FrameFilter {
         changed
     }
 
-    pub fn forget(&mut self) {
-        self.last_hash = None;
-    }
-
     pub fn due(&mut self, now_ms: u64) -> bool {
         if now_ms < self.next_due {
             return false;
@@ -293,15 +289,6 @@ mod tests {
         assert!(f.changed(&a));
         let at = a.len() - 400; // somewhere in the last row
         a[at] = 200;
-        assert!(f.changed(&a));
-    }
-
-    #[test]
-    fn forgetting_lets_the_same_frame_through_again() {
-        let mut f = FrameFilter::default();
-        let a = vec![1u8; 64];
-        assert!(f.changed(&a));
-        f.forget();
         assert!(f.changed(&a));
     }
 

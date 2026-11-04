@@ -6,6 +6,8 @@ Every feature, numbered, for the implementation plan to trace back to. Prioritie
 - **P2:** the taskbar's full job and everyday widgets
 - **P3:** everything else
 
+**Status, 2026-11-04:** Milestone 1 delivers every P1 below except where noted, with F-006 (size slider) from P2 too. Not in M1: the P1 widgets moved to M2 and M3 by the plan, and F-026, where the dock is only on the primary screen and the taskbar is hidden on all of them. F-086 is targeted but only run on Windows 11. What only the owner can verify is in [manual checks](../manual-checks.md).
+
 ## Dock
 
 | ID | P | Feature | Doc |

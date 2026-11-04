@@ -1,7 +1,7 @@
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
 import { compactMoney, STRIPE_SAMPLE, stripeProvider, type StripeData } from "../_providers/stripe";
-import { StripeCard, StripeLogo } from "../_shared/StripeCard";
+import { StripeCard, StripeLogo, stripeMenu } from "../_shared/StripeCard";
 import "./stripe-tile.css";
 
 function StripeTile({ data }: TileProps<StripeData>) {
@@ -26,4 +26,5 @@ export default defineWidget<StripeData>({
   Tile: StripeTile,
   Card: StripeCard,
   provider: stripeProvider,
+  menu: stripeMenu,
 });

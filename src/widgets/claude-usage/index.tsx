@@ -2,7 +2,7 @@ import { defineWidget, type TileProps } from "../../core/widget";
 import { Bar } from "../../design/parts/Bar";
 import { Tile } from "../../design/parts/Tile";
 import { claudeProvider, durationText, type ClaudeData } from "../_providers/claude";
-import { ClaudeCard } from "../_shared/ClaudeCard";
+import { ClaudeCard, claudeMenu } from "../_shared/ClaudeCard";
 import { ClaudeLogo } from "../_shared/ClaudeLogo";
 import "./claude-usage.css";
 
@@ -41,4 +41,5 @@ export default defineWidget<ClaudeData>({
   Tile: ClaudeUsageTile,
   Card: ClaudeCard,
   provider: claudeProvider,
+  menu: claudeMenu,
 });

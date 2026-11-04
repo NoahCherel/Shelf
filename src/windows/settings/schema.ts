@@ -88,7 +88,7 @@ export const SCHEMA: PageDef[] = [
     id: "dock",
     title: "Dock",
     groups: [
-      section("Size", [
+      section(undefined, [
         slider("size", {
           label: "Size",
           tip: "How tall the dock's tiles are. Everything scales with it.",

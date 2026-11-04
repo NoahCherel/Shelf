@@ -13,7 +13,8 @@ fn size_of(kind: &str) -> Option<(f64, f64, &'static str)> {
     }
 }
 
-#[tauri::command]
+/// Async on purpose: making a window in a synchronous command deadlocks WebView2 on Windows.
+#[tauri::command(async)]
 pub fn open_window(app: AppHandle, kind: String) -> Result<(), String> {
     let (width, height, title) = size_of(&kind).ok_or("unknown window")?;
     if let Some(window) = app.get_webview_window(&kind) {
@@ -39,7 +40,7 @@ pub fn open_window(app: AppHandle, kind: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn close_window(app: AppHandle, kind: String) -> Result<(), String> {
     match app.get_webview_window(&kind) {
         Some(window) => window.destroy().map_err(|e| e.to_string()),

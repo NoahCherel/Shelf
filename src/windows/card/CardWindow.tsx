@@ -55,16 +55,30 @@ export function CardWindow() {
 
   useEffect(() => {
     let n = 0;
-    invoke<string | null>("card_current")
-      .then((id) => id && setShown({ id, n: ++n }))
-      .catch(() => {});
-    const off = listen<string>("card-open", (id) => setShown({ id, n: ++n }));
+    let current: string | null = null;
+    const show = (id: string) => {
+      current = id;
+      setShown({ id, n: ++n });
+    };
+    // Catches up if the window was asked to open before this page had loaded.
+    const catchUp = () => {
+      invoke<string | null>("card_current")
+        .then((id) => {
+          if (id && id !== current) show(id);
+          current = id;
+        })
+        .catch(() => {});
+    };
+    const off = listen<string>("card-open", show);
+    off.then(catchUp);
+    window.addEventListener("focus", catchUp);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") invoke("close_card").catch(() => {});
     };
     window.addEventListener("keydown", onKey);
     return () => {
       off.then((stop) => stop());
+      window.removeEventListener("focus", catchUp);
       window.removeEventListener("keydown", onKey);
     };
   }, []);

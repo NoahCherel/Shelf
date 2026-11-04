@@ -26,6 +26,14 @@ function Limit({ label, win, lengthMs, resets }: { label: string; win: LimitWind
   );
 }
 
+export const claudeMenu = () => [
+  {
+    label: "Logout",
+    danger: true,
+    onClick: () => void invoke("claude_connect", { on: false }).then(() => refresh(claudeProvider), () => {}),
+  },
+];
+
 export function ClaudeCard({ data, status }: TileProps<ClaudeData>) {
   const [error, setError] = useState<string | null>(null);
   const connect = (on: boolean) => {

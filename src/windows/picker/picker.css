@@ -110,6 +110,8 @@
 }
 
 .picker__scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--track) transparent;
   flex: 1;
   min-height: 0;
   overflow-y: auto;

@@ -1,97 +1,63 @@
 # Shelf
 
-A personal widget dock for Windows 10/11 that replaces the taskbar. Built with
-Tauri v2: a Rust backend and a plain HTML/CSS/JS frontend, with no bundler.
+A private Windows taskbar replacement: a centred glass pill of widgets, built with Tauri 2, Rust and React. It's for personal use and isn't published or redistributed.
 
-The dock is a centered pill of clear dark glass that floats above the bottom edge
-and is only as wide as its contents, so the desktop on either side stays clickable.
-Maximized windows still stop above it.
+## Run it
 
-Right-click an app to pin or unpin it. A dot marks a running app; pinned apps that
-aren't running follow without one, and clicking one launches it.
-
-| Widget | In the bar | Shows | Needs |
-| --- | --- | --- | --- |
-| Net revenue | Once set up | Last 7 days, change, 14-day line | Stripe restricted key |
-| Claude usage | Always | Session and weekly limits, reset times, pace | Connect in its panel |
-| GitHub activity | Once set up | Today, week, streak, contribution grid | Username |
-| Clock & weather | Always | Time, date, temperature; click the temperature for the forecast | City for temperature |
-| Now playing | While playing | Track, with previous/play/next | |
-| Next event | When there is one | Next event, and the 14-day agenda in its panel | iCal links |
-| Pomodoro | While running | Countdown, start and pause | |
-| Battery, CPU and RAM, next to-do, latest note | If turned on | | Settings > Keep in the bar |
-| To-dos, Notes, System, AI spend, Settings | Under the chevron | | |
-
-## Claude usage
-
-No key is needed. Claude Code hands its limits to its status line command, so
-**Connect** adds Shelf to that command in each Claude Code config folder
-(`~/.claude` and every Orca profile):
-
-- Whatever status line you already had keeps running and showing its output.
-- Each `settings.json` is backed up once, as `settings.json.shelf-backup`.
-- Only the limits are saved, to `%APPDATA%\Shelf\claude_usage.json`.
-- **Disconnect** puts the previous command back.
-
-Shelf never reads Claude's login tokens. Anthropic's terms keep those for Claude
-Code and its own apps, so please don't change this to use `.credentials.json`.
-
-The numbers refresh while Claude Code is in use. In between, they show the last
-reading, and a window whose reset time has passed shows 0%. If another tool
-rewrites the status line, the panel offers Connect again.
-
-If iCal links are set, Shelf also pauses playing media within a minute of a
-timed event starting. Turn this off in Settings.
-
-## Setup
-
-You need [Rust](https://rustup.rs), Node.js, and the Microsoft C++ build tools.
-
-```sh
+```
 npm install
-npm run dev     # run from source
-npm run build   # build the NSIS installer
+npm run tauri build -- --no-bundle
+src-tauri\target\release\shelf.exe
 ```
 
-## Getting your taskbar back
+For development, `npm run dev` runs it against the live frontend.
 
-Shelf hides the Windows taskbar while it runs and restores it when it quits.
-Quit from **Settings > Quit Shelf**. The tray menu also has Quit, but the tray
-is hidden along with the taskbar.
+| Command | Does |
+| --- | --- |
+| `shelf.exe --quit` | Closes the running dock normally |
+| `shelf.exe --restore-taskbar` | Puts the Windows taskbar back if it's ever stuck |
 
-Shelf can't restore the taskbar if it's killed instead of quit. That includes
-crashes that skip the panic hook, ending it in Task Manager, and pressing
-Ctrl+C on `npm run dev`. To recover, run:
+The taskbar always comes back: on quit, after a crash, and within seconds if the process is killed.
 
-```sh
-shelf.exe --restore-taskbar
+## Using it
+
+Right-click the dock for Widgets…, Settings, Lock dock and Quit. In Widgets…, click a tile to add or remove it. Drag widgets along the dock to reorder them. Click a tile for its card.
+
+While Liquid Glass is on, the dock doesn't appear in screenshots or recordings, because that's how it avoids seeing itself in the glass. The Black style has no such effect.
+
+## How it's built
+
+```
+src-tauri/src/
+  shell/       taskbar, appbar, dock and card windows, shell events
+  apps/        pins, open windows, icons
+  glass/       screen capture for Liquid Glass
+  system/      CPU, memory, battery, startup
+  secrets.rs   keys, encrypted with DPAPI
+  store.rs     JSON files under %APPDATA%\Shelf\data
+  net.rs       HTTP, where keys get attached so they never reach a page
+  claude_usage.rs   limits from Claude Code's status line
+src/
+  core/        widget contract, registry, layout, providers, settings
+  design/      tokens, shared parts, the glass shader
+  widgets/     one folder per widget
+  windows/     dock, card, picker, settings, menu, gallery
 ```
 
-Restarting Windows Explorer from Task Manager also brings the taskbar back, but
-it won't undo the auto-hide setting. Shelf saves your original auto-hide setting
-in `%APPDATA%\Shelf\taskbar_state.txt`, and `--restore-taskbar` puts it back.
+**To add a widget:** create `src/widgets/<id>/index.tsx` exporting `defineWidget({...})`. It then appears in the picker with search and categories, and nothing else changes. To remove one, delete its folder. A saved layout that still names it drops it on load.
 
-## Where your data lives
+Claude limits come only from the status line feed. Claude's own login is never read, as Anthropic's terms keep those tokens for Claude Code and its apps.
 
-Settings, to-dos, notes and cached API results are in the WebView's
-`localStorage`, under `%LOCALAPPDATA%\dev.personal.shelf`.
+## Tests
 
-**API keys are stored there in plain text**, so use restricted keys where the
-provider offers them. Stripe keys only need read access to charges. Keys are
-sent only to their own provider, through the Rust backend.
+| Command | Checks |
+| --- | --- |
+| `npm test` | Frontend |
+| `cargo test --lib` in `src-tauri` | Rust; never touches the real taskbar |
+| `sh src/test/e2e.sh <folder>` | Drives the built app through WebView2's debug port. Hides the taskbar |
+| `sh src/test/measure.sh` | CPU and memory at rest and with motion. Hides the taskbar |
+| `src/test/probe.ps1` | Read-only look at the dock, work area and taskbar |
 
-## Known limitations
+`?w=gallery&all=1` shows every widget's sample, and `?w=gallery&glass=glow` runs the shader over a test scene, both in an ordinary browser.
 
-- The glass has no blur or edge refraction: a WebView can't sample the desktop
-  behind it. The look is dark-only.
-- The AI spend figure needs an OpenAI admin key and covers the current month in
-  UTC.
-- The GitHub grid reads your public contribution page, which isn't an official
-  API and could change. Private work only counts if your profile shows it. The
-  events list in its panel can lag by a few hours.
-- Calendar events with a `TZID` are treated as local time. Only daily and weekly
-  repeats are expanded; monthly and yearly events show their first occurrence
-  only.
-- The dock lives on the primary monitor. It doesn't yet react to monitor or DPI
-  changes, so restart Shelf after changing them.
-- There's no single-instance guard, so don't launch it twice.
+Real-hardware checks are in [`docs/manual-checks.md`](docs/manual-checks.md). The study behind the design is in [`docs/lumabar/`](docs/lumabar/README.md), and the build plan in [`docs/superpowers/plans/`](docs/superpowers/plans/).

@@ -7,7 +7,7 @@ const MAX_TILES = 16;
 
 const VERTEX = "attribute vec2 p; varying vec2 uv; void main(){ uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }";
 
-/** Values tuned by eye against the reference; recorded in docs/lumabar/04-glass.md. */
+/** Values tuned by eye against the reference; the study's glass notes record them. */
 const LOOK = {
   lensBand: 24,
   lensStrength: 22,

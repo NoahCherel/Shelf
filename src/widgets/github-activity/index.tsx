@@ -117,4 +117,5 @@ export default defineWidget<GithubData>({
   Tile: GithubTile,
   Card: GithubCard,
   provider: githubProvider,
+  menu: () => [{ label: "Logout", danger: true, onClick: () => useSettings.getState().update({ github: { user: "" } }) }],
 });

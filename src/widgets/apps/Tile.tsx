@@ -22,6 +22,9 @@ export function stableOrder(previous: AppEntry[], next: AppEntry[]): AppEntry[] 
   return [...kept, ...next.filter((e) => !known.has(e.key))];
 }
 
+const ICON_RETRY_MS = 2500;
+const ICON_TRIES = 6;
+
 const icons = new Map<string, Promise<string | null>>();
 
 function iconFor(key: string): Promise<string | null> {
@@ -29,6 +32,8 @@ function iconFor(key: string): Promise<string | null> {
   if (!icon) {
     icon = invoke<string | null>("apps_icon", { key }).catch(() => null);
     icons.set(key, icon);
+    // Only found icons are kept, so a miss can be asked again.
+    icon.then((found) => found || icons.delete(key));
   }
   return icon;
 }
@@ -38,9 +43,19 @@ function AppIcon({ entry, preview }: { entry: AppEntry; preview?: boolean }) {
   useEffect(() => {
     if (preview) return;
     let live = true;
-    iconFor(entry.key).then((icon) => live && setSrc(icon));
+    let timer: ReturnType<typeof setTimeout>;
+    let tries = 0;
+    const attempt = () => {
+      iconFor(entry.key).then((icon) => {
+        if (!live) return;
+        if (icon) setSrc(icon);
+        else if (++tries < ICON_TRIES) timer = setTimeout(attempt, ICON_RETRY_MS);
+      });
+    };
+    attempt();
     return () => {
       live = false;
+      clearTimeout(timer);
     };
   }, [entry.key, preview]);
   if (src) return <img className="app__icon" src={src} alt="" draggable={false} />;

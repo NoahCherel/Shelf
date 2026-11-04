@@ -90,10 +90,3 @@ pub fn autostart_set(on: bool) -> bool {
     }
     cmd.status().is_ok_and(|s| s.success())
 }
-
-#[tauri::command]
-pub fn open_url(url: String) {
-    if url.starts_with("http://") || url.starts_with("https://") {
-        let _ = std::process::Command::new("explorer").arg(url).spawn();
-    }
-}
