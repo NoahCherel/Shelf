@@ -1,0 +1,54 @@
+.apps {
+  display: flex;
+  align-items: stretch;
+  height: var(--T);
+  min-width: 0;
+}
+
+/* When the bar outgrows the screen, these are what give way. */
+.app {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 1 calc(var(--T) * 0.78);
+  min-width: calc(var(--T) * 0.3);
+  height: 100%;
+}
+
+.app:hover .app__icon {
+  filter: brightness(1.12);
+}
+
+.app__icon {
+  display: block;
+  width: var(--icon);
+  height: var(--icon);
+  object-fit: contain;
+  transition: filter 150ms ease-out;
+}
+
+.app__icon--blank {
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--T) * 0.14);
+  background: var(--track);
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: 700;
+}
+
+.app__dot {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--T) * 0.03);
+  width: calc(var(--T) * 0.055);
+  height: calc(var(--T) * 0.055);
+  margin-left: calc(var(--T) * -0.0275);
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.app__dot--active {
+  opacity: 1;
+}

@@ -1,0 +1,10 @@
+/* When the shader can't run, the bar falls back to a dark translucent look. */
+:root[data-style="liquid"] {
+  --bar-fill: #1c1c1ee0;
+  --bar-rim: #ffffff2e;
+}
+
+:root[data-style="liquid"][data-theme="light"] {
+  --bar-fill: #f5f5f7e0;
+  --bar-rim: #00000014;
+}

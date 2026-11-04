@@ -1,0 +1,66 @@
+import { beforeEach, vi } from "vitest";
+import { invoke } from "./tauri";
+import { defaults, sanitize, useSettings } from "./settings";
+
+vi.mock("./tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+
+const mockInvoke = vi.mocked(invoke);
+
+beforeEach(() => {
+  mockInvoke.mockReset();
+  mockInvoke.mockResolvedValue(null);
+  useSettings.setState({ ...defaults() });
+});
+
+it("defaults are M size, taskbar Hidden, theme follows Windows, style Liquid Glass", () => {
+  const d = defaults();
+  expect(d.size).toBe(50);
+  expect(d.taskbarMode).toBe("hidden");
+  expect(d.theme).toBe("auto");
+  expect(d.style).toBe("liquid");
+  expect(d.lockDock).toBe(false);
+});
+
+it("24-hour comes from the locale", () => {
+  const spy = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions");
+  spy.mockReturnValue({ hour12: true } as Intl.ResolvedDateTimeFormatOptions);
+  expect(defaults().hour24).toBe(false);
+  spy.mockReturnValue({ hour12: false } as Intl.ResolvedDateTimeFormatOptions);
+  expect(defaults().hour24).toBe(true);
+  spy.mockRestore();
+});
+
+it("invalid saved values fall back per key without losing the others", () => {
+  const s = sanitize({ size: "huge", style: "chrome", accent: "#ff0000", seconds: 3, lockDock: true, weather: { city: "Paris" }, github: 7 });
+  expect(s.size).toBe(defaults().size);
+  expect(s.style).toBe("liquid");
+  expect(s.seconds).toBe(defaults().seconds);
+  expect(s.accent).toBe("#ff0000");
+  expect(s.lockDock).toBe(true);
+  expect(s.weather.city).toBe("Paris");
+  expect(s.github.user).toBe("");
+});
+
+it("a size outside the slider is clamped", () => {
+  expect(sanitize({ size: 500 }).size).toBe(62);
+  expect(sanitize({ size: 2 }).size).toBe(40);
+});
+
+it("a corrupt file gives the defaults", () => {
+  for (const bad of [null, 7, "x", []]) expect(sanitize(bad)).toEqual(defaults());
+});
+
+it("update saves through the store", () => {
+  useSettings.getState().update({ seconds: false });
+  expect(useSettings.getState().seconds).toBe(false);
+  const [cmd, args] = mockInvoke.mock.calls[0];
+  expect(cmd).toBe("store_save");
+  expect(args).toMatchObject({ name: "settings", value: { seconds: false, version: 1 } });
+});
+
+it("load applies what's saved", async () => {
+  mockInvoke.mockResolvedValue({ size: 44, github: { user: "octocat" } });
+  await useSettings.getState().load();
+  expect(useSettings.getState().size).toBe(44);
+  expect(useSettings.getState().github.user).toBe("octocat");
+});

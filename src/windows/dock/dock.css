@@ -1,0 +1,62 @@
+.dock {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  width: max-content;
+  min-width: var(--T);
+  height: var(--bar-h);
+  padding: var(--bar-pad);
+  border-radius: var(--bar-radius);
+  background: var(--bar-fill);
+  box-shadow: inset 0 0 0 var(--rim-w) var(--bar-rim);
+}
+
+/* The shader draws the fill and rim, so the page draws neither. */
+.dock[data-glass="true"] {
+  background: none;
+  box-shadow: none;
+}
+
+.slot {
+  position: relative;
+  flex: none;
+  height: var(--T);
+}
+
+/* Only the apps tile gives up room when the bar outgrows the screen. */
+.slot--shrink {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The last good value, dimmed slightly while it can't be refreshed. */
+.slot[data-status="stale"] {
+  opacity: 0.72;
+}
+
+.slot[data-dragging="true"] {
+  z-index: 1;
+  opacity: 0.85;
+}
+
+.slot__remove {
+  position: absolute;
+  top: calc(var(--T) * -0.03);
+  left: calc(var(--T) * -0.03);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: calc(var(--T) * 0.3);
+  height: calc(var(--T) * 0.3);
+  border-radius: 50%;
+  background: var(--error);
+}
+
+.slot__remove svg {
+  width: 62%;
+  height: 62%;
+}

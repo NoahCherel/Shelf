@@ -1,3 +1,10 @@
+# Shelf: handoff
+
+**Current state, 2026-11-04:** Milestone 1 of the rebuild is done on branch `rebuild`. Start from [README.md](README.md), then the [Milestone 1 plan](docs/superpowers/plans/2026-11-04-shelf-rebuild-m1-the-bar.md) and the [study](docs/lumabar/README.md). Next is a plan for Milestone 2, written after the owner has used it and worked through [docs/manual-checks.md](docs/manual-checks.md).
+
+Everything below this line describes the first build, which was replaced. It's kept for its lessons about the taskbar and appbar.
+
+---
 # Shelf — handoff notes
 
 > **Superseded (2026-11-04).** The owner judged the current build not good enough and is

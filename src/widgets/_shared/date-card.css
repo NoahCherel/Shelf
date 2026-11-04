@@ -1,0 +1,78 @@
+.date__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.date__name {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.date__day {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border-radius: var(--radius-inner);
+  background: var(--fill);
+  font-weight: 600;
+}
+
+.date__today {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+
+.date__forecast {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+
+.date__fday {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.date__fname,
+.date__fmin {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.date__ftemp {
+  font-weight: 600;
+}
+
+.date__glyph {
+  width: 22px;
+  height: 22px;
+}
+
+.date__city {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  outline: none;
+  background: var(--track);
+  color: var(--fg);
+  font: inherit;
+  user-select: text;
+}
+
+.date__city:focus {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.date__error {
+  margin: 0;
+  color: var(--error);
+}

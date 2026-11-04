@@ -1,0 +1,83 @@
+/* Every design value in one place. Sizes scale from one unit: the tile height T. */
+:root {
+  --T: 50px;
+  --bar-h: calc(var(--T) * 1.09);
+  --bar-pad: calc(var(--T) * 0.04);
+  --gap: calc(var(--T) * 0.04);
+  --tile-radius: calc(var(--T) * 0.24);
+  --bar-radius: calc(var(--T) * 0.28);
+  --icon: calc(var(--T) * 0.6);
+  --rim-w: max(1px, calc(var(--T) * 0.0135));
+
+  --fs-hero: calc(var(--T) * 0.4);
+  --fs-large: calc(var(--T) * 0.32);
+  --fs-value: calc(var(--T) * 0.24);
+  --fs-label: calc(var(--T) * 0.17);
+  --fs-second: calc(var(--T) * 0.15);
+  --fs-micro: calc(var(--T) * 0.11);
+
+  --radius-card: 22px;
+  --radius-menu: 20px;
+  --radius-inner: 10px;
+
+  --font: "SF Pro Display", "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+
+  --fill: #ffffff0e;
+  --rim: #ffffff27;
+  --fg: #f5f5f7;
+  --muted: #98989d;
+  --accent: #0a84ff;
+  --error: #ff453a;
+  --good: #30d158;
+  --warn: #ff9f0a;
+  --card: #181818;
+  --surface: #1f1f1f;
+  --hairline: #ffffff1f;
+  --track: #ffffff1f;
+}
+
+:root[data-theme="light"] {
+  --fill: #0000000b;
+  --rim: #0000001a;
+  --fg: #1c1c1e;
+  --muted: #6e6e73;
+  --accent: #007aff;
+  --error: #d70015;
+  --good: #248a3d;
+  --warn: #b25000;
+  --card: #ffffff;
+  --surface: #f0f0f3;
+  --hairline: #0000001a;
+  --track: #0000001a;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font);
+  letter-spacing: 0.01em;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}

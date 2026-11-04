@@ -1,0 +1,69 @@
+.today {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 calc(var(--T) * 0.25);
+  line-height: 1;
+}
+
+.today__left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--T) * 0.09);
+}
+
+.today__weekday {
+  color: #ff453a;
+  font-size: calc(var(--T) * 0.15);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.today__date {
+  font-size: calc(var(--T) * 0.27);
+  font-weight: 700;
+}
+
+.today__divider {
+  align-self: stretch;
+  width: 1px;
+  margin: calc(var(--T) * 0.2) calc(var(--T) * 0.2);
+  background: var(--hairline);
+}
+
+.today__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(var(--T) * 0.09);
+}
+
+.today__clock {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--T) * 0.03);
+  white-space: nowrap;
+}
+
+.today__time {
+  font-size: calc(var(--T) * 0.27);
+  font-weight: 700;
+}
+
+.today__suffix {
+  font-size: calc(var(--T) * 0.15);
+  font-weight: 700;
+}
+
+.today__weather {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--T) * 0.05);
+  color: var(--muted);
+  font-size: calc(var(--T) * 0.17);
+}
+
+.today__glyph {
+  width: calc(var(--T) * 0.2);
+  height: calc(var(--T) * 0.2);
+}
