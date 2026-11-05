@@ -18,8 +18,11 @@ const MENU_HEIGHT = 190;
 /** A press that moves less than this is a click. */
 const DRAG_DISTANCE = 6;
 
-/** Space under the bar, inside the window. */
-const GAP_BELOW = 17;
+/** Tells Rust how big the bar is and how it should sit on the screen. */
+export function reportSize(el: HTMLElement, gap: number, float: boolean): void {
+  const { width, height } = el.getBoundingClientRect();
+  invoke("set_dock_width", { width, bar: Math.ceil(height), gap, float }).catch(() => {});
+}
 
 export function handleDragEnd({ active, over }: { active: { id: unknown }; over: { id: unknown } | null }): void {
   if (!over || active.id === over.id) return;
@@ -100,6 +103,8 @@ export function DockBar() {
   const [glassFailed, setGlassFailed] = useState(false);
   const onGlassUnavailable = useCallback(() => setGlassFailed(true), []);
   const glass = style === "liquid" && !fullscreen && !locked && !glassFailed;
+  const edgeGap = useSettings((s) => s.edgeGap);
+  const floatOverWindows = useSettings((s) => s.floatOverWindows);
   const bar = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
 
@@ -108,13 +113,10 @@ export function DockBar() {
   useEffect(() => {
     const el = bar.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => {
-      const { width, height } = el.getBoundingClientRect();
-      invoke("set_dock_width", { width, height: Math.ceil(height + GAP_BELOW) }).catch(() => {});
-    });
+    const observer = new ResizeObserver(() => reportSize(el, edgeGap, floatOverWindows));
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [edgeGap, floatOverWindows]);
 
   return (
     // Limited by the screen, not the window, which is always only as wide as the bar.

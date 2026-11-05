@@ -1,0 +1,25 @@
+.status {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 0 calc(var(--T) * 0.08);
+}
+
+.status__part {
+  display: grid;
+  place-items: center;
+  flex: 0 0 calc(var(--T) * 0.56);
+  height: calc(var(--T) * 0.72);
+  border-radius: calc(var(--T) * 0.18);
+  color: var(--fg);
+}
+
+.status__part:hover {
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+.status__part svg {
+  display: block;
+  width: calc(var(--T) * 0.42);
+  height: calc(var(--T) * 0.42);
+}

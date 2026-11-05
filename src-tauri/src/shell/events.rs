@@ -11,10 +11,10 @@ use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromWindow, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
+    GetClassNameW, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed,
 };
 
-use super::dock::{fullscreen_now, Foreground};
+use super::dock::{fullscreen_now, is_fullscreen, Foreground};
 use super::taskbar::{Mode, TASKBAR};
 
 pub static FULLSCREEN: AtomicBool = AtomicBool::new(false);
@@ -71,7 +71,8 @@ fn covers(h: HWND, monitor: HMONITOR) -> bool {
             return false;
         }
         let m = mi.rcMonitor;
-        r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom
+        let fills = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+        is_fullscreen(fills, IsZoomed(h).as_bool())
     }
 }
 

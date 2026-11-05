@@ -12,12 +12,17 @@ export interface SettingsData {
   seconds: boolean;
   taskbarMode: "hidden" | "autohide";
   lockDock: boolean;
+  /** Over other windows, reserving nothing. Otherwise maximized windows stop above the dock. */
+  floatOverWindows: boolean;
+  /** Logical px between the dock and the bottom of the screen. */
+  edgeGap: number;
   weather: { city: string };
   github: { user: string };
 }
 
 export const SIZE_MIN = 40;
 export const SIZE_MAX = 62;
+export const GAP_MAX = 24;
 
 export function defaults(): SettingsData {
   return {
@@ -29,6 +34,8 @@ export function defaults(): SettingsData {
     seconds: true,
     taskbarMode: "hidden",
     lockDock: false,
+    floatOverWindows: true,
+    edgeGap: 6,
     weather: { city: "" },
     github: { user: "" },
   };
@@ -54,6 +61,8 @@ export function sanitize(raw: unknown): SettingsData {
     seconds: bool(raw.seconds, d.seconds),
     taskbarMode: oneOf(raw.taskbarMode, ["hidden", "autohide"] as const, d.taskbarMode),
     lockDock: bool(raw.lockDock, d.lockDock),
+    floatOverWindows: bool(raw.floatOverWindows, d.floatOverWindows),
+    edgeGap: typeof raw.edgeGap === "number" && Number.isFinite(raw.edgeGap) ? Math.min(GAP_MAX, Math.max(0, raw.edgeGap)) : d.edgeGap,
     weather: { city: text(weather.city, d.weather.city) },
     github: { user: text(github.user, d.github.user) },
   };

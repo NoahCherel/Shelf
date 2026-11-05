@@ -21,6 +21,18 @@ it("defaults are M size, taskbar Hidden, theme follows Windows, style Liquid Gla
   expect(d.lockDock).toBe(false);
 });
 
+it("floats over windows by default, with a small gap", () => {
+  expect(defaults().floatOverWindows).toBe(true);
+  expect(defaults().edgeGap).toBe(6);
+});
+
+it("the gap stays within its slider", () => {
+  expect(sanitize({ edgeGap: 99 }).edgeGap).toBe(24);
+  expect(sanitize({ edgeGap: -3 }).edgeGap).toBe(0);
+  expect(sanitize({ edgeGap: "x" }).edgeGap).toBe(6);
+  expect(sanitize({ floatOverWindows: false }).floatOverWindows).toBe(false);
+});
+
 it("24-hour comes from the locale", () => {
   const spy = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions");
   spy.mockReturnValue({ hour12: true } as Intl.ResolvedDateTimeFormatOptions);

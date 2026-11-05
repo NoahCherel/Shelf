@@ -137,7 +137,12 @@ pub fn open_card(
     place(&app, (width, height))?;
     app.emit_to("card", "card-open", &widget_id).map_err(|e| e.to_string())?;
     card.show().map_err(|e| e.to_string())?;
-    card.set_focus().map_err(|e| e.to_string())
+    card.set_focus().map_err(|e| e.to_string())?;
+    // The dock doesn't take focus when clicked, so Windows may have refused that.
+    if let Ok(hwnd) = card.hwnd() {
+        crate::apps::take_foreground_raw(hwnd.0 as isize);
+    }
+    Ok(())
 }
 
 /// The page reports how tall its content is, once rendered.

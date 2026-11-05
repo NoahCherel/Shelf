@@ -110,6 +110,16 @@ for (let i = 0; i < 8 && blanks; i++) {
   blanks = await dock.eval(`document.querySelectorAll(".app__icon--blank").length`);
 }
 check("app icons load", blanks === 0, `${await dock.eval(`document.querySelectorAll(".app__icon[src]").length`)} icons, ${blanks} blank, ${icons} at first`);
+// Measured in the real dock: a CSS mistake once left these squeezed to their icons with every test green.
+const room = await dock.eval(`(() => {
+  const apps = [...document.querySelectorAll(".app")].map((a) => a.getBoundingClientRect());
+  const T = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--T"));
+  const icon = document.querySelector(".app .app__icon").getBoundingClientRect().width;
+  return { T, icon, pitch: apps[1].left - apps[0].left };
+})()`);
+check("apps have a taskbar button's room", room.pitch >= room.T * 0.9, `${room.pitch.toFixed(1)} px apart, icon ${room.icon.toFixed(1)}`);
+check("the focus plate is wider than the icon", room.pitch - room.T * 0.2 > room.icon);
+check("the status tile shows the network", await dock.eval(`!!document.querySelector('[data-widget-id="system-status"] [data-net]')`));
 check("glass canvas is live", await dock.eval(`!!document.querySelector("canvas.glass") && document.querySelector(".dock").dataset.glass === "true"`));
 
 // Card over its tile
@@ -140,7 +150,7 @@ await card.shot("menu.png");
 await card.eval(`[...document.querySelectorAll(".menu__row")].find((e) => e.textContent === "Widgets…").click()`);
 const picker = await Page.open("picker");
 await sleep(1200);
-check("the picker lists all widgets", (await picker.eval(`document.querySelectorAll(".pick").length`)) === 11);
+check("the picker lists all widgets", (await picker.eval(`document.querySelectorAll(".pick").length`)) === 12);
 await picker.shot("picker.png");
 check("the dock shows − badges", (await dock.eval(`document.querySelectorAll(".slot__remove").length`)) === start.length);
 await dock.shot("dock-badges.png");
@@ -166,7 +176,7 @@ await dock.drag(await dock.centre('[data-widget-id="clock-and-weather"]'), { x: 
 await sleep(500);
 
 // Settings from the menu
-await dock.click(".dock", "right");
+await dock.click('[data-widget-id="github-activity"]', "right");
 await sleep(600);
 await card.eval(`[...document.querySelectorAll(".menu__row")].find((e) => e.textContent === "Settings").click()`);
 const settings = await Page.open("settings");

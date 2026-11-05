@@ -15,7 +15,7 @@ function ClockWeatherTile({ data, preview }: TileProps<number>) {
   const { time, suffix } = timeParts(now, hour24);
   const date = dateParts(now);
   return (
-    <Tile width={1} tone="solid" className="cw">
+    <Tile width={1} className="cw">
       <div className="cw__top">
         <span className="cw__time">{time}</span>
         {suffix && <span className="cw__suffix">{suffix}</span>}
@@ -25,7 +25,9 @@ function ClockWeatherTile({ data, preview }: TileProps<number>) {
         <span className="cw__day">{date.day}</span>
       </div>
       <div className="cw__side">
-        <span className="cw__temp">{weather ? `${weather.temp}°` : "–"}</span>
+        <span className="cw__temp" data-empty={!weather}>
+          {weather ? `${weather.temp}°` : "–"}
+        </span>
       </div>
     </Tile>
   );

@@ -1,6 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/react";
-import { DockBar } from "./Bar";
+import { DockBar, reportSize } from "./Bar";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
 
@@ -45,6 +45,14 @@ it("gives the apps tile the only shrinkable slot when the bar overflows", () => 
   const { container } = render(<DockBar />);
   const shrinkable = slots(container).filter((s) => s.classList.contains("slot--shrink"));
   expect(shrinkable.map((s) => s.dataset.widgetId)).toEqual(["apps"]);
+});
+
+it("reports its size with the gap and whether it floats", async () => {
+  const { invoke } = await import("../../core/tauri");
+  const el = document.createElement("div");
+  el.getBoundingClientRect = () => ({ width: 700.4, height: 54.5 }) as DOMRect;
+  reportSize(el, 6, true);
+  expect(invoke).toHaveBeenCalledWith("set_dock_width", { width: 700.4, bar: 55, gap: 6, float: true });
 });
 
 it("skips an id with no widget instead of breaking", () => {

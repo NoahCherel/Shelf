@@ -27,6 +27,19 @@ Everything public sources couldn't answer, and what we decided. The owner delega
 | G-21 | How previews, jump lists and tray forwarding work | Hard shell features | Research spikes during implementation planning: DWM thumbnails, Shell APIs, tray hosting [I] |
 | G-22 | Whether the Clock click on temperature differs | Small | Whole tile opens Calendar, per the changelog [S: changelog 1.2.5] [I] |
 
+## Owner changes after using Milestone 1
+
+These replace the study's values, on the owner's word, 2026-11-04:
+
+- The dock floats over windows by default, so apps use the whole screen. Reserving the edge is a setting, off by default. It left an empty strip beside and under the pill.
+- The gap under the dock is 6 logical px by default, not 17, and adjustable.
+- Clock & Weather has no red block. The reference's colour blocks looked wrong on the glass.
+- Each app gets 0.96T of width, not the reference's 0.78T, as on Windows' and macOS' own docks.
+- A Search button sits beside Start, and a Status tile shows Wi-Fi, sound, battery and notifications. Both open Windows' own panels rather than the reference's cards.
+- Right-clicking an app shows Windows' own menu with Task Manager, End task and Close added; right-clicking Start shows Windows' quick menu. Shelf's menu stays on everything else.
+- Clicking the dock no longer takes focus from the current app, and Start toggles from its tile.
+- The app in focus gets a lit plate behind its icon, and a longer dot. The reference's identical dots don't show which one it is.
+
 ## Limits of this study
 
 - Nothing here was seen in a running copy, because you chose public sources only [I]

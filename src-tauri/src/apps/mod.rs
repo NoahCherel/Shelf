@@ -1,24 +1,25 @@
 //! The Apps widget's data: pins, open windows, icons, and the Start menu.
 
 mod icons;
+pub mod menu;
 mod merge;
 mod pins;
 mod windows;
 
 use std::collections::HashMap;
-use std::mem::size_of;
 use std::sync::Mutex;
 
 use ::windows::core::{w, HSTRING, PCWSTR};
 use ::windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
-use ::windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_LWIN,
-};
+use ::windows::Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_X};
 use ::windows::Win32::UI::Shell::ShellExecuteW;
 use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 use merge::{click_plan, merge, AppEntry, Click};
+use tauri::{AppHandle, Manager};
 
-pub use windows::watch_foreground;
+use crate::system::tap_keys;
+
+pub use windows::{take_foreground_raw, watch_foreground};
 
 /// Sent once per icon, so the icons aren't copied to the page on every refresh.
 static ICONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
@@ -87,15 +88,26 @@ pub fn apps_activate(key: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens the Start menu by tapping the Windows key.
+/// Opens or closes Start by tapping the Windows key, like the real button. A click on the dock
+/// can itself close Start, and then it must stay closed.
 #[tauri::command]
 pub fn start_menu() {
-    let key = |flags| INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_LWIN, dwFlags: flags, ..Default::default() } },
-    };
-    let inputs = [key(Default::default()), key(KEYEVENTF_KEYUP)];
-    unsafe {
-        SendInput(&inputs, size_of::<INPUT>() as i32);
+    if menu::should_press_start(windows::start_is_open(), windows::ms_since_start_closed()) {
+        tap_keys(&[VK_LWIN]);
     }
+}
+
+/// Windows' own quick menu, with Task Manager and the rest: the one Win+X opens.
+#[tauri::command]
+pub fn start_quick_menu() {
+    tap_keys(&[VK_LWIN, VK_X]);
+}
+
+/// Windows' menu for an app. The menu runs on the main thread, as the dock window owns it.
+#[tauri::command(async)]
+pub fn apps_context_menu(app: AppHandle, key: String) -> Result<(), String> {
+    let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let raw = dock.hwnd().map_err(|e| e.to_string())?.0 as isize;
+    app.run_on_main_thread(move || menu::show(raw, &entry)).map_err(|e| e.to_string())
 }

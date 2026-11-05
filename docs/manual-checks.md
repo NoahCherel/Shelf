@@ -15,7 +15,11 @@ Run Shelf from `src-tauri\target\release\shelf.exe`.
 ## Real clicks
 
 - [ ] Left-click an app: it focuses. Click again: it minimizes. Click a closed pinned app: it launches.
-- [ ] Click Start: the Start menu opens, with the taskbar hidden.
+- [ ] Click Start: the Start menu opens, with the taskbar hidden. Click Start again: it closes, and your app keeps focus.
+- [ ] Right-click an app: Windows' menu appears, and clicking away closes it. Try **Gestionnaire des tâches** and **Fermer la fenêtre**.
+- [ ] Right-click Start: Windows' quick menu appears.
+- [ ] Click Search, and each icon of the Status tile: the right Windows panel opens, and clicking the icon again or clicking away closes it.
+- [ ] Click a widget from another app: its card opens and takes the keyboard, and clicking away closes it.
 - [ ] Click a tile, then click elsewhere: the card closes. Click the same tile twice: it opens, then closes.
 - [ ] Right-click the dock: the menu appears. Try Lock dock, then try dragging a widget.
 - [ ] Drag a widget along the dock with the real mouse.
@@ -33,7 +37,7 @@ Run Shelf from `src-tauri\target\release\shelf.exe`.
 - [ ] **Lock:** lock and unlock. The glass should pick up the desktop again.
 - [ ] **Explorer restart:** run `taskkill /f /im explorer.exe` then `start explorer`. The taskbar should stay hidden, and the edge stay reserved.
 - [ ] **Fullscreen:** play a fullscreen video or game. The dock should disappear, and come back afterwards.
-- [ ] **Maximize a window:** it should stop above the dock.
+- [ ] **Maximize a window:** the dock should stay visible, floating over it. With **Float over windows** off, the window should stop above the dock.
 
 ## Hardware I couldn't test
 

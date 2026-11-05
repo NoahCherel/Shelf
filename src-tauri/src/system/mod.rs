@@ -1,5 +1,7 @@
 //! Machine facts for widgets, and a few Windows settings.
 
+pub mod status;
+
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -7,6 +9,9 @@ use serde::Serialize;
 use sysinfo::System;
 use tauri::State;
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+};
 
 const CPU_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
@@ -61,6 +66,20 @@ pub fn system_stats(monitor: State<'_, Mutex<SysMonitor>>) -> SysStats {
         mem_used: monitor.sys.used_memory(),
         mem_total: monitor.sys.total_memory(),
         battery: battery(),
+    }
+}
+
+/// Presses the keys in order and lets them go in reverse, like a person pressing a shortcut.
+pub fn tap_keys(keys: &[VIRTUAL_KEY]) {
+    let event = |vk: VIRTUAL_KEY, up: bool| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: vk, dwFlags: if up { KEYEVENTF_KEYUP } else { Default::default() }, ..Default::default() },
+        },
+    };
+    let inputs: Vec<INPUT> = keys.iter().map(|&k| event(k, false)).chain(keys.iter().rev().map(|&k| event(k, true))).collect();
+    unsafe {
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
     }
 }
 

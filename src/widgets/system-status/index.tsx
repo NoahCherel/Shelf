@@ -1,0 +1,146 @@
+import type { MouseEvent, ReactNode } from "react";
+import { invoke } from "../../core/tauri";
+import { defineWidget, type TileProps } from "../../core/widget";
+import { Tile } from "../../design/parts/Tile";
+import { signalBars, statusProvider, type StatusData } from "../_providers/status";
+import "./system-status.css";
+
+const PART = 0.56;
+const PADDING = 0.16;
+
+function partCount(data: StatusData | null) {
+  return data?.battery === null ? 3 : 4;
+}
+
+function widthFor(data: StatusData | null) {
+  return partCount(data) * PART + PADDING;
+}
+
+function Wave({ d, on }: { d: string; on: boolean }) {
+  return <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity={on ? 1 : 0.28} />;
+}
+
+function NetworkGlyph({ data }: { data: StatusData | null }) {
+  const wifi = data?.wifi ?? null;
+  if (wifi) {
+    const bars = signalBars(wifi.signal);
+    return (
+      <svg viewBox="0 0 24 24" data-net={`wifi-${bars}`} aria-hidden="true">
+        <circle cx="12" cy="18.500" r="1.800" fill="currentColor" />
+        <Wave d="M8.700 15a4.700 4.700 0 0 1 6.600 0" on={bars >= 2} />
+        <Wave d="M5.500 11.700a9.200 9.200 0 0 1 13 0" on={bars >= 3} />
+        <Wave d="M2.500 8.500a13.500 13.500 0 0 1 19 0" on={bars >= 4} />
+      </svg>
+    );
+  }
+  if (data?.online) {
+    return (
+      <svg viewBox="0 0 24 24" data-net="wired" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3.500" y="4.500" width="17" height="11.500" rx="2" />
+        <path d="M12 16v3.500M7.500 20h9" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" data-net="offline" aria-hidden="true">
+      <circle cx="12" cy="18.500" r="1.800" fill="currentColor" opacity="0.4" />
+      <Wave d="M5.500 11.700a9.200 9.200 0 0 1 13 0" on={false} />
+      <Wave d="M2.500 8.500a13.500 13.500 0 0 1 19 0" on={false} />
+      <path d="M4 3.500l16 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SoundGlyph({ data }: { data: StatusData | null }) {
+  const muted = data?.volume?.muted ?? false;
+  const percent = data?.volume?.percent ?? 0;
+  return (
+    <svg viewBox="0 0 24 24" data-muted={muted} aria-hidden="true">
+      <path d="M3.500 9.500v5h3.500l5 4.500v-14l-5 4.500h-3.500Z" fill="currentColor" />
+      {muted ? (
+        <path d="M15.500 9.500l5 5m0-5l-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      ) : (
+        <>
+          <Wave d="M15 9.500a4 4 0 0 1 0 5" on={percent > 0} />
+          <Wave d="M17.500 7a7.500 7.500 0 0 1 0 10" on={percent >= 50} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function BatteryGlyph({ battery }: { battery: NonNullable<StatusData["battery"]> }) {
+  const low = !battery.charging && battery.percent <= 20;
+  const fill = Math.max(1.500, (Math.min(100, battery.percent) / 100) * 15);
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="7" width="18" height="10" rx="2.500" fill="none" stroke="currentColor" strokeWidth="1.600" opacity="0.7" />
+      <rect x="20.800" y="10" width="1.800" height="4" rx="0.900" fill="currentColor" opacity="0.7" />
+      <rect x="3.500" y="8.500" width={fill} height="7" rx="1.200" fill={low ? "var(--warn)" : "currentColor"} />
+      {battery.charging && <path d="M12.500 6l-4 6.500h3l-1 5.500 4.500-7h-3.200l.700-5Z" fill="var(--good)" stroke="var(--card)" strokeWidth="0.600" />}
+    </svg>
+  );
+}
+
+function BellGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.900" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
+      <path d="M6 16.500V11a6 6 0 0 1 12 0v5.500l1.500 2h-15l1.500-2Z" />
+      <path d="M10 21h4" />
+    </svg>
+  );
+}
+
+function Part({ label, title, panel, preview, children }: { label: string; title?: string; panel: string; preview?: boolean; children: ReactNode }) {
+  const open = (e: MouseEvent) => {
+    e.stopPropagation();
+    if (!preview) invoke("shell_panel", { kind: panel }).catch(() => {});
+  };
+  return (
+    <button type="button" className="status__part" aria-label={label} title={title ?? label} onClick={open}>
+      {children}
+    </button>
+  );
+}
+
+function networkTitle(data: StatusData | null): string {
+  if (data?.wifi) return `${data.wifi.ssid} (${data.wifi.signal}%)`;
+  return data?.online ? "Connected" : "Not connected";
+}
+
+function StatusTile({ data, preview }: TileProps<StatusData>) {
+  return (
+    <Tile width={widthFor(data)} className="status">
+      <Part label="Network" title={networkTitle(data)} panel="wifi" preview={preview}>
+        <NetworkGlyph data={data} />
+      </Part>
+      <Part label="Sound" title={data?.volume ? `${data.volume.percent}%` : "Sound"} panel="sound" preview={preview}>
+        <SoundGlyph data={data} />
+      </Part>
+      {data?.battery && (
+        <Part label="Battery" title={`${data.battery.percent}%`} panel="quick" preview={preview}>
+          <BatteryGlyph battery={data.battery} />
+        </Part>
+      )}
+      <Part label="Notifications" panel="notifications" preview={preview}>
+        <BellGlyph />
+      </Part>
+    </Tile>
+  );
+}
+
+export default defineWidget<StatusData>({
+  id: "system-status",
+  name: "Status",
+  description: "Wi-Fi, sound, battery and notifications, opening Windows' own panels.",
+  category: "system",
+  width: widthFor,
+  sample: {
+    wifi: { ssid: "Home", signal: 90 },
+    online: true,
+    volume: { percent: 60, muted: false },
+    battery: { percent: 80, charging: false },
+  },
+  Tile: StatusTile,
+  provider: statusProvider,
+});

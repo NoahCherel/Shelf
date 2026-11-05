@@ -1,6 +1,8 @@
 import { beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { invoke } from "../../core/tauri";
+import { invoke, listen } from "../../core/tauri";
+import { widthOf } from "../../core/widget";
+import apps from "./index";
 import { AppsTile, stableOrder, type AppEntry } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
@@ -38,6 +40,12 @@ it("shows a dot only for open apps", () => {
   expect(dots[0].closest("button")?.getAttribute("aria-label")).toBe("open");
 });
 
+it("marks only the app in focus, so it's clear which one that is", () => {
+  render(<AppsTile data={[app("other", true), app("focused", true, true)]} status="ready" />);
+  expect(screen.getByRole("button", { name: "focused" }).className).toContain("app--active");
+  expect(screen.getByRole("button", { name: "other" }).className).not.toContain("app--active");
+});
+
 it("activates on click", () => {
   render(<AppsTile data={[app("code", true)]} status="ready" />);
   fireEvent.click(screen.getByRole("button", { name: "code" }));
@@ -67,6 +75,59 @@ it("asks again when an icon isn't ready yet", async () => {
   await act(() => vi.advanceTimersByTimeAsync(5000));
   expect(container.querySelector("img")?.getAttribute("src")).toContain("data:image/png");
   vi.useRealTimers();
+});
+
+it("has a Search button beside Start, as on Windows", () => {
+  render(<AppsTile data={[]} status="ready" />);
+  const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+  expect(names).toEqual(["Start", "Search"]);
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "search" });
+});
+
+it("right-clicking an app asks for Windows' menu, not Shelf's", () => {
+  const dock = vi.fn();
+  render(
+    <div onContextMenu={dock}>
+      <AppsTile data={[app("code", true)]} status="ready" />
+    </div>,
+  );
+  fireEvent.contextMenu(screen.getByRole("button", { name: "code" }));
+  expect(mockInvoke).toHaveBeenCalledWith("apps_context_menu", { key: "code" });
+  expect(dock).not.toHaveBeenCalled();
+});
+
+it("right-clicking Start asks for Windows' quick menu", () => {
+  const dock = vi.fn();
+  render(
+    <div onContextMenu={dock}>
+      <AppsTile data={[]} status="ready" />
+    </div>,
+  );
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Start" }));
+  expect(mockInvoke.mock.calls.map((c) => c[0])).toContain("start_quick_menu");
+  expect(dock).not.toHaveBeenCalled();
+});
+
+it("right-click does nothing in the picker", () => {
+  render(<AppsTile data={[app("code", true)]} status="sample" preview />);
+  fireEvent.contextMenu(screen.getByRole("button", { name: "code" }));
+  expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_context_menu")).toEqual([]);
+});
+
+it("marks Start while its menu is open", async () => {
+  render(<AppsTile data={[]} status="ready" />);
+  const start = screen.getByRole("button", { name: "Start" });
+  expect(start.className).not.toContain("app--active");
+  const handler = vi.mocked(listen).mock.calls.filter((c) => c[0] === "start-open").at(-1)![1] as (open: boolean) => void;
+  await act(async () => handler(true));
+  expect(start.className).toContain("app--active");
+  await act(async () => handler(false));
+  expect(start.className).not.toContain("app--active");
+});
+
+it("each app gets as much room as a taskbar button", () => {
+  expect(widthOf(apps, [app("a"), app("b")])).toBeCloseTo(0.96 * 4);
 });
 
 it("does nothing when clicked in the picker", () => {

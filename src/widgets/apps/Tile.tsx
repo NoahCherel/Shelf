@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { invoke } from "../../core/tauri";
+import { useEffect, useState, type MouseEvent } from "react";
+import { invoke, listen } from "../../core/tauri";
 import type { TileProps } from "../../core/widget";
 import "./apps.css";
 
@@ -62,6 +62,15 @@ function AppIcon({ entry, preview }: { entry: AppEntry; preview?: boolean }) {
   return <span className="app__icon app__icon--blank">{entry.name.charAt(0).toUpperCase()}</span>;
 }
 
+function SearchGlyph() {
+  return (
+    <svg viewBox="0 0 30 30" className="app__icon app__icon--search" aria-hidden="true">
+      <circle cx="13.500" cy="13.500" r="7.500" fill="none" stroke="currentColor" strokeWidth="2.600" />
+      <path d="M19.300 19.300 25 25" stroke="currentColor" strokeWidth="2.800" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function StartLogo() {
   return (
     <svg viewBox="0 0 30 30" className="app__icon" aria-hidden="true">
@@ -85,28 +94,54 @@ function StartLogo() {
 
 export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
   const entries = data ?? [];
+  const [startOpen, setStartOpen] = useState(false);
+  useEffect(() => {
+    if (preview) return;
+    const off = listen<boolean>("start-open", setStartOpen);
+    return () => {
+      off.then((stop) => stop());
+    };
+  }, [preview]);
+  const windowsMenu = (e: MouseEvent, command: string, args?: Record<string, unknown>) => {
+    if (preview) return;
+    // This is Windows' menu to show, not Shelf's.
+    e.preventDefault();
+    e.stopPropagation();
+    invoke(command, args).catch(() => {});
+  };
   return (
     <div className="apps">
       <button
         type="button"
-        className="app"
+        className={startOpen ? "app app--active" : "app"}
         aria-label="Start"
         title="Start"
         onClick={() => !preview && invoke("start_menu").catch(() => {})}
+        onContextMenu={(e) => windowsMenu(e, "start_quick_menu")}
       >
         <StartLogo />
+      </button>
+      <button
+        type="button"
+        className="app"
+        aria-label="Search"
+        title="Search"
+        onClick={() => !preview && invoke("shell_panel", { kind: "search" }).catch(() => {})}
+      >
+        <SearchGlyph />
       </button>
       {entries.map((entry) => (
         <button
           type="button"
           key={entry.key}
-          className="app"
+          className={entry.active ? "app app--active" : "app"}
           aria-label={entry.name}
           title={entry.windows[0]?.title ?? entry.name}
           onClick={() => !preview && invoke("apps_activate", { key: entry.key }).catch(() => {})}
+          onContextMenu={(e) => windowsMenu(e, "apps_context_menu", { key: entry.key })}
         >
           <AppIcon entry={entry} preview={preview} />
-          {entry.windows.length > 0 && <span className={entry.active ? "app__dot app__dot--active" : "app__dot"} />}
+          {entry.windows.length > 0 && <span className="app__dot" />}
         </button>
       ))}
     </div>

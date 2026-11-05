@@ -2,9 +2,11 @@ import { create } from "zustand";
 import { invoke, listen } from "./tauri";
 import { widgets } from "./registry";
 
-export const DEFAULT_LAYOUT = ["claude-plan-usage", "apps", "github-activity", "clock-and-weather"];
+export const DEFAULT_LAYOUT = ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"];
 
-const VERSION = 1;
+/** Layouts older than this haven't met the status tile, and get it once. Removing it after sticks. */
+const VERSION = 2;
+const STATUS_TILE = "system-status";
 
 interface Layout {
   ids: string[];
@@ -45,9 +47,14 @@ export const useLayout = create<Layout>((set, get) => {
       change(ids);
     },
     async load() {
-      const saved = (await invoke("store_load", { name: "layout" }).catch(() => null)) as { ids?: unknown } | null;
+      const saved = (await invoke("store_load", { name: "layout" }).catch(() => null)) as { ids?: unknown; version?: number } | null;
       // A missing or broken file gets the default; ids that no longer exist just drop out.
-      set({ ids: Array.isArray(saved?.ids) ? known(saved.ids) : known(DEFAULT_LAYOUT) });
+      if (!Array.isArray(saved?.ids)) {
+        set({ ids: known(DEFAULT_LAYOUT) });
+        return;
+      }
+      const outdated = (saved.version ?? 1) < VERSION;
+      set({ ids: known(outdated ? [...saved.ids, STATUS_TILE] : saved.ids) });
     },
   };
 });
