@@ -57,3 +57,20 @@ body,
 .bench input {
   caret-color: transparent;
 }
+
+.bench__previews {
+  position: absolute;
+  left: 420px;
+  bottom: calc(var(--bar-h) + 6px + 8px);
+  height: 170px;
+}
+
+.bench__previews .pv {
+  width: 100%;
+  height: 100%;
+}
+
+/* Windows draws the pictures on the real strip. This shows where they go. */
+.bench__previews .pv__frame[data-hwnd] {
+  background: repeating-linear-gradient(45deg, #ffffff14 0 8px, #ffffff08 8px 16px);
+}

@@ -50,6 +50,8 @@ const pages = (await (await fetch("http://127.0.0.1:9333/json")).json()).filter(
 // The dock goes first, so anything above it stays on top.
 pages.sort((a, b) => Number(b.url.includes("w=dock")) - Number(a.url.includes("w=dock")));
 for (const page of pages) {
+  // This window isn't hidden from screenshots, and Windows draws its pictures outside the page.
+  if (page.url.includes("w=preview")) continue;
   const { ws, send } = await connect(page.webSocketDebuggerUrl);
   const look = (await send("Runtime.evaluate", {
     expression: `JSON.stringify({ x: screenX, y: screenY, scale: devicePixelRatio, width: innerWidth, content: document.getElementById("root").childElementCount, hidden: document.hidden })`,

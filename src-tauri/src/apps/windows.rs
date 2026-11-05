@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use tauri::{AppHandle, Emitter};
 use windows::core::{BOOL, GUID, PWSTR};
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::System::Threading::{
     AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -18,7 +18,7 @@ use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
+    BringWindowToTop, EnumWindows, PostMessageW, WM_CLOSE, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, EVENT_SYSTEM_FOREGROUND,
     GWL_EXSTYLE, GW_OWNER, SW_MINIMIZE, SW_RESTORE, WINEVENT_OUTOFCONTEXT, WS_EX_APPWINDOW,
     WS_EX_TOOLWINDOW,
@@ -254,6 +254,17 @@ pub fn focus(raw: isize) {
         take_foreground(h);
     }
     LAST_FOREGROUND.store(raw, Ordering::Relaxed);
+}
+
+pub fn is_minimized(raw: isize) -> bool {
+    unsafe { IsIconic(hwnd(raw)).as_bool() }
+}
+
+/// Asks, as the window's own close button does, so it can still offer to save.
+pub fn close(raw: isize) {
+    unsafe {
+        let _ = PostMessageW(Some(hwnd(raw)), WM_CLOSE, WPARAM(0), LPARAM(0));
+    }
 }
 
 pub fn minimize(raw: isize) {

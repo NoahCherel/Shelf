@@ -4,6 +4,7 @@ import { panels, type PanelId } from "../../panels";
 import { CardContent } from "../card/CardWindow";
 import { DockWindow } from "../dock/DockWindow";
 import { PickerWindow } from "../picker/PickerWindow";
+import { PreviewStrip } from "../preview/PreviewWindow";
 import { SettingsWindow } from "../settings/SettingsWindow";
 import { paintWallpaper, scenes, type Scene } from "./scenes";
 import "./bench.css";
@@ -62,6 +63,11 @@ function SceneView({ scene }: { scene: Scene }) {
         </div>
       )}
       {scene.card && <CardLayer scene={scene} />}
+      {scene.previews && (
+        <div className="bench__previews" style={{ width: scene.previews.windows.length * (scene.previews.slotWidth + 8) + 8 }}>
+          <PreviewStrip shown={scene.previews} onClosed={() => {}} />
+        </div>
+      )}
     </div>
   );
 }

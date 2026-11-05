@@ -1,3 +1,4 @@
+import type { Shown } from "../preview/PreviewWindow";
 import { fakeApps, fakeAudio, fakeWifi } from "./fixtures";
 
 export interface Scene {
@@ -6,6 +7,7 @@ export interface Scene {
   wallpaper: "glow" | "ribbons" | "pale";
   theme: "dark" | "light";
   dock?: string[]; // widget ids, drawn in a real bar with the real shader
+  previews?: Shown; // the strip above the bar, with empty frames: Windows draws the pictures
   card?: string; // card id, drawn above the bar
   anchor?: string; // selector the card centres on, when it isn't a tile's id
   view?: "picker" | "settings"; // a whole window instead of a dock
@@ -229,6 +231,44 @@ export const scenes: Scene[] = [
     measure: [{ name: "a long name stays inside its row", expect: `[...document.querySelectorAll(".search__row")].every((r) => r.scrollWidth <= r.clientWidth)` }],
   },
   { id: "card-search-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]', steps: [{ type: "pa" }] },
+  {
+    id: "dock-many-windows",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    backend: {
+      apps_list: () => {
+        const apps = fakeApps(5, 2);
+        apps[0].windows = [
+          { hwnd: 1, title: "One" },
+          { hwnd: 2, title: "Two" },
+        ];
+        apps[2].windows = [
+          { hwnd: 3, title: "Three" },
+          { hwnd: 4, title: "Four" },
+        ];
+        return apps;
+      },
+    },
+  },
+  {
+    id: "previews",
+    size: TALL,
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    previews: {
+      key: "app-0",
+      name: "App 0",
+      slotWidth: 220,
+      windows: [
+        { hwnd: 1, title: "A window with a title far too long to fit in its row", minimized: false },
+        { hwnd: 2, title: "A second window", minimized: false },
+        { hwnd: 3, title: "A minimized window", minimized: true },
+      ],
+    },
+  },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

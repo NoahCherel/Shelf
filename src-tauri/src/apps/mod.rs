@@ -2,8 +2,9 @@
 
 mod icons;
 pub mod menu;
-mod merge;
+pub mod merge;
 mod pins;
+pub mod previews;
 mod windows;
 
 use std::collections::HashMap;
@@ -39,7 +40,7 @@ pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) 
     .map_err(|_| "shell call failed".to_string())
 }
 
-fn current() -> Result<Vec<AppEntry>, String> {
+pub(crate) fn current() -> Result<Vec<AppEntry>, String> {
     let pins = on_com_thread(pins::list)?;
     let entries = merge(&pins, windows::list(), windows::foreground());
     let sources = entries.iter().filter_map(|e| Some((e.key.clone(), e.icon_source.clone()?))).collect();

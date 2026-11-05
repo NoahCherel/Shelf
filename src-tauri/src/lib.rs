@@ -135,6 +135,13 @@ pub fn run() {
             system::system_stats,
             system::status::system_status,
             system::status::shell_panel,
+            apps::previews::preview_show,
+            apps::previews::preview_slots,
+            apps::previews::preview_keep,
+            apps::previews::preview_leave,
+            apps::previews::preview_hide,
+            apps::previews::preview_activate,
+            apps::previews::preview_close_window,
             search::search_apps,
             search::search_files,
             search::search_open,
@@ -171,7 +178,7 @@ pub fn run() {
         ])
         .on_window_event(|window, event| match (event, window.label()) {
             // Alt+F4 must not take the dock down with the taskbar still hidden.
-            (WindowEvent::CloseRequested { api, .. }, "dock") => api.prevent_close(),
+            (WindowEvent::CloseRequested { api, .. }, "dock" | "preview") => api.prevent_close(),
             (WindowEvent::CloseRequested { api, .. }, "card") => {
                 api.prevent_close();
                 shell::card::on_close(window);
@@ -182,6 +189,7 @@ pub fn run() {
         })
         .setup(|app| {
             search::refresh_apps();
+            apps::previews::prepare(app.handle())?;
             shell::dock::start(app.handle())?;
             apps::watch_foreground(app.handle());
             build_tray(app.handle())?;

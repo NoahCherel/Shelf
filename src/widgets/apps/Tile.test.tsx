@@ -1,4 +1,4 @@
-import { beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
@@ -138,7 +138,96 @@ it("does nothing when clicked in the picker", () => {
   expect(mockInvoke.mock.calls.filter((c) => c[0] !== "apps_icon")).toEqual([]);
 });
 
-it("shows the window title on hover", () => {
-  render(<AppsTile data={[app("code", true)]} status="ready" />);
-  expect(screen.getByRole("button", { name: "code" }).getAttribute("title")).toBe("code window");
+describe("several windows and previews", () => {
+  const two = (key: string): AppEntry => ({ ...app(key, true), windows: [{ hwnd: 1, title: "one" }, { hwnd: 2, title: "two" }] });
+  const button = (name: string) => screen.getByRole("button", { name });
+  const closedHandler = () => vi.mocked(listen).mock.calls.filter((c) => c[0] === "preview-closed").at(-1)![1] as (e?: unknown) => void;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("an app with several windows is marked as such", () => {
+    render(<AppsTile data={[two("a"), app("b", true)]} status="ready" />);
+    expect(button("a").className).toContain("app--many");
+    expect(button("b").className).not.toContain("app--many");
+  });
+
+  it("hovering an open app asks for its previews after a short pause", () => {
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(349));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+    act(() => vi.advanceTimersByTime(1));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "a" }));
+  });
+
+  it("passing over an icon asks for nothing", () => {
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    fireEvent.mouseLeave(button("a"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+  });
+
+  it("leaving lets the previews close", () => {
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(350));
+    fireEvent.mouseLeave(button("a"));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_leave");
+  });
+
+  it("while previews show, the next icon swaps at once", () => {
+    render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(350));
+    fireEvent.mouseLeave(button("a"));
+    fireEvent.mouseEnter(button("b"));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "b" }));
+  });
+
+  it("once they've closed, the pause comes back", async () => {
+    render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    await act(async () => {});
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(350));
+    fireEvent.mouseLeave(button("a"));
+    act(() => closedHandler()());
+    fireEvent.mouseEnter(button("b"));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "b" }));
+  });
+
+  it("a pinned app that isn't open has no preview and keeps its name", () => {
+    render(<AppsTile data={[app("a")]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+    expect(button("a").getAttribute("title")).toBe("a");
+  });
+
+  it("an open app has previews instead of a tooltip", () => {
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    expect(button("a").getAttribute("title")).toBeNull();
+  });
+
+  it("pressing an app hides the previews and cancels a pending one", () => {
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    fireEvent.mouseDown(button("a"));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_hide");
+    act(() => vi.advanceTimersByTime(1000));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+  });
+
+  it("the picker's sample shows no previews", () => {
+    render(<AppsTile data={[app("a", true)]} status="sample" preview />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+  });
 });

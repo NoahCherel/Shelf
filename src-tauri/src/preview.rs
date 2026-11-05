@@ -54,6 +54,10 @@ fn guard_for(on: bool) -> Result<(), String> {
 }
 
 /// For commands that change something on the machine.
+pub fn is_on() -> bool {
+    !current().touch_taskbar
+}
+
 pub fn guard() -> Result<(), String> {
     guard_for(ON.load(Ordering::Relaxed))
 }
@@ -183,6 +187,8 @@ mod tests {
             (include_str!("system/audio.rs"), "audio_set_app_volume"),
             (include_str!("system/audio.rs"), "audio_set_output"),
             (include_str!("system/settings_link.rs"), "open_settings"),
+            (include_str!("apps/previews.rs"), "preview_activate"),
+            (include_str!("apps/previews.rs"), "preview_close_window"),
             (include_str!("search/mod.rs"), "search_open"),
             (include_str!("search/mod.rs"), "search_web"),
             (include_str!("system/toggles.rs"), "toggle_set"),

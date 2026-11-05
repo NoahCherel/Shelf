@@ -1,0 +1,90 @@
+/* Sizes match SLOT, GAP, PADDING and HEIGHT in previews.rs: 8 + 30 + 124 + 8. */
+.pv {
+  box-sizing: border-box;
+  display: flex;
+  gap: 8px;
+  width: 100vw;
+  height: 100vh;
+  padding: 8px;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 12px;
+}
+
+.pv__window {
+  flex: none;
+  width: var(--slot);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-inner);
+}
+
+.pv__window:hover {
+  background: var(--fill);
+}
+
+.pv__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 4px 0 8px;
+}
+
+.pv__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.pv__window:hover .pv__close {
+  opacity: 1;
+}
+
+.pv__close:hover {
+  background: var(--error);
+  color: #fff;
+}
+
+.pv__close svg {
+  width: 11px;
+  height: 11px;
+}
+
+.pv__frame {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 124px;
+}
+
+.pv__icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.pv__icon--blank {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-inner);
+  background: var(--track);
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 700;
+}

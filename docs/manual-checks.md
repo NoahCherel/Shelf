@@ -83,6 +83,20 @@ These launch real things, so only the owner runs them.
 - [ ] **Reopen:** close the card, open it, and files still come back.
 - [ ] **Win+S:** still opens Windows' own search, as taking the shortcut over is out of scope.
 
+## Window previews
+
+These need a real pointer, and closing or switching real windows.
+
+- [ ] **Hover:** resting on an open app shows a live picture of each window, and a video keeps playing in it.
+- [ ] **Crossing:** moving from the icon up to the strip keeps it open.
+- [ ] **Leaving:** moving away closes it, however fast, and it never stays stuck on screen.
+- [ ] **Focus:** the app you're in keeps focus while previews show.
+- [ ] **Switch:** clicking a picture brings that window forward.
+- [ ] **Close:** the cross closes that window, and an unsaved document still asks first.
+- [ ] **Minimized:** shows the app's icon, and clicking restores the window.
+- [ ] **Two dots:** an app with several windows shows them, and clicking steps through its windows.
+- [ ] **Scale:** pictures sit in their frames at 100%, 125% and 150%.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { invoke, listen } from "../../core/tauri";
 import { openPanel } from "../../panels";
 import type { TileProps } from "../../core/widget";
@@ -23,6 +23,7 @@ export function stableOrder(previous: AppEntry[], next: AppEntry[]): AppEntry[] 
   return [...kept, ...next.filter((e) => !known.has(e.key))];
 }
 
+const PREVIEW_PAUSE_MS = 350;
 const ICON_RETRY_MS = 2500;
 const ICON_TRIES = 6;
 
@@ -93,7 +94,46 @@ function StartLogo() {
   );
 }
 
+/** Previews after a pause over an open app, and straight away once they're already showing. */
+function useAppPreviews(preview?: boolean) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showing = useRef(false);
+  useEffect(() => {
+    if (preview) return;
+    const off = listen("preview-closed", () => {
+      showing.current = false;
+    });
+    return () => {
+      clearTimeout(timer.current);
+      off.then((stop) => stop());
+    };
+  }, [preview]);
+  const enter = (e: MouseEvent<HTMLElement>, entry: AppEntry) => {
+    if (preview || entry.windows.length === 0) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const show = () => {
+      showing.current = true;
+      invoke("preview_show", { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
+    };
+    clearTimeout(timer.current);
+    if (showing.current) show();
+    else timer.current = setTimeout(show, PREVIEW_PAUSE_MS);
+  };
+  const leave = () => {
+    clearTimeout(timer.current);
+    if (showing.current) invoke("preview_leave").catch(() => {});
+  };
+  const press = () => {
+    if (preview) return;
+    clearTimeout(timer.current);
+    showing.current = false;
+    invoke("preview_hide").catch(() => {});
+  };
+  return { enter, leave, press };
+}
+
 export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
+  const previews = useAppPreviews(preview);
   const entries = data ?? [];
   const [startOpen, setStartOpen] = useState(false);
   useEffect(() => {
@@ -135,9 +175,12 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
         <button
           type="button"
           key={entry.key}
-          className={entry.active ? "app app--active" : "app"}
+          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}`}
           aria-label={entry.name}
-          title={entry.windows[0]?.title ?? entry.name}
+          title={entry.windows.length > 0 ? undefined : entry.name}
+          onMouseEnter={(e) => previews.enter(e, entry)}
+          onMouseLeave={previews.leave}
+          onMouseDown={previews.press}
           onClick={() => !preview && invoke("apps_activate", { key: entry.key }).catch(() => {})}
           onContextMenu={(e) => windowsMenu(e, "apps_context_menu", { key: entry.key })}
         >

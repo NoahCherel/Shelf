@@ -68,6 +68,12 @@
   position: relative;
 }
 
+/* A second dot beside the first says there's more than one window. */
+.app--many .app__dot {
+  margin-left: calc(var(--T) * -0.055);
+  box-shadow: calc(var(--T) * 0.11) 0 0 var(--accent);
+}
+
 .app--active .app__dot {
   width: calc(var(--T) * 0.26);
 }
