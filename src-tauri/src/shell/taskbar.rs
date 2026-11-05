@@ -159,6 +159,7 @@ pub fn watch_parent(pid: u32) {
 
 #[tauri::command]
 pub fn set_taskbar_mode(mode: String) -> Result<(), String> {
+    crate::preview::guard()?;
     match mode.as_str() {
         "hidden" => TASKBAR.apply(Mode::Hidden),
         "autohide" => TASKBAR.apply(Mode::Autohide),

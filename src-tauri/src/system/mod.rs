@@ -98,7 +98,8 @@ pub fn autostart_get() -> bool {
 }
 
 #[tauri::command(async)]
-pub fn autostart_set(on: bool) -> bool {
+pub fn autostart_set(on: bool) -> Result<bool, String> {
+    crate::preview::guard()?;
     let mut cmd = reg();
     if on {
         let exe = std::env::current_exe().unwrap_or_default();
@@ -107,5 +108,5 @@ pub fn autostart_set(on: bool) -> bool {
     } else {
         cmd.args(["delete", RUN_KEY, "/v", "Shelf", "/f"]);
     }
-    cmd.status().is_ok_and(|s| s.success())
+    Ok(cmd.status().is_ok_and(|s| s.success()))
 }

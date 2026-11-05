@@ -71,6 +71,7 @@ pub fn apps_icon(key: String) -> Result<Option<String>, String> {
 
 #[tauri::command(async)]
 pub fn apps_activate(key: String) -> Result<(), String> {
+    crate::preview::guard()?;
     let foreground = windows::foreground();
     let entries = current()?;
     let entry = entries.iter().find(|e| e.key == key).ok_or("app is gone")?;
@@ -91,21 +92,26 @@ pub fn apps_activate(key: String) -> Result<(), String> {
 /// Opens or closes Start by tapping the Windows key, like the real button. A click on the dock
 /// can itself close Start, and then it must stay closed.
 #[tauri::command]
-pub fn start_menu() {
+pub fn start_menu() -> Result<(), String> {
+    crate::preview::guard()?;
     if menu::should_press_start(windows::start_is_open(), windows::ms_since_start_closed()) {
         tap_keys(&[VK_LWIN]);
     }
+    Ok(())
 }
 
 /// Windows' own quick menu, with Task Manager and the rest: the one Win+X opens.
 #[tauri::command]
-pub fn start_quick_menu() {
+pub fn start_quick_menu() -> Result<(), String> {
+    crate::preview::guard()?;
     tap_keys(&[VK_LWIN, VK_X]);
+    Ok(())
 }
 
 /// Windows' menu for an app. The menu runs on the main thread, as the dock window owns it.
 #[tauri::command(async)]
 pub fn apps_context_menu(app: AppHandle, key: String) -> Result<(), String> {
+    crate::preview::guard()?;
     let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let raw = dock.hwnd().map_err(|e| e.to_string())?.0 as isize;

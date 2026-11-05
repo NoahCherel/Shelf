@@ -58,6 +58,8 @@ Claude limits come only from the status line feed. Claude's own login is never r
 | `sh src/test/e2e.sh <folder>` | Drives the built app through WebView2's debug port. Hides the taskbar |
 | `sh src/test/measure.sh` | CPU and memory at rest and with motion. Hides the taskbar |
 | `src/test/probe.ps1` | Read-only look at the dock, work area and taskbar |
+| `node src/test/preview.mjs <command>` | Runs a command against the real app in preview mode, beside your Shelf. It uses its own data and leaves the taskbar alone, but its windows show on screen. `shelf.exe --preview` refuses anything that changes the machine |
+| `node src/test/see.mjs <out.png>` | One picture of the whole screen with Shelf's windows drawn in, under preview |
 
 `?w=gallery&all=1` shows every widget's sample, and `?w=bench&scene=<id>` shows one bench scene, both in an ordinary browser.
 

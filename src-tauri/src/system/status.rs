@@ -136,6 +136,7 @@ pub fn system_status() -> Status {
 /// Windows' own panels, opened the way its keyboard shortcuts do. They work with the taskbar hidden.
 #[tauri::command]
 pub fn shell_panel(kind: String) -> Result<(), String> {
+    crate::preview::guard()?;
     match panel_for(&kind).ok_or("unknown panel")? {
         Panel::Quick => tap_keys(&[VK_LWIN, VK_A]),
         Panel::Notifications => tap_keys(&[VK_LWIN, VK_N]),

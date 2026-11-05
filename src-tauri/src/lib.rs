@@ -4,6 +4,7 @@ mod apps;
 mod claude_usage;
 mod glass;
 mod net;
+mod preview;
 mod secrets;
 mod shell;
 mod store;
@@ -23,6 +24,7 @@ fn claude_usage() -> serde_json::Value {
 
 #[tauri::command(async)]
 fn claude_connect(on: bool) -> Result<(), String> {
+    preview::guard()?;
     claude_usage::set_connected(on)
 }
 
@@ -74,6 +76,9 @@ pub fn run() {
     if claude_usage::is_statusline_call(&args) {
         std::process::exit(claude_usage::run_statusline(&args));
     }
+    if args.iter().any(|a| a == "--preview") {
+        preview::turn_on();
+    }
     if args.iter().any(|a| a == "--restore-taskbar") {
         TASKBAR.restore();
         return;
@@ -94,10 +99,12 @@ pub fn run() {
 
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        TASKBAR.restore();
+        preview::restore_taskbar(|| TASKBAR.restore());
         default_hook(info);
     }));
-    spawn_taskbar_watch();
+    if preview::current().watchdog {
+        spawn_taskbar_watch();
+    }
 
     let app = tauri::Builder::default()
         .manage(system::SysMonitor::new())

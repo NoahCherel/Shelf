@@ -167,6 +167,9 @@ fn place(dock: &WebviewWindow) {
 /// keep stopping above the bar however narrow the bar is.
 fn register_appbar(dock: &WebviewWindow) {
     let Some((m, scale)) = monitor_rect(dock) else { return };
+    if !crate::preview::current().reserve_edge {
+        return;
+    }
     let raw = DOCK_HWND.load(Ordering::Relaxed);
     match reserved_height(layout(), scale) {
         Some(h) => {
@@ -272,7 +275,9 @@ fn saved_layout(settings: Option<&serde_json::Value>) -> DockLayout {
 pub fn start(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let settings = crate::store::load("settings");
-    TASKBAR.apply(saved_taskbar_mode(settings.as_ref()));
+    if crate::preview::current().touch_taskbar {
+        TASKBAR.apply(saved_taskbar_mode(settings.as_ref()));
+    }
     *LAYOUT.lock().unwrap_or_else(|e| e.into_inner()) = saved_layout(settings.as_ref());
 
     let hwnd = dock.hwnd()?;
@@ -302,7 +307,7 @@ pub fn stop() {
     if raw != 0 {
         appbar::unregister(raw);
     }
-    TASKBAR.restore();
+    crate::preview::restore_taskbar(|| TASKBAR.restore());
 }
 
 /// Fits the window to the bar. Anything but a new width also changes what's reserved.
