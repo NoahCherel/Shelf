@@ -1,16 +1,10 @@
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Bar } from "../../design/parts/Bar";
 import { Tile } from "../../design/parts/Tile";
-import { claudeProvider, durationText, type ClaudeData } from "../_providers/claude";
+import { CLAUDE_SAMPLE, claudeProvider, durationText, type ClaudeData } from "../_providers/claude";
 import { ClaudeCard, claudeMenu } from "../_shared/ClaudeCard";
 import { ClaudeLogo } from "../_shared/ClaudeLogo";
 import "./claude-usage.css";
-
-const SAMPLE: ClaudeData = {
-  session: { percent: 100, resetsAt: Date.now() + 85 * 60_000 },
-  weekly: { percent: 37, resetsAt: Date.now() + 4 * 86_400_000 },
-  updatedMs: 0,
-};
 
 function ClaudeUsageTile({ data }: TileProps<ClaudeData>) {
   const win = data?.session ?? null;
@@ -37,7 +31,7 @@ export default defineWidget<ClaudeData>({
   description: "Your Claude session limit and when it resets.",
   category: "ai",
   width: 2.74,
-  sample: SAMPLE,
+  sample: CLAUDE_SAMPLE,
   Tile: ClaudeUsageTile,
   Card: ClaudeCard,
   provider: claudeProvider,

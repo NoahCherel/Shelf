@@ -1,16 +1,10 @@
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Bar } from "../../design/parts/Bar";
 import { Tile } from "../../design/parts/Tile";
-import { claudeProvider, durationText, resetDayText, type ClaudeData, type LimitWindow } from "../_providers/claude";
+import { CLAUDE_SAMPLE, claudeProvider, durationText, resetDayText, type ClaudeData, type LimitWindow } from "../_providers/claude";
 import { ClaudeCard, claudeMenu } from "../_shared/ClaudeCard";
 import { ClaudeLogo } from "../_shared/ClaudeLogo";
 import "./claude-plan-usage.css";
-
-const SAMPLE: ClaudeData = {
-  session: { percent: 100, resetsAt: Date.now() + 85 * 60_000 },
-  weekly: { percent: 37, resetsAt: Date.now() + 4 * 86_400_000 },
-  updatedMs: 0,
-};
 
 function PlanRow({ label, win, reset }: { label: string; win: LimitWindow | null; reset: (ms: number) => string }) {
   return (
@@ -43,7 +37,7 @@ export default defineWidget<ClaudeData>({
   description: "Session and weekly Claude limits.",
   category: "ai",
   width: 5.06,
-  sample: SAMPLE,
+  sample: CLAUDE_SAMPLE,
   Tile: ClaudePlanTile,
   Card: ClaudeCard,
   provider: claudeProvider,

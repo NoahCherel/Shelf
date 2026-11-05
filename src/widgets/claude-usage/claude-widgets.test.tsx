@@ -1,4 +1,4 @@
-import { beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import usage from "./index";
 import plan from "../claude-plan-usage/index";
@@ -98,5 +98,22 @@ describe("card", () => {
     render(<C data={null} status="sample" />);
     fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     await screen.findByText("Claude Code isn't installed here.");
+  });
+});
+
+describe("the sample shown in the picker", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads the same however long after loading it's drawn", () => {
+    vi.useFakeTimers({ now: Date.now() + 40 * 86_400_000 });
+    const U = usage.Tile;
+    const P = plan.Tile;
+    const first = render(<U data={usage.sample ?? null} status="sample" preview />);
+    expect(first.getByText("1h 25m")).toBeTruthy();
+    first.unmount();
+    const second = render(<P data={plan.sample ?? null} status="sample" preview />);
+    expect(second.getByText("1h 25m")).toBeTruthy();
   });
 });
