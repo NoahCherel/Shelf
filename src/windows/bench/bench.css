@@ -52,3 +52,8 @@ body,
   font-family: system-ui;
   padding: 20px;
 }
+
+/* A blinking caret would make two runs differ. */
+.bench input {
+  caret-color: transparent;
+}

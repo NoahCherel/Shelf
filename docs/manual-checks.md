@@ -46,6 +46,17 @@ Run Shelf from `src-tauri\target\release\shelf.exe`.
 - [ ] **Windows 10:** targeted, but only run on Windows 11.
 - [ ] **A laptop battery:** this PC reported whichever state it has, but charging, low and draining need a real battery.
 
+## Wi-Fi card
+
+These change the real connection, so only the owner runs them.
+
+- [ ] **Connect:** a saved network connects on click, and the dock's icon follows.
+- [ ] **New network:** a secured network asks for its password in the row, and connects.
+- [ ] **Wrong password:** a plain error on that row, and no profile left behind (`netsh wlan show profiles`).
+- [ ] **Click away while connecting:** reopening shows it still connecting, or how it went.
+- [ ] **Disconnect and reconnect:** Disconnect needs a second click, and the network can be rejoined.
+- [ ] **Captive portal:** a café network shows "Connected, no internet".
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

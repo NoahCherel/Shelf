@@ -183,6 +183,8 @@ mod tests {
             (include_str!("system/audio.rs"), "audio_set_app_volume"),
             (include_str!("system/audio.rs"), "audio_set_output"),
             (include_str!("system/settings_link.rs"), "open_settings"),
+            (include_str!("system/wifi.rs"), "wifi_connect"),
+            (include_str!("system/wifi.rs"), "wifi_disconnect"),
         ];
         for (source, name) in sources {
             let at = source.find(&format!("fn {name}(")).unwrap_or_else(|| panic!("no fn {name}"));

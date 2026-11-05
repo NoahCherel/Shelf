@@ -3,6 +3,7 @@ import { invoke } from "../core/tauri";
 import { refresh } from "../core/provider";
 import { statusProvider } from "../widgets/_providers/status";
 import { SoundCard } from "./sound/SoundCard";
+import { WifiCard } from "./wifi/WifiCard";
 
 export type PanelId = "sound" | "wifi" | "quick" | "search";
 
@@ -14,6 +15,7 @@ export interface PanelDef {
 /** Each panel adds itself here as it's built. */
 export const panels: Partial<Record<PanelId, PanelDef>> = {
   sound: { Card: SoundCard, width: 340 },
+  wifi: { Card: WifiCard, width: 340 },
 };
 
 const FIRST_HEIGHT = 300;

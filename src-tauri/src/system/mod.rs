@@ -3,6 +3,7 @@
 pub mod audio;
 pub mod settings_link;
 pub mod status;
+pub mod wifi;
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

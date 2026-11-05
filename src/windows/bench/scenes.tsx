@@ -1,4 +1,4 @@
-import { fakeApps, fakeAudio } from "./fixtures";
+import { fakeApps, fakeAudio, fakeWifi } from "./fixtures";
 
 export interface Scene {
   id: string;
@@ -98,6 +98,48 @@ export const scenes: Scene[] = [
     ],
   },
   { id: "card-sound-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:sound", anchor: '[aria-label="Sound"]' },
+  { id: "card-wifi", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:wifi", anchor: '[aria-label="Network"]' },
+  {
+    id: "card-wifi-password",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:wifi",
+    anchor: '[aria-label="Network"]',
+    steps: [{ click: '.wifi__main[aria-label="Freebox-77AA10"]' }],
+  },
+  {
+    id: "card-wifi-wrong-password",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:wifi",
+    anchor: '[aria-label="Network"]',
+    backend: { wifi_networks: () => fakeWifi({ attempt: { id: "C3", state: "failed", error: "Wrong password." } }) },
+  },
+  {
+    id: "card-wifi-no-adapter",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:wifi",
+    anchor: '[aria-label="Network"]',
+    backend: { wifi_networks: () => fakeWifi({ adapter: false, on: false, networks: [] }) },
+  },
+  {
+    id: "card-wifi-off",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:wifi",
+    anchor: '[aria-label="Network"]',
+    backend: { wifi_networks: () => fakeWifi({ on: false, networks: [] }) },
+  },
+  { id: "card-wifi-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:wifi", anchor: '[aria-label="Network"]' },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

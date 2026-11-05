@@ -23,6 +23,24 @@ export const fakeAudio = (apps = 2) => ({
   apps: Array.from({ length: apps }, (_, i) => ({ pid: i + 1, name: ["Firefox", "Spotify", "Discord", "Teams", "Orca", "System sounds"][i % 6], exe: `app-${i}`, volume: 100 - i * 13, muted: false })),
 });
 
+const wifiNet = (id: string, name: string, signal: number, more: object = {}) => ({ id, name, signal, auth: "wpa2", saved: false, connected: false, ...more });
+
+export const fakeWifi = (more: object = {}) => ({
+  adapter: true,
+  on: true,
+  permission: true,
+  attempt: null,
+  networks: [
+    wifiNet("A1", "Livebox-4F20", 92, { connected: true, saved: true }),
+    wifiNet("B2", "Atelier", 70, { saved: true }),
+    wifiNet("C3", "Freebox-77AA10", 64),
+    wifiNet("D4", "Café du coin ☕", 48, { auth: "open" }),
+    wifiNet("E5", "SFR_90C8", 33),
+    wifiNet("F6", "Office", 20, { auth: "enterprise" }),
+  ],
+  ...more,
+});
+
 export interface FakeApp {
   key: string;
   name: string;
@@ -113,6 +131,10 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     secret_has: () => false,
     autostart_get: () => false,
     audio_state: () => fakeAudio(),
+    wifi_networks: () => fakeWifi(),
+    wifi_scan: () => null,
+    wifi_connect: () => null,
+    wifi_disconnect: () => null,
     audio_app_icon: ({ exe }: { exe: string }) => {
       const n = Number(exe.replace(/\D/g, "")) || 0;
       return icon(String.fromCharCode(65 + (n % 26)), COLORS[n % COLORS.length]);

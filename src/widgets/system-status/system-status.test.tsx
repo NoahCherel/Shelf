@@ -23,10 +23,11 @@ beforeEach(() => {
 const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 describe("opens Windows' own panels", () => {
-  it("the Wi-Fi icon opens the network list", () => {
+  it("the Wi-Fi icon opens Shelf's own card", () => {
     render(<T data={DATA} status="ready" />);
     press("Network");
-    expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "wifi" });
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:wifi" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("shell_panel", expect.anything());
   });
 
   it("the sound icon opens Shelf's own card", () => {
