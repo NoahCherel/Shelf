@@ -25,7 +25,7 @@ Right-click the dock for Widgets…, Settings, Lock dock and Quit. In Widgets…
 
 While Liquid Glass is on, the dock doesn't appear in screenshots or recordings, because that's how it avoids seeing itself in the glass. The Black style has no such effect.
 
-The Status tile and the loupe open Shelf's own cards, right above what you clicked: Sound, Wi-Fi, Bluetooth, Quick Settings, Search and Notifications. Resting on an open app shows live pictures of its windows, and resting on a picture brings that window up until the pointer leaves. Win+A, Win+S and Win+N still open Windows' panels, as taking those over needs a system-wide keyboard hook.
+The Status tile and the loupe open Shelf's own cards, right above what you clicked: Sound, Wi-Fi, Bluetooth, Quick Settings, Search and Notifications. The chevron opens Windows' own grid of hidden icons above the dock. Resting on an open app shows live pictures of its windows, and resting on a picture brings that window up until the pointer leaves. Win+A, Win+S and Win+N still open Windows' panels, as taking those over needs a system-wide keyboard hook.
 
 ## How it's built
 

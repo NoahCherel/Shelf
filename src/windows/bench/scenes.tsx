@@ -284,6 +284,26 @@ export const scenes: Scene[] = [
     dock: DOCK,
     backend: { system_status: () => ({ wifi: { ssid: "Home", signal: 90 }, online: true, volume: { percent: 60, muted: false }, battery: { percent: 64, charging: false }, notifications: 3 }) },
   },
+  { id: "card-app-menu", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__appmenu:app-0", anchor: '[aria-label="App 0"]' },
+  { id: "card-app-menu-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__appmenu:app-0", anchor: '[aria-label="App 0"]' },
+  {
+    id: "card-app-menu-pinned-many",
+    size: TALL,
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    card: "__appmenu:app-0",
+    anchor: '[aria-label="App 0"]',
+    backend: {
+      apps_menu: () => ({
+        items: [
+          { id: "open", label: "Explorateur de fichiers" },
+          { id: "unpin", label: "Détacher de la barre des tâches" },
+          { id: "close-all", label: "Fermer toutes les fenêtres" },
+        ],
+      }),
+    },
+  },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

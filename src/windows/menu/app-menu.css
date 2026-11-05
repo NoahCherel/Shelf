@@ -1,0 +1,76 @@
+/* Windows 11's own taskbar menu: its colours, sizes and font rather than Shelf's card look. */
+.amenu {
+  --amenu-bg: #2c2c2c;
+  --amenu-edge: #ffffff1f;
+  --amenu-hover: #ffffff14;
+  --amenu-fg: #ffffff;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 240px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--amenu-bg);
+  box-shadow: inset 0 0 0 1px var(--amenu-edge);
+  color: var(--amenu-fg);
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+:root[data-theme="light"] .amenu {
+  --amenu-bg: #f9f9f9;
+  --amenu-edge: #0000001f;
+  --amenu-hover: #0000000f;
+  --amenu-fg: #1a1a1a;
+}
+
+.amenu__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 34px;
+  padding: 0 28px 0 12px;
+  border-radius: 6px;
+  outline: none;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.amenu__row:hover,
+.amenu__row:focus-visible {
+  background: var(--amenu-hover);
+}
+
+.amenu__row:focus-visible {
+  box-shadow: 0 0 0 2px var(--amenu-fg);
+}
+
+.amenu__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.amenu__icon img,
+.amenu__icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.amenu__blank {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--amenu-hover);
+  font-size: 12px;
+  font-weight: 600;
+}

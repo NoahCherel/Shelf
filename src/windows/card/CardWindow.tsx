@@ -5,16 +5,19 @@ import { invoke, listen } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { panels, type PanelId } from "../../panels";
+import { AppMenu } from "../menu/AppMenu";
 import { dockMenuItems, Menu } from "../menu/Menu";
 import "./card-window.css";
 
 const DEFAULT_CARD_WIDTH = 340;
 const MENU_WIDTH = 210;
 const MENU_PREFIX = "__menu:";
+const APP_MENU_PREFIX = "__appmenu:";
 const PANEL_PREFIX = "__panel:";
 
 /** Height fits what's shown; Rust keeps it on the screen. */
-function Fitted({ width, children }: { width: number; children: ReactNode }) {
+/** With no width, the card window takes the content's own width. */
+function Fitted({ width, children }: { width?: number; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = box.current;
@@ -24,13 +27,13 @@ function Fitted({ width, children }: { width: number; children: ReactNode }) {
       () => {},
     );
     const observer = new ResizeObserver(() => {
-      invoke("fit_card", { width, height: el.offsetHeight }).catch(() => {});
+      invoke("fit_card", { width: width ?? el.offsetWidth, height: el.offsetHeight }).catch(() => {});
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, [width]);
   return (
-    <div className="card-slide" ref={box}>
+    <div className={width === undefined ? "card-slide card-slide--snug" : "card-slide"} ref={box}>
       {children}
     </div>
   );
@@ -64,6 +67,15 @@ export function CardContent({ id, n }: { id: string; n: number }) {
       <div className="card-window">
         <Fitted key={n} width={panel.width}>
           <panel.Card />
+        </Fitted>
+      </div>
+    );
+  }
+  if (id.startsWith(APP_MENU_PREFIX)) {
+    return (
+      <div className="card-window">
+        <Fitted key={n}>
+          <AppMenu appKey={id.slice(APP_MENU_PREFIX.length)} />
         </Fitted>
       </div>
     );

@@ -77,3 +77,33 @@
 .app--active .app__dot {
   width: calc(var(--T) * 0.26);
 }
+
+/* A new app makes its own room as it fades in. The bar follows its width. */
+.app--new {
+  animation: app-in 300ms ease-in-out;
+}
+
+.app--new .app__icon {
+  animation: app-icon-in 300ms ease-in-out;
+}
+
+@keyframes app-in {
+  from {
+    width: 0;
+    min-width: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes app-icon-in {
+  from {
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app--new,
+  .app--new .app__icon {
+    animation: none;
+  }
+}

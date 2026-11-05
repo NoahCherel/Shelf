@@ -127,6 +127,14 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     open_settings: () => null,
     open_window: () => null,
     close_window: () => null,
+    apps_menu: () => ({
+      items: [
+        { id: "open", label: "App 0" },
+        { id: "pin", label: "Épingler à la barre des tâches" },
+        { id: "close", label: "Fermer la fenêtre" },
+      ],
+    }),
+    apps_menu_choose: () => null,
     apps_list: () => fakeApps(5, 2),
     apps_icon: ({ key }: { key: string }) => {
       const n = Number(key.replace(/\D/g, "")) || 0;
@@ -169,6 +177,7 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     preview_keep: () => null,
     preview_leave: () => null,
     preview_hide: () => null,
+    tray_toggle: () => null,
     notifications_list: () => ({ access: true, items: [] }),
     notification_dismiss: () => null,
     notifications_clear: () => null,

@@ -8,7 +8,8 @@ use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use tauri::{AppHandle, Emitter};
-use windows::core::{BOOL, GUID, PWSTR};
+use windows::core::{BOOL, GUID, PWSTR, w, HSTRING};
+use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::System::Threading::{
@@ -25,7 +26,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::menu::is_start_host;
-use super::merge::{title_from_utf16, RawWindow};
+use super::merge::{title_from_utf16, RawWindow, useful_description};
 
 pub const APP_ID_KEY: PROPERTYKEY =
     PROPERTYKEY { fmtid: GUID::from_u128(0x9F4C2855_9F79_4B39_A8D0_E1D42DE1D5F3), pid: 5 };
@@ -38,7 +39,7 @@ static HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static START_OPEN: AtomicBool = AtomicBool::new(false);
 static START_CLOSED: Mutex<Option<Instant>> = Mutex::new(None);
 /// A window's program and app id don't change, and reading them isn't free.
-static KNOWN: Mutex<Option<HashMap<isize, (String, Option<String>)>>> = Mutex::new(None);
+static KNOWN: Mutex<Option<HashMap<isize, (String, Option<String>, Option<String>)>>> = Mutex::new(None);
 
 fn hwnd(raw: isize) -> HWND {
     HWND(raw as *mut c_void)
@@ -174,6 +175,33 @@ pub fn store_string(store: &IPropertyStore, key: &PROPERTYKEY) -> Option<String>
     }
 }
 
+/// The name in a program's version information.
+fn file_description(exe: &str) -> Option<String> {
+    let path = HSTRING::from(exe);
+    unsafe {
+        let size = GetFileVersionInfoSizeW(&path, None);
+        if size == 0 {
+            return None;
+        }
+        let mut info = vec![0u8; size as usize];
+        GetFileVersionInfoW(&path, None, size, info.as_mut_ptr() as *mut c_void).ok()?;
+        let block = info.as_ptr() as *const c_void;
+        let (mut found, mut length) = (std::ptr::null_mut(), 0u32);
+        if !VerQueryValueW(block, w!("\\VarFileInfo\\Translation"), &mut found, &mut length).as_bool() || length < 4 {
+            return None;
+        }
+        let codes = found as *const u16;
+        let (language, page) = (*codes, *codes.add(1));
+        let wanted = HSTRING::from(format!("\\StringFileInfo\\{language:04x}{page:04x}\\FileDescription"));
+        if !VerQueryValueW(block, &wanted, &mut found, &mut length).as_bool() || length == 0 {
+            return None;
+        }
+        let text = std::slice::from_raw_parts(found as *const u16, length as usize);
+        let end = text.iter().position(|c| *c == 0).unwrap_or(text.len());
+        Some(String::from_utf16_lossy(&text[..end]))
+    }
+}
+
 fn app_id(h: HWND) -> Option<String> {
     let store: IPropertyStore = unsafe { SHGetPropertyStoreForWindow(h).ok()? };
     store_string(&store, &APP_ID_KEY)
@@ -192,9 +220,13 @@ pub fn list() -> Vec<RawWindow> {
         .filter(|h| is_app_window(*h))
         .map(|h| {
             let raw = h.0 as isize;
-            let (exe, id) = old.get(&raw).cloned().unwrap_or_else(|| (exe_path(window_pid(h)), app_id(h)));
-            known.insert(raw, (exe.clone(), id.clone()));
-            RawWindow { hwnd: raw, title: window_title(h), exe, app_id: id }
+            let (exe, id, description) = old.get(&raw).cloned().unwrap_or_else(|| {
+                let exe = exe_path(window_pid(h));
+                let description = useful_description(file_description(&exe));
+                (exe, app_id(h), description)
+            });
+            known.insert(raw, (exe.clone(), id.clone(), description.clone()));
+            RawWindow { description, hwnd: raw, title: window_title(h), exe, app_id: id }
         })
         .collect();
     *guard = Some(known);
@@ -226,14 +258,6 @@ pub fn take_foreground_raw(raw: isize) {
 
 pub fn exe_of_pid(pid: u32) -> String {
     exe_path(pid)
-}
-
-pub fn pid_of(raw: isize) -> u32 {
-    window_pid(hwnd(raw))
-}
-
-pub fn exe_of(raw: isize) -> String {
-    exe_path(pid_of(raw))
 }
 
 pub fn start_is_open() -> bool {

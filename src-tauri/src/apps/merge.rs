@@ -12,6 +12,8 @@ pub struct Pin {
 
 #[derive(Clone, Debug)]
 pub struct RawWindow {
+    /// What the program calls itself, as Windows shows in its own lists.
+    pub description: Option<String>,
     pub hwnd: isize,
     pub title: String,
     pub exe: String,
@@ -68,6 +70,12 @@ fn exe_stem(exe: &str) -> &str {
     file.rsplit_once('.').map_or(file, |(stem, _)| stem)
 }
 
+/// Some programs describe only what they're built with.
+pub fn useful_description(text: Option<String>) -> Option<String> {
+    let text = text?.trim().to_string();
+    (!text.is_empty() && !text.eq_ignore_ascii_case("Electron")).then_some(text)
+}
+
 /// Store apps all run inside this host, so the program name says nothing about them.
 fn is_frame_host(exe: &str) -> bool {
     same(exe_stem(exe), "ApplicationFrameHost")
@@ -101,7 +109,7 @@ pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<Ap
             let frame_host = is_frame_host(&w.exe);
             entries.push(AppEntry {
                 key,
-                name: if frame_host { w.title.clone() } else { exe_stem(&w.exe).to_string() },
+                name: if frame_host { w.title.clone() } else { w.description.clone().unwrap_or_else(|| exe_stem(&w.exe).to_string()) },
                 pinned: false,
                 active: false,
                 windows: Vec::new(),
@@ -135,8 +143,28 @@ pub fn click_plan(entry: &AppEntry, foreground: isize) -> Click {
 mod tests {
     use super::*;
 
+    #[test]
+    fn an_app_is_named_as_its_program_describes_itself() {
+        let mut window = win(1, "A title", r"C:\apps\WindowsTerminal.exe", None);
+        window.description = Some("Windows Terminal".into());
+        assert_eq!(merge(&[], vec![window], 0)[0].name, "Windows Terminal");
+    }
+
+    #[test]
+    fn with_no_description_it_falls_back_to_the_programs_file_name() {
+        assert_eq!(merge(&[], vec![win(1, "A title", r"C:\apps\WINWORD.EXE", None)], 0)[0].name, "WINWORD");
+    }
+
+    #[test]
+    fn a_framework_isnt_a_name() {
+        assert_eq!(useful_description(Some("Electron".into())), None);
+        assert_eq!(useful_description(Some("  ".into())), None);
+        assert_eq!(useful_description(None), None);
+        assert_eq!(useful_description(Some(" Discord ".into())), Some("Discord".into()));
+    }
+
     fn win(hwnd: isize, title: &str, exe: &str, app_id: Option<&str>) -> RawWindow {
-        RawWindow { hwnd, title: title.into(), exe: exe.into(), app_id: app_id.map(String::from) }
+        RawWindow { description: None, hwnd, title: title.into(), exe: exe.into(), app_id: app_id.map(String::from) }
     }
 
     fn pin(name: &str, target: Option<&str>, app_id: Option<&str>) -> Pin {
