@@ -224,6 +224,42 @@ describe("several windows and previews", () => {
     expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
   });
 
+  it("clicking an app with several windows shows them, and doesn't switch", () => {
+    render(<AppsTile data={[two("a")]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    fireEvent.mouseDown(button("a"));
+    fireEvent.click(button("a"));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "a" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("apps_activate", expect.anything());
+  });
+
+  it("clicking again closes them", () => {
+    render(<AppsTile data={[two("a")]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(350));
+    mockInvoke.mockClear();
+    fireEvent.mouseDown(button("a"));
+    fireEvent.click(button("a"));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_hide");
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+    expect(mockInvoke).not.toHaveBeenCalledWith("apps_activate", expect.anything());
+  });
+
+  it("pressing an app with several windows doesn't close them first", () => {
+    render(<AppsTile data={[two("a")]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(350));
+    mockInvoke.mockClear();
+    fireEvent.mouseDown(button("a"));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_hide");
+  });
+
+  it("clicking an app with one window still brings it forward", () => {
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.click(button("a"));
+    expect(mockInvoke).toHaveBeenCalledWith("apps_activate", { key: "a" });
+  });
+
   it("the picker's sample shows no previews", () => {
     render(<AppsTile data={[app("a", true)]} status="sample" preview />);
     fireEvent.mouseEnter(button("a"));

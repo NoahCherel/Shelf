@@ -126,6 +126,20 @@ pub fn search_files(query: String, ticket: u64) -> Result<Vec<SearchItem>, Strin
         .collect())
 }
 
+/// Nothing is stored for this: it's Windows' own list of what was opened.
+#[tauri::command(async)]
+pub fn search_recent_files() -> Vec<SearchItem> {
+    let mut known = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    files::recent()
+        .into_iter()
+        .map(|path| {
+            let item = SearchItem { id: format!("file:{path}"), name: files::recent_name(files::file_name(&path)).to_string(), kind: "file", detail: None };
+            known.remember(&item, &path);
+            item
+        })
+        .collect()
+}
+
 fn shell_open(target: &str) {
     unsafe {
         ShellExecuteW(None, w!("open"), &HSTRING::from(target), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);

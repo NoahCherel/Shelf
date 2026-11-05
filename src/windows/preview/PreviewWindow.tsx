@@ -31,9 +31,41 @@ function AppIcon({ appKey, name }: { appKey: string; name: string }) {
   return <span className="pv__icon pv__icon--blank">{name.charAt(0).toUpperCase()}</span>;
 }
 
+const PEEK_PAUSE_MS = 250;
+
+/** Resting on a picture shows that window, and the next picture follows at once. */
+function usePeek() {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const peeking = useRef(false);
+  const send = (hwnd: number | null) => invoke("preview_peek", { hwnd }).catch(() => {});
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return {
+    enter(hwnd: number) {
+      clearTimeout(timer.current);
+      if (peeking.current) {
+        send(hwnd);
+        return;
+      }
+      timer.current = setTimeout(() => {
+        peeking.current = true;
+        send(hwnd);
+      }, PEEK_PAUSE_MS);
+    },
+    leave() {
+      clearTimeout(timer.current);
+      if (peeking.current) send(null);
+    },
+    leaveStrip() {
+      clearTimeout(timer.current);
+      peeking.current = false;
+    },
+  };
+}
+
 /** The strip itself. Windows draws each live picture over its frame. */
 export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwnd: number) => void }) {
   const strip = useRef<HTMLDivElement>(null);
+  const peek = usePeek();
 
   // Every change of layout moves the pictures, which sit outside the page.
   useLayoutEffect(() => {
@@ -51,12 +83,21 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
       ref={strip}
       style={{ "--slot": `${shown.slotWidth}px` } as CSSProperties}
       onMouseEnter={() => invoke("preview_keep").catch(() => {})}
-      onMouseLeave={() => invoke("preview_leave").catch(() => {})}
+      onMouseLeave={() => {
+        peek.leaveStrip();
+        invoke("preview_leave").catch(() => {});
+      }}
     >
       {shown.windows.map((window) => {
         const title = window.title || shown.name;
         return (
-          <div key={window.hwnd} className="pv__window" onClick={() => invoke("preview_activate", { hwnd: window.hwnd }).catch(() => {})}>
+          <div
+            key={window.hwnd}
+            className="pv__window"
+            onClick={() => invoke("preview_activate", { hwnd: window.hwnd }).catch(() => {})}
+            onMouseEnter={() => peek.enter(window.hwnd)}
+            onMouseLeave={peek.leave}
+          >
             <div className="pv__head">
               <span className="pv__title">{title}</span>
               <button
@@ -65,6 +106,7 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
                 aria-label={`Close ${title}`}
                 onClick={(e) => {
                   e.stopPropagation();
+                  peek.leave();
                   invoke("preview_close_window", { hwnd: window.hwnd }).catch(() => {});
                   onClosed(window.hwnd);
                 }}

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { invoke, listen } from "../../core/tauri";
 import { PreviewWindow } from "./PreviewWindow";
 
@@ -100,4 +100,61 @@ it("a title is text, never HTML", async () => {
 it("a window with no title falls back to the app's name", async () => {
   await openIt({ ...SHOWN, windows: [{ hwnd: 1, title: "", minimized: false }] });
   expect(screen.getByText("Firefox")).toBeTruthy();
+});
+
+describe("resting on a picture", () => {
+  const peeks = () => mockInvoke.mock.calls.filter((c) => c[0] === "preview_peek").map((c) => (c[1] as { hwnd: number | null }).hwnd);
+  const picture = (title: string) => screen.getByText(title).closest(".pv__window") as HTMLElement;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows that window after a short pause", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(249));
+    expect(peeks()).toEqual([]);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(peeks()).toEqual([11]);
+  });
+
+  it("passing over a picture shows nothing", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    fireEvent.mouseLeave(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(peeks()).toEqual([]);
+  });
+
+  it("leaving the picture puts things back", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    fireEvent.mouseLeave(picture("First window"));
+    expect(peeks()).toEqual([11, null]);
+  });
+
+  it("moving between pictures follows straight away", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    // Leaving towards the next picture is also what enters it.
+    fireEvent.mouseLeave(picture("First window"), { relatedTarget: picture("Second window") });
+    expect(peeks()).toEqual([11, null, 22]);
+  });
+
+  it("once the pointer has left the strip, the pause comes back", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    fireEvent.mouseLeave(picture("First window"));
+    fireEvent.mouseLeave(document.querySelector(".pv") as HTMLElement);
+    fireEvent.mouseEnter(picture("Second window"));
+    expect(peeks()).toEqual([11, null]);
+  });
 });

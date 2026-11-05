@@ -79,7 +79,7 @@ These launch real things, so only the owner runs them.
 - [ ] **Open an app:** Enter or a click starts it, and the card closes.
 - [ ] **Open a file:** a file result opens in its usual app.
 - [ ] **Web:** the last row opens the browser on a search for the text.
-- [ ] **Recent:** what was opened comes back with an empty box next time.
+- [ ] **Recent:** recent searches, apps and files show with an empty box, and a recent file opens.
 - [ ] **Reopen:** close the card, open it, and files still come back.
 - [ ] **Win+S:** still opens Windows' own search, as taking the shortcut over is out of scope.
 
@@ -94,7 +94,9 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Switch:** clicking a picture brings that window forward.
 - [ ] **Close:** the cross closes that window, and an unsaved document still asks first.
 - [ ] **Minimized:** shows the app's icon, and clicking restores the window.
-- [ ] **Two dots:** an app with several windows shows them, and clicking steps through its windows.
+- [ ] **Peek:** resting on a picture shows that window over the others until the pointer leaves it, and moving to the next picture follows. Afterwards, everything is back as it was.
+- [ ] **Two dots:** an app with several windows shows them.
+- [ ] **Click:** on several windows, a click shows them and another closes them. On one window, it brings it forward.
 - [ ] **Scale:** pictures sit in their frames at 100%, 125% and 150%.
 
 ## A day of use

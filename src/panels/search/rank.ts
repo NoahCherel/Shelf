@@ -1,7 +1,7 @@
 export interface SearchItem {
   id: string;
   name: string;
-  kind: "app" | "file";
+  kind: "app" | "file" | "search";
   detail?: string | null;
 }
 

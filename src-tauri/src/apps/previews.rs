@@ -3,16 +3,17 @@
 //! can't see them. The window never takes focus, so hovering can't disturb the app you're in.
 
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-use ::windows::core::BOOL;
+use ::windows::core::{w, BOOL, HRESULT, PCSTR};
 use ::windows::Win32::Foundation::{HWND, POINT, RECT};
 use ::windows::Win32::Graphics::Dwm::{
-    DwmQueryThumbnailSourceSize, DwmRegisterThumbnail, DwmUnregisterThumbnail, DwmUpdateThumbnailProperties, DWM_THUMBNAIL_PROPERTIES, DWM_TNP_OPACITY,
-    DWM_TNP_RECTDESTINATION, DWM_TNP_VISIBLE,
+    DwmQueryThumbnailSourceSize, DwmRegisterThumbnail, DwmSetWindowAttribute, DwmUnregisterThumbnail, DwmUpdateThumbnailProperties,
+    DWMWA_EXCLUDED_FROM_PEEK, DWM_THUMBNAIL_PROPERTIES, DWM_TNP_OPACITY, DWM_TNP_RECTDESTINATION, DWM_TNP_VISIBLE,
 };
+use ::windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use ::windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
@@ -102,6 +103,8 @@ static HOVER: Hover = Hover(AtomicU64::new(0));
 /// The app being shown, and the pictures registered for it.
 static SHOWN: Mutex<Option<String>> = Mutex::new(None);
 static PICTURES: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+static ON_STRIP: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+static PEEKING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize, Clone)]
 struct ShownWindow {
@@ -145,6 +148,7 @@ fn clear_pictures() {
 }
 
 fn hide(app: &AppHandle) -> Result<(), String> {
+    let _ = set_peek(app, None);
     clear_pictures();
     *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = None;
     preview_window(app)?.hide().map_err(|e| e.to_string())?;
@@ -171,6 +175,48 @@ fn watch_pointer(app: AppHandle, dock: Rect, strip: Rect) {
     });
 }
 
+fn may_peek(shown: &[isize], raw: isize) -> bool {
+    shown.contains(&raw)
+}
+
+/// Windows' own Aero Peek, which has no public name, only a number in dwmapi. It shows one window
+/// over the others without activating it, until told to stop.
+type LivePreview = unsafe extern "system" fn(BOOL, HWND, HWND, u32, *mut c_void) -> HRESULT;
+const LIVE_PREVIEW_ORDINAL: usize = 113;
+const PEEK_AT_WINDOW: u32 = 3;
+
+fn live_preview() -> Option<LivePreview> {
+    static FOUND: OnceLock<Option<usize>> = OnceLock::new();
+    let found = FOUND.get_or_init(|| unsafe {
+        let library = LoadLibraryW(w!("dwmapi.dll")).ok()?;
+        GetProcAddress(library, PCSTR(LIVE_PREVIEW_ORDINAL as *const u8)).map(|f| f as usize)
+    });
+    found.map(|address| unsafe { std::mem::transmute::<usize, LivePreview>(address) })
+}
+
+/// The strip stays up during a peek, so the pointer can move on to the next picture.
+fn set_peek(app: &AppHandle, target: Option<isize>) -> Result<(), String> {
+    let Some(activate) = live_preview() else { return Ok(()) };
+    let strip = preview_window(app)?.hwnd().map_err(|e| e.to_string())?;
+    let was_peeking = PEEKING.swap(target.is_some(), Ordering::SeqCst);
+    if target.is_none() && !was_peeking {
+        return Ok(());
+    }
+    let window = target.map_or(HWND(std::ptr::null_mut()), hwnd_of);
+    let result = unsafe { activate(BOOL::from(target.is_some()), window, HWND(strip.0), PEEK_AT_WINDOW, std::ptr::null_mut()) };
+    result.ok().map_err(|e| e.to_string())
+}
+
+/// A peek fades every other window, and these two have to stay for the pointer to move on.
+fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
+    let raw = window.hwnd().map_err(|e| e.to_string())?;
+    let exclude = BOOL::from(true);
+    unsafe {
+        DwmSetWindowAttribute(HWND(raw.0), DWMWA_EXCLUDED_FROM_PEEK, &exclude as *const BOOL as *const c_void, std::mem::size_of::<BOOL>() as u32)
+            .map_err(|e| e.to_string())
+    }
+}
+
 /// Clicks on the strip mustn't take focus from your app, as with the dock.
 pub fn prepare(app: &AppHandle) -> Result<(), String> {
     let window = preview_window(app)?;
@@ -179,7 +225,8 @@ pub fn prepare(app: &AppHandle) -> Result<(), String> {
         let style = GetWindowLongPtrW(HWND(raw.0), GWL_EXSTYLE);
         SetWindowLongPtrW(HWND(raw.0), GWL_EXSTYLE, style | WS_EX_NOACTIVATE.0 as isize);
     }
-    Ok(())
+    stay_during_peek(&window)?;
+    stay_during_peek(&app.get_webview_window("dock").ok_or("dock window missing")?)
 }
 
 /// Tile position is logical px inside the dock window.
@@ -230,7 +277,9 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     if !HOVER.still_leaving(opening) {
         return Ok(());
     }
+    let _ = set_peek(&app, None);
     clear_pictures();
+    *ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()) = shown.windows.iter().map(|w| w.hwnd).collect();
     *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(key);
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     window.show().map_err(|e| e.to_string())?;
@@ -272,6 +321,15 @@ pub fn preview_slots(app: AppHandle, slots: Vec<Slot>) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Nothing here lasts: the window goes back when the pointer leaves or the strip closes.
+#[tauri::command(async)]
+pub fn preview_peek(app: AppHandle, hwnd: Option<isize>) -> Result<(), String> {
+    if hwnd.is_some_and(|raw| !may_peek(&ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()), raw)) {
+        return Err("not on the strip".into());
+    }
+    set_peek(&app, hwnd)
 }
 
 #[tauri::command]
@@ -378,6 +436,13 @@ mod tests {
         let entries = vec![entry(&[11, 22])];
         assert!(is_listed(&entries, 22));
         assert!(!is_listed(&entries, 33));
+    }
+
+    #[test]
+    fn only_a_window_on_the_strip_can_be_peeked_at() {
+        let shown = vec![11, 22];
+        assert!(may_peek(&shown, 22));
+        assert!(!may_peek(&shown, 33));
     }
 
     #[test]

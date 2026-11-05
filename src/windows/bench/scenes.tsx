@@ -1,5 +1,5 @@
 import type { Shown } from "../preview/PreviewWindow";
-import { fakeApps, fakeAudio, fakeWifi } from "./fixtures";
+import { fakeApps, fakeAudio, fakeSearchFiles, fakeWifi } from "./fixtures";
 
 export interface Scene {
   id: string;
@@ -210,7 +210,10 @@ export const scenes: Scene[] = [
     dock: DOCK,
     card: "__panel:search",
     anchor: '[aria-label="Search"]',
-    backend: { store_load: ({ name }: { name: string }) => (name === "search-history" ? { Firefox: 5, Discord: 2, Paint: 1 } : null) },
+    backend: {
+      store_load: ({ name }: { name: string }) => (name === "search-history" ? { Firefox: 5, Discord: 2 } : name === "search-recent" ? ["facture", "météo nice"] : null),
+      search_recent_files: () => fakeSearchFiles().map(({ id, name, kind }) => ({ id, name, kind })),
+    },
   },
   { id: "card-search-results", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]', steps: [{ type: "pa" }] },
   { id: "card-search-no-results", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]', backend: { search_files: () => [] }, steps: [{ type: "zzzz" }] },

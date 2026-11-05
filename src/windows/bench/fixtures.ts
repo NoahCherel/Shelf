@@ -156,11 +156,13 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     brightness_set: () => null,
     preview_show: () => null,
     preview_slots: () => null,
+    preview_peek: () => null,
     preview_keep: () => null,
     preview_leave: () => null,
     preview_hide: () => null,
     search_apps: () => fakeSearchApps(),
     search_files: () => fakeSearchFiles(),
+    search_recent_files: () => [],
     search_open: () => null,
     search_web: () => null,
     search_icon: ({ id }: { id: string }) => {

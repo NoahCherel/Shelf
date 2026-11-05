@@ -97,3 +97,31 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.search__list .search__section {
+  margin: 10px 10px 4px;
+}
+
+.search__remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--muted);
+  opacity: 0;
+}
+
+.search__row--on .search__remove {
+  opacity: 1;
+}
+
+.search__remove:hover {
+  background: var(--track);
+}
+
+.search__remove svg {
+  width: 11px;
+  height: 11px;
+}

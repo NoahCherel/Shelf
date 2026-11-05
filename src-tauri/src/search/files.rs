@@ -17,6 +17,37 @@ const ITEM_NAME: PROPERTYKEY = PROPERTYKEY { fmtid: GUID::from_u128(0xb725f130_4
 const MOST: usize = 12;
 const GIVE_UP_AFTER: Duration = Duration::from_secs(4);
 
+const MOST_RECENT: usize = 6;
+const SHORTCUT: &str = ".lnk";
+
+/// Windows' Recent folder holds a shortcut for each file and folder opened. A file's shortcut keeps
+/// its extension in its name, as in report.pdf.lnk, and a folder's doesn't.
+fn recent_shortcuts(mut found: Vec<(String, u64)>) -> Vec<String> {
+    found.retain(|(name, _)| name.strip_suffix(SHORTCUT).is_some_and(|stem| stem.contains('.')));
+    found.sort_by_key(|(_, modified)| std::cmp::Reverse(*modified));
+    found.into_iter().take(MOST_RECENT).map(|(name, _)| name).collect()
+}
+
+pub fn recent_name(shortcut: &str) -> &str {
+    shortcut.strip_suffix(SHORTCUT).unwrap_or(shortcut)
+}
+
+/// Paths of the shortcuts for recently opened files, as Windows itself keeps them.
+pub fn recent() -> Vec<String> {
+    let Some(folder) = std::env::var_os("APPDATA").map(|d| std::path::PathBuf::from(d).join(r"Microsoft\Windows\Recent")) else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(&folder) else { return Vec::new() };
+    let found = entries
+        .flatten()
+        .filter_map(|e| {
+            let modified = e.metadata().ok()?.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+            Some((e.file_name().to_string_lossy().into_owned(), modified))
+        })
+        .collect();
+    recent_shortcuts(found).into_iter().map(|name| folder.join(name).to_string_lossy().into_owned()).collect()
+}
+
 pub fn file_name(path: &str) -> &str {
     path.rsplit('\\').next().unwrap_or(path)
 }
@@ -63,6 +94,25 @@ pub fn find(query: &str, still_wanted: impl Fn() -> bool) -> Result<Vec<String>,
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recent_files_are_newest_first_and_at_most_six() {
+        let found: Vec<_> = (0..9).map(|i| (format!("f{i}.pdf.lnk"), i as u64)).collect();
+        let recent = recent_shortcuts(found);
+        assert_eq!(recent.len(), 6);
+        assert_eq!(recent[0], "f8.pdf.lnk");
+    }
+
+    #[test]
+    fn recent_folders_and_other_things_are_left_out() {
+        let found = vec![("Documents.lnk".to_string(), 3), ("report.pdf.lnk".to_string(), 2), ("desktop.ini".to_string(), 1)];
+        assert_eq!(recent_shortcuts(found), ["report.pdf.lnk"]);
+    }
+
+    #[test]
+    fn a_recent_file_is_named_without_its_shortcut() {
+        assert_eq!(recent_name("report.final.pdf.lnk"), "report.final.pdf");
+    }
 
     #[test]
     fn a_file_shows_its_folder() {

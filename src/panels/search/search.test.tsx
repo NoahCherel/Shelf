@@ -20,6 +20,8 @@ const APPS = [
 
 let files: (query: string) => Promise<unknown> = async () => [];
 let history: Record<string, number> | null = null;
+let recentSearches: string[] | null = null;
+let recentFiles: unknown[] = [];
 
 const flush = () => act(() => vi.advanceTimersByTimeAsync(0));
 
@@ -27,11 +29,14 @@ beforeEach(() => {
   vi.useFakeTimers();
   files = async () => [];
   history = null;
+  recentSearches = null;
+  recentFiles = [];
   mockInvoke.mockReset();
   mockInvoke.mockImplementation(async (cmd, args) => {
     if (cmd === "search_apps") return APPS;
     if (cmd === "search_files") return files((args as { query: string }).query);
-    if (cmd === "store_load") return history;
+    if (cmd === "store_load") return (args as { name: string }).name === "search-recent" ? recentSearches : history;
+    if (cmd === "search_recent_files") return recentFiles;
     return null;
   });
 });
@@ -197,4 +202,110 @@ it("results render as text, never HTML", async () => {
   await act(() => vi.advanceTimersByTimeAsync(150));
   expect(document.querySelector("img[src='x']")).toBeNull();
   expect(screen.getByText("pa<img src=x onerror=alert(1)>.txt")).toBeTruthy();
+});
+
+describe("with an empty box", () => {
+  const FILE = { id: "file:r", name: "budget.xlsx", kind: "file" };
+
+  it("shows recent searches, apps and files", async () => {
+    recentSearches = ["facture"];
+    history = { Notepad: 2 };
+    recentFiles = [FILE];
+    await openCard();
+    expect(rows()).toEqual(["facture", "Notepad", "budget.xlsx"]);
+    expect(screen.getByText("RECENT SEARCHES")).toBeTruthy();
+    expect(screen.getByText("RECENT FILES")).toBeTruthy();
+  });
+
+  it("nothing recent shows no headings", async () => {
+    await openCard();
+    expect(rows()).toEqual([]);
+    expect(screen.queryByText("RECENT FILES")).toBeNull();
+  });
+
+  it("a recent file opens", async () => {
+    recentFiles = [FILE];
+    await openCard();
+    fireEvent.click(screen.getByText("budget.xlsx"));
+    expect(mockInvoke).toHaveBeenCalledWith("search_open", { id: "file:r" });
+  });
+
+  it("recent files go once there's text to search", async () => {
+    recentFiles = [FILE];
+    await openCard();
+    type("paint");
+    expect(rows()).not.toContain("budget.xlsx");
+  });
+
+  it("a recent search fills the box rather than opening anything", async () => {
+    recentSearches = ["facture"];
+    await openCard();
+    fireEvent.click(screen.getByText("facture"));
+    expect(box().value).toBe("facture");
+    expect(mockInvoke).not.toHaveBeenCalledWith("close_card");
+    expect(document.activeElement).toBe(box());
+  });
+
+  it("Enter on a recent search fills the box too", async () => {
+    recentSearches = ["facture"];
+    await openCard();
+    fireEvent.keyDown(box(), { key: "Enter" });
+    expect(box().value).toBe("facture");
+    expect(mockInvoke).not.toHaveBeenCalledWith("search_web", expect.anything());
+  });
+
+  it("a recent search can be removed", async () => {
+    recentSearches = ["facture", "impots"];
+    await openCard();
+    fireEvent.click(screen.getByRole("button", { name: "Remove facture" }));
+    expect(mockInvoke).toHaveBeenCalledWith("store_save", { name: "search-recent", value: ["impots"] });
+    expect(rows()).toEqual(["impots"]);
+    expect(box().value).toBe("");
+  });
+});
+
+describe("remembering a search", () => {
+  const saved = () => mockInvoke.mock.calls.filter((c) => c[0] === "store_save" && (c[1] as { name: string }).name === "search-recent").map((c) => (c[1] as { value: string[] }).value);
+
+  it("happens when something is opened from it, newest first", async () => {
+    recentSearches = ["old"];
+    await openCard();
+    type("paint");
+    fireEvent.keyDown(box(), { key: "Enter" });
+    await flush();
+    expect(saved()).toEqual([["paint", "old"]]);
+  });
+
+  it("doesn't happen just from typing", async () => {
+    await openCard();
+    type("secret thing");
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(saved()).toEqual([]);
+  });
+
+  it("a web search counts", async () => {
+    await openCard();
+    type("météo");
+    fireEvent.click(screen.getByText("Search the web for “météo”"));
+    await flush();
+    expect(saved()).toEqual([["météo"]]);
+  });
+
+  it("the same search isn't kept twice, whatever its case", async () => {
+    recentSearches = ["Paint", "old"];
+    await openCard();
+    type("paint");
+    fireEvent.keyDown(box(), { key: "Enter" });
+    await flush();
+    expect(saved()).toEqual([["paint", "old"]]);
+  });
+
+  it("only the last five are kept", async () => {
+    recentSearches = ["a", "b", "c", "d", "e"];
+    await openCard();
+    type("paint");
+    fireEvent.keyDown(box(), { key: "Enter" });
+    await flush();
+    expect(saved()).toEqual([["paint", "a", "b", "c", "d"]]);
+  });
 });

@@ -123,13 +123,26 @@ function useAppPreviews(preview?: boolean) {
     clearTimeout(timer.current);
     if (showing.current) invoke("preview_leave").catch(() => {});
   };
-  const press = () => {
+  const press = (entry: AppEntry) => {
     if (preview) return;
     clearTimeout(timer.current);
+    // With several windows the click that follows decides, as it does on Windows.
+    if (entry.windows.length > 1) return;
     showing.current = false;
     invoke("preview_hide").catch(() => {});
   };
-  return { enter, leave, press };
+  /** Several windows: a click shows them all, and another closes them. */
+  const toggle = (e: MouseEvent<HTMLElement>, entry: AppEntry) => {
+    if (showing.current) {
+      showing.current = false;
+      invoke("preview_hide").catch(() => {});
+      return;
+    }
+    const r = e.currentTarget.getBoundingClientRect();
+    showing.current = true;
+    invoke("preview_show", { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
+  };
+  return { enter, leave, press, toggle };
 }
 
 export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
@@ -180,8 +193,12 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
           title={entry.windows.length > 0 ? undefined : entry.name}
           onMouseEnter={(e) => previews.enter(e, entry)}
           onMouseLeave={previews.leave}
-          onMouseDown={previews.press}
-          onClick={() => !preview && invoke("apps_activate", { key: entry.key }).catch(() => {})}
+          onMouseDown={() => previews.press(entry)}
+          onClick={(e) => {
+            if (preview) return;
+            if (entry.windows.length > 1) previews.toggle(e, entry);
+            else invoke("apps_activate", { key: entry.key }).catch(() => {});
+          }}
           onContextMenu={(e) => windowsMenu(e, "apps_context_menu", { key: entry.key })}
         >
           <AppIcon entry={entry} preview={preview} />
