@@ -107,3 +107,33 @@
     animation: none;
   }
 }
+
+/* And folds away the same way when it closes. It holds its last frame until Shelf removes it. */
+.app--leaving {
+  pointer-events: none;
+  animation: app-out 300ms ease-in-out forwards;
+}
+
+.app--leaving .app__icon {
+  animation: app-icon-out 300ms ease-in-out forwards;
+}
+
+@keyframes app-out {
+  to {
+    width: 0;
+    min-width: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes app-icon-out {
+  to {
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app--leaving {
+    display: none;
+  }
+}

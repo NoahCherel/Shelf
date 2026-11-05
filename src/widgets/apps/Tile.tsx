@@ -26,6 +26,8 @@ export function stableOrder(previous: AppEntry[], next: AppEntry[]): AppEntry[] 
 const APP_MENU_PREFIX = "__appmenu:";
 const APP_MENU_WIDTH = 300;
 const APP_MENU_HEIGHT = 120;
+/** As long as the fold in apps.css. */
+const FOLD_MS = 300;
 const PREVIEW_PAUSE_MS = 350;
 const ICON_RETRY_MS = 2500;
 const ICON_TRIES = 6;
@@ -161,10 +163,62 @@ function useArrivals(entries: AppEntry[] | null, preview?: boolean): Set<string>
   return arrived.current;
 }
 
+/** Apps just gone, kept where they were for the moment they take to fold away. */
+function useLeaving(entries: AppEntry[] | null, preview?: boolean): AppEntry[] {
+  const [, redraw] = useState(0);
+  const last = useRef<AppEntry[] | null>(null);
+  const leaving = useRef(new Map<string, { entry: AppEntry; index: number }>());
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  if (entries && !preview) {
+    const now = new Set(entries.map((e) => e.key));
+    last.current?.forEach((entry, index) => {
+      if (!now.has(entry.key)) leaving.current.set(entry.key, { entry, index });
+    });
+    for (const key of now) leaving.current.delete(key);
+    last.current = entries;
+  }
+
+  useEffect(() => {
+    for (const [key, timer] of timers.current) {
+      if (!leaving.current.has(key)) {
+        clearTimeout(timer);
+        timers.current.delete(key);
+      }
+    }
+    for (const key of leaving.current.keys()) {
+      if (timers.current.has(key)) continue;
+      timers.current.set(
+        key,
+        setTimeout(() => {
+          timers.current.delete(key);
+          leaving.current.delete(key);
+          redraw((n) => n + 1);
+        }, FOLD_MS),
+      );
+    }
+  });
+
+  useEffect(() => {
+    const running = timers.current;
+    return () => {
+      running.forEach(clearTimeout);
+      running.clear();
+    };
+  }, []);
+
+  const rows = [...(entries ?? [])];
+  [...leaving.current.values()]
+    .sort((a, b) => a.index - b.index)
+    .forEach(({ entry, index }) => rows.splice(Math.min(index, rows.length), 0, entry));
+  return rows;
+}
+
 export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
   const previews = useAppPreviews(preview);
   const arrived = useArrivals(data, preview);
-  const entries = data ?? [];
+  const rows = useLeaving(data, preview);
+  const present = new Set((data ?? []).map((e) => e.key));
   const [startOpen, setStartOpen] = useState(false);
   useEffect(() => {
     if (preview) return;
@@ -201,10 +255,16 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
       >
         <SearchGlyph />
       </button>
-      {entries.map((entry) => (
+      {rows.map((entry) =>
+        !present.has(entry.key) && !preview ? (
+          <span key={entry.key} className="app app--leaving" data-key={entry.key} aria-hidden="true">
+            <AppIcon entry={entry} />
+          </span>
+        ) : (
         <button
           type="button"
           key={entry.key}
+          data-key={entry.key}
           className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}`}
           aria-label={entry.name}
           title={entry.windows.length > 0 ? undefined : entry.name}
@@ -228,7 +288,8 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
           <AppIcon entry={entry} preview={preview} />
           {entry.windows.length > 0 && <span className="app__dot" />}
         </button>
-      ))}
+        ),
+      )}
     </div>
   );
 }
