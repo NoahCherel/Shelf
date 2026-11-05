@@ -4,7 +4,7 @@ import { DEFAULT_LAYOUT, useLayout } from "./layout";
 
 vi.mock("./tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 vi.mock("./registry", () => ({
-  widgets: ["claude-plan-usage", "apps", "github-activity", "clock-and-weather", "clock", "battery"].map((id) => ({ id })),
+  widgets: ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather", "clock", "battery"].map((id) => ({ id })),
 }));
 
 const mockInvoke = vi.mocked(invoke);
@@ -41,19 +41,19 @@ describe("changes", () => {
 
   it("every change saves with a version", () => {
     useLayout.getState().add("battery");
-    expect(saved()).toEqual([{ name: "layout", value: { version: 1, ids: ["apps", "clock", "battery"] } }]);
+    expect(saved()).toEqual([{ name: "layout", value: { version: 2, ids: ["apps", "clock", "battery"] } }]);
   });
 });
 
 describe("load", () => {
   it("drops ids not in the registry and keeps the rest", async () => {
-    mockInvoke.mockResolvedValue({ version: 1, ids: ["clock", "gone-widget", "apps"] });
+    mockInvoke.mockResolvedValue({ version: 2, ids: ["clock", "gone-widget", "apps"] });
     await useLayout.getState().load();
     expect(useLayout.getState().ids).toEqual(["clock", "apps"]);
   });
 
   it("drops duplicates and non-strings", async () => {
-    mockInvoke.mockResolvedValue({ version: 1, ids: ["clock", "clock", 7, null] });
+    mockInvoke.mockResolvedValue({ version: 2, ids: ["clock", "clock", 7, null] });
     await useLayout.getState().load();
     expect(useLayout.getState().ids).toEqual(["clock"]);
   });
@@ -62,7 +62,7 @@ describe("load", () => {
     mockInvoke.mockResolvedValue(null);
     await useLayout.getState().load();
     expect(useLayout.getState().ids).toEqual(DEFAULT_LAYOUT);
-    expect(DEFAULT_LAYOUT).toEqual(["claude-plan-usage", "apps", "github-activity", "clock-and-weather"]);
+    expect(DEFAULT_LAYOUT).toEqual(["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"]);
   });
 
   it("yields the default layout for a corrupt shape", async () => {
@@ -75,13 +75,25 @@ describe("load", () => {
   });
 
   it("keeps a layout the owner emptied on purpose", async () => {
-    mockInvoke.mockResolvedValue({ version: 1, ids: [] });
+    mockInvoke.mockResolvedValue({ version: 2, ids: [] });
     await useLayout.getState().load();
     expect(useLayout.getState().ids).toEqual([]);
   });
 
+  it("gives a layout saved before the status tile one, last", async () => {
+    mockInvoke.mockResolvedValue({ version: 1, ids: ["apps", "clock"] });
+    await useLayout.getState().load();
+    expect(useLayout.getState().ids).toEqual(["apps", "clock", "system-status"]);
+  });
+
+  it("doesn't bring it back once removed", async () => {
+    mockInvoke.mockResolvedValue({ version: 2, ids: ["apps", "clock"] });
+    await useLayout.getState().load();
+    expect(useLayout.getState().ids).toEqual(["apps", "clock"]);
+  });
+
   it("does not write back while loading", async () => {
-    mockInvoke.mockResolvedValue({ version: 1, ids: ["clock", "gone-widget"] });
+    mockInvoke.mockResolvedValue({ version: 2, ids: ["clock", "gone-widget"] });
     await useLayout.getState().load();
     expect(saved()).toEqual([]);
   });

@@ -7,3 +7,4 @@ docs/lumabar/_evidence/
 
 .superpowers/
 dist/
+.bench/

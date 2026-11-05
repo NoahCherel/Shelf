@@ -65,6 +65,8 @@ export interface WidgetDef<D = any> {
   /** Fixed height of the card, in px. */
   cardHeight?: number;
   cardWidth?: number;
+  /** A shared panel to open on click, instead of a card of its own. */
+  panel?: "quick";
   provider?: Provider<D>;
   sample?: D;
   menu?: (ctx: MenuCtx) => MenuItem[];

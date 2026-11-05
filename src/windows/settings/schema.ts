@@ -97,6 +97,19 @@ export const SCHEMA: PageDef[] = [
           marks: { S: 40, M: 50, L: 62 },
         }),
       ]),
+      section("Position", [
+        toggle("floatOverWindows", {
+          label: "Float over windows",
+          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop above it.",
+        }),
+        slider("edgeGap", {
+          label: "Distance from edge",
+          tip: "The space between the dock and the bottom of the screen.",
+          min: 0,
+          max: 24,
+          marks: {},
+        }),
+      ]),
       section("Clock", [
         toggle("hour24", { label: "24-hour time", tip: "Shows 17:30 rather than 5:30 PM on every clock." }),
         toggle("seconds", { label: "Seconds", tip: "Shows seconds on the Clock widget." }),

@@ -4,6 +4,8 @@ mod apps;
 mod claude_usage;
 mod glass;
 mod net;
+mod preview;
+mod search;
 mod secrets;
 mod shell;
 mod store;
@@ -23,6 +25,7 @@ fn claude_usage() -> serde_json::Value {
 
 #[tauri::command(async)]
 fn claude_connect(on: bool) -> Result<(), String> {
+    preview::guard()?;
     claude_usage::set_connected(on)
 }
 
@@ -74,6 +77,9 @@ pub fn run() {
     if claude_usage::is_statusline_call(&args) {
         std::process::exit(claude_usage::run_statusline(&args));
     }
+    if args.iter().any(|a| a == "--preview") {
+        preview::turn_on();
+    }
     if args.iter().any(|a| a == "--restore-taskbar") {
         TASKBAR.restore();
         return;
@@ -94,10 +100,12 @@ pub fn run() {
 
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        TASKBAR.restore();
+        preview::restore_taskbar(|| TASKBAR.restore());
         default_hook(info);
     }));
-    spawn_taskbar_watch();
+    if preview::current().watchdog {
+        spawn_taskbar_watch();
+    }
 
     let app = tauri::Builder::default()
         .manage(system::SysMonitor::new())
@@ -115,6 +123,9 @@ pub fn run() {
             shell::card::fit_card,
             shell::card::card_current,
             shell::card::close_card,
+            shell::card::swap_card,
+            shell::card::card_room,
+            system::settings_link::open_settings,
             shell::windows::open_window,
             shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,
@@ -122,19 +133,58 @@ pub fn run() {
             glass::glass_stop,
             glass::glass_frame,
             system::system_stats,
+            system::status::system_status,
+            system::notifications::notifications_list,
+            system::notifications::notification_dismiss,
+            system::notifications::notifications_clear,
+            system::notifications::notification_open,
+            apps::previews::preview_show,
+            apps::previews::preview_slots,
+            apps::previews::preview_peek,
+            apps::previews::preview_keep,
+            apps::previews::preview_leave,
+            apps::previews::preview_hide,
+            apps::previews::preview_activate,
+            apps::previews::preview_close_window,
+            search::search_apps,
+            search::search_files,
+            search::search_recent_files,
+            search::search_forget_file,
+            search::search_open,
+            search::search_web,
+            search::search_icon,
+            system::toggles::toggles_state,
+            system::toggles::toggle_set,
+            system::bluetooth::bluetooth_devices,
+            system::radios::radios_state,
+            system::radios::radio_set,
+            system::brightness::brightness_get,
+            system::brightness::brightness_set,
+            system::wifi::wifi_networks,
+            system::wifi::wifi_scan,
+            system::wifi::wifi_connect,
+            system::wifi::wifi_disconnect,
+            system::audio::audio_state,
+            system::audio::audio_set_volume,
+            system::audio::audio_set_mute,
+            system::audio::audio_set_app_volume,
+            system::audio::audio_set_output,
+            system::audio::audio_app_icon,
             system::autostart_get,
             system::autostart_set,
             apps::apps_list,
             apps::apps_icon,
             apps::apps_activate,
             apps::start_menu,
+            apps::start_quick_menu,
+            apps::apps_context_menu,
             claude_usage,
             claude_connect,
             quit,
         ])
         .on_window_event(|window, event| match (event, window.label()) {
             // Alt+F4 must not take the dock down with the taskbar still hidden.
-            (WindowEvent::CloseRequested { api, .. }, "dock") => api.prevent_close(),
+            (WindowEvent::CloseRequested { api, .. }, "dock" | "preview") => api.prevent_close(),
             (WindowEvent::CloseRequested { api, .. }, "card") => {
                 api.prevent_close();
                 shell::card::on_close(window);
@@ -144,6 +194,8 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
+            search::refresh_apps();
+            apps::previews::prepare(app.handle())?;
             shell::dock::start(app.handle())?;
             apps::watch_foreground(app.handle());
             build_tray(app.handle())?;

@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
 import { appVersion } from "../../core/tauri";
+import { Switch } from "../../design/parts/Switch";
 import { useSettings } from "../../core/settings";
 import { ACCENTS, readPath, writePath, type RowDef, type SectionDef } from "./schema";
 
 function useValue<V>(key: string): [V, (value: V) => void] {
   const value = useSettings(() => readPath(key)) as V;
   return [value, (next) => writePath(key, next)];
-}
-
-function Switch({ label, on, onFlip }: { label: string; on: boolean; onFlip: () => void }) {
-  return (
-    <button type="button" role="switch" aria-label={label} aria-checked={on} className={on ? "switch switch--on" : "switch"} onClick={onFlip}>
-      <i />
-    </button>
-  );
 }
 
 function ToggleRow({ row }: { row: Extract<RowDef, { kind: "toggle" }> }) {

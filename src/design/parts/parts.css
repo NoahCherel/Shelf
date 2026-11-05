@@ -117,3 +117,77 @@ button.tile:hover {
 .row__value {
   font-weight: 700;
 }
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 23px;
+  border-radius: 999px;
+  background: var(--track);
+  transition: background 150ms ease-out;
+}
+
+.switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px #0000004d;
+  transition: transform 150ms ease-out;
+}
+
+.switch--on {
+  background: var(--accent);
+}
+
+.switch--on i {
+  transform: translateX(15px);
+}
+
+/* A thick bar that fills from the left, with the handle inside it. */
+.pslider {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  outline: none;
+  background: linear-gradient(to right, var(--accent) var(--level), var(--track) var(--level));
+  overflow: hidden;
+}
+
+.pslider:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.pslider::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #00000059;
+}
+
+.settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-link svg {
+  width: 11px;
+  height: 11px;
+}
+
+.settings-link:hover {
+  filter: brightness(1.2);
+}

@@ -15,7 +15,7 @@ export default defineWidget<AppEntry[]>({
   name: "Apps",
   description: "Start, your pinned apps and every open window.",
   category: "apps-files",
-  width: (data) => 0.78 * ((data?.length ?? 0) + 1),
+  width: (data) => 0.96 * ((data?.length ?? 0) + 2),
   sample: ["Browser", "Files", "Mail", "Terminal", "Code"].map((name, i) => sampleEntry(name, i % 2 === 0)),
   Tile: AppsTile,
   provider: {

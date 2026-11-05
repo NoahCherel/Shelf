@@ -13,6 +13,17 @@ const MARGIN: f64 = 8.0;
 const REOPEN_GUARD_MS: u64 = 250;
 /// Windows moves focus from the window into its web view as it opens, which looks like clicking away.
 const SETTLE_MS: u64 = 250;
+/// Long lists scroll inside the card rather than reaching for the top of the screen.
+const MAX_HEIGHT: f64 = 640.0;
+
+fn limit_height(height: f64, room: f64) -> f64 {
+    height.min(MAX_HEIGHT).min(room)
+}
+
+/// Logical px between the top of the screen and the dock, less a margin at each end.
+fn room_above(dock: Rect, monitor: Rect, margin: i32, scale: f64) -> f64 {
+    (dock.y - monitor.y - 2 * margin) as f64 / scale
+}
 
 #[derive(Clone, Copy, Default)]
 pub struct Span {
@@ -61,6 +72,10 @@ impl CardState {
         CardMove::Open
     }
 
+    pub fn swap(&mut self, id: &str) {
+        self.open = Some(id.to_string());
+    }
+
     /// True when losing focus really does mean the card should close.
     pub fn blur_closes(&mut self, now: u64) -> bool {
         if now.saturating_sub(self.opened_at) < SETTLE_MS {
@@ -95,6 +110,15 @@ fn card_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     app.get_webview_window("card").ok_or_else(|| "card window missing".to_string())
 }
 
+/// The only place the card hides. The page unmounts what it shows, which stops its providers
+/// and drops anything typed into it.
+fn hide_card(app: &AppHandle) -> Result<(), String> {
+    let card = card_window(app)?;
+    card.hide().map_err(|e| e.to_string())?;
+    let _ = app.emit_to("card", "card-closed", ());
+    Ok(())
+}
+
 /// Sizes and moves the card for `logical` px, relative to the remembered tile.
 fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
     let (card, dock) = (card_window(app)?, app.get_webview_window("dock").ok_or("dock window missing")?);
@@ -105,10 +129,28 @@ fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
         let tile = *TILE.lock().unwrap_or_else(|e| e.into_inner());
-        let wanted = ((logical.0 * scale).round() as i32, (logical.1 * scale).round() as i32);
-        let r = card_rect(tile, dock_rect, monitor, wanted, (MARGIN * scale).round() as i32);
+        let margin = (MARGIN * scale).round() as i32;
+        let height = limit_height(logical.1, room_above(dock_rect, monitor, margin, scale));
+        let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
+        let r = card_rect(tile, dock_rect, monitor, wanted, margin);
         card.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
         card.set_position(PhysicalPosition::new(r.x, r.y))
+    };
+    run().map_err(|e| e.to_string())
+}
+
+/// How tall a card may be here, so its body can scroll inside that rather than being cut off.
+#[tauri::command]
+pub fn card_room(app: AppHandle) -> Result<f64, String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let run = || -> tauri::Result<f64> {
+        let Some(m) = dock.primary_monitor()? else { return Ok(MAX_HEIGHT) };
+        let scale = m.scale_factor();
+        let monitor = Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 };
+        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
+        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
+        let margin = (MARGIN * scale).round() as i32;
+        Ok(limit_height(f64::MAX, room_above(dock_rect, monitor, margin, scale)))
     };
     run().map_err(|e| e.to_string())
 }
@@ -126,7 +168,7 @@ pub fn open_card(
     let card = card_window(&app)?;
     match with_state(|s| s.request(&widget_id, now())) {
         CardMove::Ignore => return Ok(()),
-        CardMove::Close => return card.hide().map_err(|e| e.to_string()),
+        CardMove::Close => return hide_card(&app),
         CardMove::Open => {}
     }
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
@@ -137,7 +179,20 @@ pub fn open_card(
     place(&app, (width, height))?;
     app.emit_to("card", "card-open", &widget_id).map_err(|e| e.to_string())?;
     card.show().map_err(|e| e.to_string())?;
-    card.set_focus().map_err(|e| e.to_string())
+    card.set_focus().map_err(|e| e.to_string())?;
+    // The dock doesn't take focus when clicked, so Windows may have refused that.
+    if let Ok(hwnd) = card.hwnd() {
+        crate::apps::take_foreground_raw(hwnd.0 as isize);
+    }
+    Ok(())
+}
+
+/// A different card in the same place, as when a panel leads to another.
+#[tauri::command]
+pub fn swap_card(app: AppHandle, widget_id: String, width: f64) -> Result<(), String> {
+    with_state(|s| s.swap(&widget_id));
+    place(&app, (width, 300.0))?;
+    app.emit_to("card", "card-open", &widget_id).map_err(|e| e.to_string())
 }
 
 /// The page reports how tall its content is, once rendered.
@@ -158,19 +213,19 @@ pub fn card_current() -> Option<String> {
 #[tauri::command]
 pub fn close_card(app: AppHandle) -> Result<(), String> {
     with_state(|s| s.closed(now()));
-    card_window(&app)?.hide().map_err(|e| e.to_string())
+    hide_card(&app)
 }
 
 /// Clicking away closes the card.
 pub fn on_blur(window: &tauri::Window) {
     if with_state(|s| s.blur_closes(now())) {
-        let _ = window.hide();
+        let _ = hide_card(window.app_handle());
     }
 }
 
 pub fn on_close(window: &tauri::Window) {
     with_state(|s| s.closed(now()));
-    let _ = window.hide();
+    let _ = hide_card(window.app_handle());
 }
 
 #[cfg(test)]
@@ -235,6 +290,44 @@ mod tests {
         assert!(s.open.is_some());
         assert!(s.blur_closes(1400), "clicking away later does close it");
         assert!(s.open.is_none());
+    }
+
+    #[test]
+    fn after_a_swap_the_same_tile_closes_the_new_card() {
+        let mut s = CardState::default();
+        s.request("quick", 0);
+        s.swap("wifi");
+        assert_eq!(s.open.as_deref(), Some("wifi"));
+        assert_eq!(s.request("wifi", 1000), CardMove::Close);
+    }
+
+    #[test]
+    fn every_way_of_closing_announces_it() {
+        // One place hides the card, and it also tells the page, which then unmounts what it shows.
+        let source = include_str!("card.rs");
+        let code = &source[..source.find("#[cfg(test)]").unwrap()];
+        assert_eq!(code.matches(".hide()").count(), 1);
+        assert!(code.contains("card-closed"));
+    }
+
+    #[test]
+    fn cards_stop_growing_at_640() {
+        assert_eq!(limit_height(300.0, 900.0), 300.0);
+        assert_eq!(limit_height(2000.0, 900.0), 640.0);
+    }
+
+    #[test]
+    fn a_short_screen_limits_the_card_to_the_room_above_the_dock() {
+        assert_eq!(limit_height(2000.0, 500.0), 500.0);
+        assert_eq!(limit_height(300.0, 500.0), 300.0);
+    }
+
+    #[test]
+    fn the_room_is_what_lies_above_the_dock() {
+        let monitor = Rect { x: 0, y: 0, w: 1366, h: 768 };
+        let dock = Rect { x: 200, y: 700, w: 900, h: 68 };
+        assert_eq!(room_above(dock, monitor, 8, 1.0), 684.0);
+        assert_eq!(room_above(dock, monitor, 8, 2.0), 342.0);
     }
 
     #[test]

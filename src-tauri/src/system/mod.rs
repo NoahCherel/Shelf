@@ -1,5 +1,15 @@
 //! Machine facts for widgets, and a few Windows settings.
 
+pub mod audio;
+pub mod bluetooth;
+pub mod brightness;
+pub mod notifications;
+pub mod radios;
+pub mod settings_link;
+pub mod status;
+pub mod toggles;
+pub mod wifi;
+
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -7,6 +17,9 @@ use serde::Serialize;
 use sysinfo::System;
 use tauri::State;
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+};
 
 const CPU_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
@@ -64,6 +77,20 @@ pub fn system_stats(monitor: State<'_, Mutex<SysMonitor>>) -> SysStats {
     }
 }
 
+/// Presses the keys in order and lets them go in reverse, like a person pressing a shortcut.
+pub fn tap_keys(keys: &[VIRTUAL_KEY]) {
+    let event = |vk: VIRTUAL_KEY, up: bool| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: vk, dwFlags: if up { KEYEVENTF_KEYUP } else { Default::default() }, ..Default::default() },
+        },
+    };
+    let inputs: Vec<INPUT> = keys.iter().map(|&k| event(k, false)).chain(keys.iter().rev().map(|&k| event(k, true))).collect();
+    unsafe {
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
 fn reg() -> std::process::Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -79,7 +106,8 @@ pub fn autostart_get() -> bool {
 }
 
 #[tauri::command(async)]
-pub fn autostart_set(on: bool) -> bool {
+pub fn autostart_set(on: bool) -> Result<bool, String> {
+    crate::preview::guard()?;
     let mut cmd = reg();
     if on {
         let exe = std::env::current_exe().unwrap_or_default();
@@ -88,5 +116,5 @@ pub fn autostart_set(on: bool) -> bool {
     } else {
         cmd.args(["delete", RUN_KEY, "/v", "Shelf", "/f"]);
     }
-    cmd.status().is_ok_and(|s| s.success())
+    Ok(cmd.status().is_ok_and(|s| s.success()))
 }

@@ -9,6 +9,7 @@ import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { GlassLayer } from "../../design/glass/GlassLayer";
+import { openPanel } from "../../panels";
 import "./dock.css";
 
 const DEFAULT_CARD_WIDTH = 340;
@@ -18,8 +19,11 @@ const MENU_HEIGHT = 190;
 /** A press that moves less than this is a click. */
 const DRAG_DISTANCE = 6;
 
-/** Space under the bar, inside the window. */
-const GAP_BELOW = 17;
+/** Tells Rust how big the bar is and how it should sit on the screen. */
+export function reportSize(el: HTMLElement, gap: number, float: boolean): void {
+  const { width, height } = el.getBoundingClientRect();
+  invoke("set_dock_width", { width, bar: Math.ceil(height), gap, float }).catch(() => {});
+}
 
 export function handleDragEnd({ active, over }: { active: { id: unknown }; over: { id: unknown } | null }): void {
   if (!over || active.id === over.id) return;
@@ -37,7 +41,9 @@ function Slot({ def }: { def: WidgetDef }) {
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: def.id, disabled: locked });
 
   const openCard = (e: MouseEvent<HTMLDivElement>) => {
-    if (!def.Card || pickerOpen) return;
+    if (pickerOpen) return;
+    if (def.panel) return openPanel(def.panel, e.currentTarget);
+    if (!def.Card) return;
     const r = e.currentTarget.getBoundingClientRect();
     invoke("open_card", {
       widgetId: def.id,
@@ -100,6 +106,8 @@ export function DockBar() {
   const [glassFailed, setGlassFailed] = useState(false);
   const onGlassUnavailable = useCallback(() => setGlassFailed(true), []);
   const glass = style === "liquid" && !fullscreen && !locked && !glassFailed;
+  const edgeGap = useSettings((s) => s.edgeGap);
+  const floatOverWindows = useSettings((s) => s.floatOverWindows);
   const bar = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
 
@@ -108,13 +116,10 @@ export function DockBar() {
   useEffect(() => {
     const el = bar.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => {
-      const { width, height } = el.getBoundingClientRect();
-      invoke("set_dock_width", { width, height: Math.ceil(height + GAP_BELOW) }).catch(() => {});
-    });
+    const observer = new ResizeObserver(() => reportSize(el, edgeGap, floatOverWindows));
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [edgeGap, floatOverWindows]);
 
   return (
     // Limited by the screen, not the window, which is always only as wide as the bar.

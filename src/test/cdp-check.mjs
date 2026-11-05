@@ -110,6 +110,16 @@ for (let i = 0; i < 8 && blanks; i++) {
   blanks = await dock.eval(`document.querySelectorAll(".app__icon--blank").length`);
 }
 check("app icons load", blanks === 0, `${await dock.eval(`document.querySelectorAll(".app__icon[src]").length`)} icons, ${blanks} blank, ${icons} at first`);
+// Measured in the real dock: a CSS mistake once left these squeezed to their icons with every test green.
+const room = await dock.eval(`(() => {
+  const apps = [...document.querySelectorAll(".app")].map((a) => a.getBoundingClientRect());
+  const T = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--T"));
+  const icon = document.querySelector(".app .app__icon").getBoundingClientRect().width;
+  return { T, icon, pitch: apps[1].left - apps[0].left };
+})()`);
+check("apps have a taskbar button's room", room.pitch >= room.T * 0.9, `${room.pitch.toFixed(1)} px apart, icon ${room.icon.toFixed(1)}`);
+check("the focus plate is wider than the icon", room.pitch - room.T * 0.2 > room.icon);
+check("the status tile shows the network", await dock.eval(`!!document.querySelector('[data-widget-id="system-status"] [data-net]')`));
 check("glass canvas is live", await dock.eval(`!!document.querySelector("canvas.glass") && document.querySelector(".dock").dataset.glass === "true"`));
 
 // Card over its tile
@@ -140,7 +150,7 @@ await card.shot("menu.png");
 await card.eval(`[...document.querySelectorAll(".menu__row")].find((e) => e.textContent === "Widgets…").click()`);
 const picker = await Page.open("picker");
 await sleep(1200);
-check("the picker lists all widgets", (await picker.eval(`document.querySelectorAll(".pick").length`)) === 11);
+check("the picker lists all widgets", (await picker.eval(`document.querySelectorAll(".pick").length`)) === 12);
 await picker.shot("picker.png");
 check("the dock shows − badges", (await dock.eval(`document.querySelectorAll(".slot__remove").length`)) === start.length);
 await dock.shot("dock-badges.png");
@@ -166,7 +176,7 @@ await dock.drag(await dock.centre('[data-widget-id="clock-and-weather"]'), { x: 
 await sleep(500);
 
 // Settings from the menu
-await dock.click(".dock", "right");
+await dock.click('[data-widget-id="github-activity"]', "right");
 await sleep(600);
 await card.eval(`[...document.querySelectorAll(".menu__row")].find((e) => e.textContent === "Settings").click()`);
 const settings = await Page.open("settings");
@@ -197,6 +207,61 @@ await settings.shot("settings-general.png");
 await settings.click('[aria-label="Close"]');
 await sleep(600);
 check("Settings closes", !(await targets()).some((t) => t.url.includes("w=settings")));
+
+// Each part of the dock opens its own card, centred on it and fully on screen. Escape closes it.
+const screenBox = `(() => ({ width: screen.width, height: screen.height, x: screenX, y: screenY, w: innerWidth, h: innerHeight }))()`;
+for (const [selector, marker, name] of [
+  ['[aria-label="Network"]', "Wi-Fi", "Wi-Fi"],
+  ['[aria-label="Sound"]', "OUTPUT", "Sound"],
+  ['[aria-label="Search"]', "", "Search"],
+  ['[aria-label="Notifications"]', "Notification settings", "Notifications"],
+]) {
+  const part = await dock.centre(selector);
+  const at = await dock.eval(`(${screenBox.slice(1, -1)})`);
+  await dock.clickAt(part.x, part.y);
+  await sleep(1300);
+  const box = await card.eval(`(${screenBox.slice(1, -1)})`);
+  const centre = box.x + box.w / 2;
+  const onScreen = box.x >= 0 && box.x + box.w <= box.width && box.y >= 0 && box.y + box.h <= box.height;
+  const shown = name === "Search" ? await card.eval(`!!document.querySelector(".search__box input")`) : await card.eval(`document.body.textContent.includes(${JSON.stringify(marker)})`);
+  check(`${name} opens its own card`, shown);
+  const off = Math.abs(centre - (at.x + part.x));
+  // A wide card near the edge is kept on screen rather than centred.
+  check(`${name}'s card sits over its part, on screen`, onScreen && (off <= 8 || box.x <= 16 || box.x + box.w >= box.width - 16), `${off.toFixed(1)} px off`);
+  await card.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(600);
+  check(`Escape closes ${name}`, await card.eval(`!document.querySelector(".card-window > *")`));
+}
+
+const quickPart = (await dock.centre('[aria-label="Battery"]')) ? '[aria-label="Battery"]' : '[aria-label="Quick settings"]';
+await dock.click(quickPart);
+await sleep(1300);
+check("Quick Settings opens its own card", await card.eval(`!!document.querySelector(".quick__pills")`));
+await card.click('[aria-label="Wi-Fi networks"]');
+await sleep(900);
+check("its chevron moves to the Wi-Fi card", await card.eval(`document.body.textContent.includes("Wi-Fi settings")`));
+await card.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+await sleep(600);
+
+// Hovering an open app shows its live previews.
+const openApp = await dock.eval(`(() => { const a = [...document.querySelectorAll(".app")].find((e) => e.querySelector(".app__dot")); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+if (openApp) {
+  const strip = await Page.open("preview");
+  await dock.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: openApp.x - 1, y: openApp.y });
+  await dock.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: openApp.x, y: openApp.y });
+  let seen = false;
+  for (let i = 0; i < 30 && !seen; i++) {
+    await sleep(50);
+    seen = await strip.eval(`!!document.querySelector(".pv__window")`);
+  }
+  check("hovering an open app shows its previews", seen);
+  await dock.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 2 });
+  await sleep(1200);
+  check("moving away closes them", !(await strip.eval(`!!document.querySelector(".pv__window")`)));
+  strip.close();
+} else {
+  console.log("skip previews: no app is open");
+}
 
 for (const p of [dock, card]) p.close();
 const failed = results.filter((ok) => !ok).length;

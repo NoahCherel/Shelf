@@ -19,12 +19,35 @@ sysinfo = "0.33"
 reqwest = { version = "0.12", default-features = false, features = ["native-tls"] }
 png = "0.17"
 base64 = "0.22"
+windows-core = "0.61"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_Globalization",
+  "Devices_Radios",
+  "UI_Notifications",
+  "UI_Notifications_Management",
+  "ApplicationModel",
+  "Devices_Bluetooth",
+  "Devices_Enumeration",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Registry",
+  "Win32_System_Search",
+  "Win32_System_Search_Common",
+  "Win32_System_Wmi",
+  "Win32_Security",
+  "Win32_System_Ole",
+  "Foundation_Collections",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_NetworkManagement_WiFi",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_NetworkListManager",
+  "Win32_Devices_FunctionDiscovery",
   "Win32_UI_Shell_PropertiesSystem",
   "Win32_UI_Accessibility",
   "Win32_System_Com",

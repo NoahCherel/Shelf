@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter};
 
 pub fn app_dir() -> PathBuf {
     let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
-    Path::new(&base).join("Shelf")
+    Path::new(&base).join(crate::preview::current().data_folder)
 }
 
 fn data_dir() -> PathBuf {

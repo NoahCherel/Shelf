@@ -45,6 +45,9 @@ pub enum Click {
     Minimize(isize),
 }
 
+/// File Explorer's windows don't report an id, though its pin does.
+const EXPLORER_APP_ID: &str = "Microsoft.Windows.Explorer";
+
 pub fn title_from_utf16(wide: &[u16]) -> String {
     String::from_utf16_lossy(wide)
 }
@@ -84,7 +87,10 @@ pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<Ap
         })
         .collect();
 
-    for w in windows {
+    for mut w in windows {
+        if w.app_id.is_none() && same(exe_stem(&w.exe), "explorer") {
+            w.app_id = Some(EXPLORER_APP_ID.to_string());
+        }
         let pinned = pins.iter().position(|p| {
             p.app_id.as_ref().zip(w.app_id.as_ref()).is_some_and(|(a, b)| same(a, b))
                 || p.target.as_ref().is_some_and(|t| same(t, &w.exe))
@@ -167,6 +173,16 @@ mod tests {
         let list = merge(&pins, vec![win(5, "repo", r"c:\x\code.exe", Some("Some.Other.Id"))], 0);
         assert_eq!(list.len(), 1);
         assert!(list[0].pinned);
+    }
+
+    #[test]
+    fn explorer_windows_merge_with_the_file_explorer_pin() {
+        // Its windows report no app id, and its pin often has no target path.
+        let pins = [pin("File Explorer", None, Some("Microsoft.Windows.Explorer"))];
+        let list = merge(&pins, vec![win(5, "Downloads", r"C:\Windows\explorer.exe", None), win(6, "Docs", r"C:\WINDOWS\Explorer.EXE", None)], 6);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].windows.len(), 2);
+        assert!(list[0].pinned && list[0].active);
     }
 
     #[test]

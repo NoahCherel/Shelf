@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { invoke } from "../../core/tauri";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { invoke, listen } from "../../core/tauri";
+import { openPanel } from "../../panels";
 import type { TileProps } from "../../core/widget";
 import "./apps.css";
 
@@ -22,6 +23,7 @@ export function stableOrder(previous: AppEntry[], next: AppEntry[]): AppEntry[] 
   return [...kept, ...next.filter((e) => !known.has(e.key))];
 }
 
+const PREVIEW_PAUSE_MS = 350;
 const ICON_RETRY_MS = 2500;
 const ICON_TRIES = 6;
 
@@ -62,6 +64,15 @@ function AppIcon({ entry, preview }: { entry: AppEntry; preview?: boolean }) {
   return <span className="app__icon app__icon--blank">{entry.name.charAt(0).toUpperCase()}</span>;
 }
 
+function SearchGlyph() {
+  return (
+    <svg viewBox="0 0 30 30" className="app__icon app__icon--search" aria-hidden="true">
+      <circle cx="13.500" cy="13.500" r="7.500" fill="none" stroke="currentColor" strokeWidth="2.600" />
+      <path d="M19.300 19.300 25 25" stroke="currentColor" strokeWidth="2.800" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function StartLogo() {
   return (
     <svg viewBox="0 0 30 30" className="app__icon" aria-hidden="true">
@@ -83,30 +94,115 @@ function StartLogo() {
   );
 }
 
+/** Previews after a pause over an open app, and straight away once they're already showing. */
+function useAppPreviews(preview?: boolean) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showing = useRef(false);
+  useEffect(() => {
+    if (preview) return;
+    const off = listen("preview-closed", () => {
+      showing.current = false;
+    });
+    return () => {
+      clearTimeout(timer.current);
+      off.then((stop) => stop());
+    };
+  }, [preview]);
+  const enter = (e: MouseEvent<HTMLElement>, entry: AppEntry) => {
+    if (preview || entry.windows.length === 0) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const show = () => {
+      showing.current = true;
+      invoke("preview_show", { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
+    };
+    clearTimeout(timer.current);
+    if (showing.current) show();
+    else timer.current = setTimeout(show, PREVIEW_PAUSE_MS);
+  };
+  const leave = () => {
+    clearTimeout(timer.current);
+    if (showing.current) invoke("preview_leave").catch(() => {});
+  };
+  const press = (entry: AppEntry) => {
+    if (preview) return;
+    clearTimeout(timer.current);
+    // With several windows the click that follows decides, as it does on Windows.
+    if (entry.windows.length > 1) return;
+    showing.current = false;
+    invoke("preview_hide").catch(() => {});
+  };
+  /** Several windows: a click shows them all, and another closes them. */
+  const toggle = (e: MouseEvent<HTMLElement>, entry: AppEntry) => {
+    if (showing.current) {
+      showing.current = false;
+      invoke("preview_hide").catch(() => {});
+      return;
+    }
+    const r = e.currentTarget.getBoundingClientRect();
+    showing.current = true;
+    invoke("preview_show", { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
+  };
+  return { enter, leave, press, toggle };
+}
+
 export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
+  const previews = useAppPreviews(preview);
   const entries = data ?? [];
+  const [startOpen, setStartOpen] = useState(false);
+  useEffect(() => {
+    if (preview) return;
+    const off = listen<boolean>("start-open", setStartOpen);
+    return () => {
+      off.then((stop) => stop());
+    };
+  }, [preview]);
+  const windowsMenu = (e: MouseEvent, command: string, args?: Record<string, unknown>) => {
+    if (preview) return;
+    // This is Windows' menu to show, not Shelf's.
+    e.preventDefault();
+    e.stopPropagation();
+    invoke(command, args).catch(() => {});
+  };
   return (
     <div className="apps">
       <button
         type="button"
-        className="app"
+        className={startOpen ? "app app--active" : "app"}
         aria-label="Start"
         title="Start"
         onClick={() => !preview && invoke("start_menu").catch(() => {})}
+        onContextMenu={(e) => windowsMenu(e, "start_quick_menu")}
       >
         <StartLogo />
+      </button>
+      <button
+        type="button"
+        className="app"
+        aria-label="Search"
+        title="Search"
+        onClick={(e) => !preview && openPanel("search", e.currentTarget)}
+      >
+        <SearchGlyph />
       </button>
       {entries.map((entry) => (
         <button
           type="button"
           key={entry.key}
-          className="app"
+          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}`}
           aria-label={entry.name}
-          title={entry.windows[0]?.title ?? entry.name}
-          onClick={() => !preview && invoke("apps_activate", { key: entry.key }).catch(() => {})}
+          title={entry.windows.length > 0 ? undefined : entry.name}
+          onMouseEnter={(e) => previews.enter(e, entry)}
+          onMouseLeave={previews.leave}
+          onMouseDown={() => previews.press(entry)}
+          onClick={(e) => {
+            if (preview) return;
+            if (entry.windows.length > 1) previews.toggle(e, entry);
+            else invoke("apps_activate", { key: entry.key }).catch(() => {});
+          }}
+          onContextMenu={(e) => windowsMenu(e, "apps_context_menu", { key: entry.key })}
         >
           <AppIcon entry={entry} preview={preview} />
-          {entry.windows.length > 0 && <span className={entry.active ? "app__dot app__dot--active" : "app__dot"} />}
+          {entry.windows.length > 0 && <span className="app__dot" />}
         </button>
       ))}
     </div>

@@ -42,6 +42,16 @@ it("honours 24-hour time", () => {
   expect(screen.getByText("17:49")).toBeTruthy();
 });
 
+it("has no red block", () => {
+  const { container } = render(<T data={NOON} status="ready" preview />);
+  expect(container.querySelector(".tile--solid")).toBeNull();
+});
+
+it("draws no empty circle when there's no temperature", () => {
+  const { container } = render(<T data={NOON} status="ready" />);
+  expect(container.querySelector<HTMLElement>(".cw__temp")?.dataset.empty).toBe("true");
+});
+
 it("is square", () => {
   expect(widget.width).toBe(1);
 });

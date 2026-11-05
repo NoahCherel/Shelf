@@ -1,6 +1,8 @@
 # Shelf: handoff
 
-**Current state, 2026-11-04:** Milestone 1 of the rebuild is done on branch `rebuild`. Start from [README.md](README.md), then the [Milestone 1 plan](docs/superpowers/plans/2026-11-04-shelf-rebuild-m1-the-bar.md) and the [study](docs/lumabar/README.md). Next is a plan for Milestone 2, written after the owner has used it and worked through [docs/manual-checks.md](docs/manual-checks.md).
+**Current state, 2026-11-05:** Shelf's own panels and window previews are done on branch `panels`: see the [panels plan](docs/superpowers/plans/2026-11-05-shelf-panels.md) and [what Windows allows](docs/lumabar/16-panels-spike.md). Still open: tray icons, a notifications card, and the keyboard shortcuts.
+
+**2026-11-04:** Milestone 1 of the rebuild is done on branch `rebuild`. Start from [README.md](README.md), then the [Milestone 1 plan](docs/superpowers/plans/2026-11-04-shelf-rebuild-m1-the-bar.md) and the [study](docs/lumabar/README.md). Next is a plan for Milestone 2, written after the owner has used it and worked through [docs/manual-checks.md](docs/manual-checks.md).
 
 Everything below this line describes the first build, which was replaced. It's kept for its lessons about the taskbar and appbar.
 
