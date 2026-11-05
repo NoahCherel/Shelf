@@ -53,11 +53,12 @@ Claude limits come only from the status line feed. Claude's own login is never r
 | Command | Checks |
 | --- | --- |
 | `npm test` | Frontend |
+| `npm run bench` | Renders every scene in a hidden headless Edge, with fake data, and compares each with its stored picture. Touches nothing real. `-- --update` accepts new pictures, only after viewing them |
 | `cargo test --lib` in `src-tauri` | Rust; never touches the real taskbar |
 | `sh src/test/e2e.sh <folder>` | Drives the built app through WebView2's debug port. Hides the taskbar |
 | `sh src/test/measure.sh` | CPU and memory at rest and with motion. Hides the taskbar |
 | `src/test/probe.ps1` | Read-only look at the dock, work area and taskbar |
 
-`?w=gallery&all=1` shows every widget's sample, and `?w=gallery&glass=glow` runs the shader over a test scene, both in an ordinary browser.
+`?w=gallery&all=1` shows every widget's sample, and `?w=bench&scene=<id>` shows one bench scene, both in an ordinary browser.
 
 Real-hardware checks are in [`docs/manual-checks.md`](docs/manual-checks.md). The study behind the design is in [`docs/lumabar/`](docs/lumabar/README.md), and the build plan in [`docs/superpowers/plans/`](docs/superpowers/plans/).

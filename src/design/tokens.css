@@ -73,6 +73,15 @@ body {
   box-sizing: border-box;
 }
 
+/* The visual bench needs every picture to be the same. */
+[data-bench] *,
+[data-bench] *::before,
+[data-bench] *::after {
+  animation: none !important;
+  transition: none !important;
+  caret-color: transparent !important;
+}
+
 button {
   font: inherit;
   letter-spacing: inherit;

@@ -19,6 +19,7 @@ const views: Record<string, View> = {
   },
   settings: () => import("./windows/settings/SettingsWindow").then((m) => m.SettingsWindow),
   gallery: () => import("./windows/gallery/Gallery").then((m) => m.Gallery),
+  bench: () => import("./windows/bench/BenchWindow").then((m) => m.BenchWindow),
 };
 
 const name = new URLSearchParams(location.search).get("w") ?? "dock";
@@ -28,8 +29,12 @@ document.addEventListener("contextmenu", (e) => {
   if (!(e.target as HTMLElement).closest("input, textarea")) e.preventDefault();
 });
 
+// The bench's stand-in backend and stopped clock have to be in place before anything else runs.
+const ready = name === "bench" ? import("./windows/bench/prepare").then((m) => m.prepareBench()) : Promise.resolve();
+
 // Settings first: providers need them, and the first paint should already be right.
-syncSettings()
+ready
+  .then(syncSettings)
   .then(() => {
     // The picker's tiles stay one size whatever size the dock is.
     followLook(name === "picker" ? PICKER_T : undefined);

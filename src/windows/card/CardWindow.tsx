@@ -49,6 +49,24 @@ function MenuBody({ def }: { def: WidgetDef | undefined }) {
   );
 }
 
+/** What the card window shows for an id: a widget's card or a menu. */
+export function CardContent({ id, n }: { id: string; n: number }) {
+  if (id.startsWith(MENU_PREFIX)) {
+    return (
+      <div className="card-window">
+        <MenuBody key={n} def={byId(id.slice(MENU_PREFIX.length))} />
+      </div>
+    );
+  }
+  const def = byId(id);
+  if (!def?.Card) return null;
+  return (
+    <div className="card-window">
+      <CardBody key={n} def={def} />
+    </div>
+  );
+}
+
 export function CardWindow() {
   // `shown` changes on every open, so the slide replays.
   const [shown, setShown] = useState<{ id: string; n: number } | null>(null);
@@ -83,19 +101,5 @@ export function CardWindow() {
     };
   }, []);
 
-  if (!shown) return null;
-  if (shown.id.startsWith(MENU_PREFIX)) {
-    return (
-      <div className="card-window">
-        <MenuBody key={shown.n} def={byId(shown.id.slice(MENU_PREFIX.length))} />
-      </div>
-    );
-  }
-  const def = byId(shown.id);
-  if (!def?.Card) return null;
-  return (
-    <div className="card-window">
-      <CardBody key={shown.n} def={def} />
-    </div>
-  );
+  return shown && <CardContent id={shown.id} n={shown.n} />;
 }

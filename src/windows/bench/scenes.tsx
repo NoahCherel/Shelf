@@ -1,0 +1,100 @@
+import { fakeApps } from "./fixtures";
+
+export interface Scene {
+  id: string;
+  size: [number, number];
+  wallpaper: "glow" | "ribbons" | "pale";
+  theme: "dark" | "light";
+  dock?: string[]; // widget ids, drawn in a real bar with the real shader
+  card?: string; // card id, drawn above the bar
+  view?: "picker" | "settings"; // a whole window instead of a dock
+  settings?: Record<string, unknown>;
+  backend?: Record<string, (args: any) => unknown>;
+  steps?: { hover?: string; click?: string }[]; // selectors, run through the debug port
+  measure?: { name: string; expect: string }[]; // JavaScript run in the page; each must be true
+  scale?: number; // display scale, default 1.25 as on the owner's PC
+}
+
+const DOCK = ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"];
+const WIDE: [number, number] = [1536, 200];
+const TALL: [number, number] = [1536, 640];
+
+const T = `parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--T"))`;
+const appLefts = `[...document.querySelectorAll(".app")].map((a) => a.getBoundingClientRect().left)`;
+
+export const scenes: Scene[] = [
+  {
+    id: "dock-default",
+    size: WIDE,
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    measure: [{ name: "the bar is centred", expect: `Math.abs(document.querySelector(".dock").getBoundingClientRect().left + document.querySelector(".dock").getBoundingClientRect().width / 2 - innerWidth / 2) < 2` }],
+  },
+  { id: "dock-ribbons", size: WIDE, wallpaper: "ribbons", theme: "dark", dock: DOCK },
+  { id: "dock-light", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK },
+  {
+    id: "dock-focus",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: ["apps"],
+    measure: [
+      { name: "apps are at least 0.9T apart", expect: `(${appLefts})[1] - (${appLefts})[0] >= ${T} * 0.9` },
+      { name: "one app is marked", expect: `document.querySelectorAll(".app--active").length === 1` },
+      {
+        name: "the focus plate is wider than the icon",
+        expect: `(() => { const a = document.querySelector(".app--active"); const inset = parseFloat(getComputedStyle(a, "::before").left); return a.getBoundingClientRect().width - inset * 2 > a.querySelector(".app__icon").getBoundingClientRect().width; })()`,
+      },
+    ],
+  },
+  {
+    id: "dock-apps-many",
+    size: [1200, 200],
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    backend: { apps_list: () => fakeApps(40, 3) },
+    measure: [{ name: "the bar stays on the screen", expect: `document.querySelector(".dock").getBoundingClientRect().width <= innerWidth` }],
+  },
+  { id: "card-claude", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "claude-plan-usage" },
+  { id: "card-date", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "clock-and-weather" },
+  { id: "menu", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__menu:github-activity" },
+  { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
+  { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
+];
+
+/** Our own test scenes: bright curves on dark, so bending shows up at the bar's edges. */
+export function paintWallpaper(g: CanvasRenderingContext2D, w: number, h: number, kind: Scene["wallpaper"]): void {
+  if (kind === "pale") {
+    const pale = g.createLinearGradient(0, 0, w, h);
+    pale.addColorStop(0, "#eef3fb");
+    pale.addColorStop(1, "#d9e4f5");
+    g.fillStyle = pale;
+    g.fillRect(0, 0, w, h);
+    return;
+  }
+  g.fillStyle = "#07060c";
+  g.fillRect(0, 0, w, h);
+  if (kind === "glow") {
+    const glow = g.createRadialGradient(w / 2, -h * 0.6, h * 0.5, w / 2, -h * 0.6, h * 1.75);
+    glow.addColorStop(0, "#7a0a64");
+    glow.addColorStop(0.62, "#c81e6e");
+    glow.addColorStop(0.8, "#f4b2ff");
+    glow.addColorStop(0.86, "#ffd65a");
+    glow.addColorStop(0.93, "#d97a12");
+    glow.addColorStop(1, "#1a0806");
+    g.fillStyle = glow;
+    g.fillRect(0, 0, w, h);
+    return;
+  }
+  // Hard-edged ribbons, the hardest thing to bend convincingly.
+  ["#ff2d6f", "#ffb000", "#7a5cff", "#21d4fd"].forEach((color, i) => {
+    g.strokeStyle = color;
+    g.lineWidth = (26 - i * 4) * (h / 300);
+    g.beginPath();
+    g.moveTo(-20, h * (0.2 + i * 0.2));
+    g.bezierCurveTo(w * 0.3, h * (1.1 - i * 0.25), w * 0.6, h * (0.1 + i * 0.2), w + 20, h * (0.85 - i * 0.15));
+    g.stroke();
+  });
+}
