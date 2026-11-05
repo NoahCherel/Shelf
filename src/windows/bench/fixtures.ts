@@ -131,6 +131,13 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     secret_has: () => false,
     autostart_get: () => false,
     audio_state: () => fakeAudio(),
+    radios_state: () => [
+      { kind: "wifi", on: true },
+      { kind: "bluetooth", on: false },
+    ],
+    radio_set: () => null,
+    brightness_get: () => 70,
+    brightness_set: () => null,
     wifi_networks: () => fakeWifi(),
     wifi_scan: () => null,
     wifi_connect: () => null,

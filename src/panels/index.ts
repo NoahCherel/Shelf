@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { invoke } from "../core/tauri";
 import { refresh } from "../core/provider";
 import { statusProvider } from "../widgets/_providers/status";
+import { QuickCard } from "./quick/QuickCard";
 import { SoundCard } from "./sound/SoundCard";
 import { WifiCard } from "./wifi/WifiCard";
 
@@ -16,6 +17,7 @@ export interface PanelDef {
 export const panels: Partial<Record<PanelId, PanelDef>> = {
   sound: { Card: SoundCard, width: 340 },
   wifi: { Card: WifiCard, width: 340 },
+  quick: { Card: QuickCard, width: 340 },
 };
 
 const FIRST_HEIGHT = 300;

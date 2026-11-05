@@ -55,8 +55,8 @@ it("openPanel centres the card on the part that was clicked", () => {
 });
 
 it("a panel not built yet still opens Windows' own", () => {
-  openPanel("quick", anchor());
-  expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "quick" });
+  openPanel("search", anchor());
+  expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "search" });
   expect(mockInvoke).not.toHaveBeenCalledWith("open_card", expect.anything());
 });
 

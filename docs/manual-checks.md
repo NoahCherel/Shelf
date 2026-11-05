@@ -57,6 +57,16 @@ These change the real connection, so only the owner runs them.
 - [ ] **Disconnect and reconnect:** Disconnect needs a second click, and the network can be rejoined.
 - [ ] **Captive portal:** a café network shows "Connected, no internet".
 
+## Quick Settings card
+
+These change real settings, so only the owner runs them.
+
+- [ ] **Bluetooth switch:** turns it on and off, and the state stays after reopening the card.
+- [ ] **Wi-Fi switch:** turning it off drops the connection, the dock's icon follows, and it turns back on.
+- [ ] **Brightness slider:** the screen follows the drag, ends on the last value, and stays there.
+- [ ] **Outside monitor only:** the slider is gone and a Display link is there instead.
+- [ ] **Links:** Airplane mode, Do not disturb, Night light and Energy saver each open the right page.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

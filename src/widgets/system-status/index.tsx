@@ -9,12 +9,10 @@ import "./system-status.css";
 const PART = 0.56;
 const PADDING = 0.16;
 
-function partCount(data: StatusData | null) {
-  return data?.battery === null ? 3 : 4;
-}
+const PARTS = 4;
 
-function widthFor(data: StatusData | null) {
-  return partCount(data) * PART + PADDING;
+function widthFor() {
+  return PARTS * PART + PADDING;
 }
 
 function Wave({ d, on }: { d: string; on: boolean }) {
@@ -114,6 +112,16 @@ function Part({ label, title, panel, preview, onScroll, children }: { label: str
   );
 }
 
+function SlidersGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 8h9M19 8h1M4 16h1M11 16h9" />
+      <circle cx="16" cy="8" r="2.500" />
+      <circle cx="8" cy="16" r="2.500" />
+    </svg>
+  );
+}
+
 function networkTitle(data: StatusData | null): string {
   if (data?.wifi) return `${data.wifi.ssid} (${data.wifi.signal}%)`;
   return data?.online ? "Connected" : "Not connected";
@@ -133,7 +141,7 @@ function StatusTile({ data, preview }: TileProps<StatusData>) {
     scrolled.current = null;
   }, [reading]);
   return (
-    <Tile width={widthFor(data)} className="status">
+    <Tile width={widthFor()} className="status">
       <Part label="Network" title={networkTitle(data)} panel="wifi" preview={preview}>
         <NetworkGlyph data={data} />
       </Part>
@@ -151,9 +159,13 @@ function StatusTile({ data, preview }: TileProps<StatusData>) {
       >
         <SoundGlyph data={data} />
       </Part>
-      {data?.battery && (
+      {data?.battery ? (
         <Part label="Battery" title={`${data.battery.percent}%`} panel="quick" preview={preview}>
           <BatteryGlyph battery={data.battery} />
+        </Part>
+      ) : (
+        <Part label="Quick settings" panel="quick" preview={preview}>
+          <SlidersGlyph />
         </Part>
       )}
       <Part label="Notifications" panel="notifications" preview={preview}>
@@ -166,7 +178,7 @@ function StatusTile({ data, preview }: TileProps<StatusData>) {
 export default defineWidget<StatusData>({
   id: "system-status",
   name: "Status",
-  description: "Wi-Fi, sound, battery and notifications, opening Windows' own panels.",
+  description: "Wi-Fi, sound, battery and notifications, opening their cards.",
   category: "system",
   width: widthFor,
   sample: {

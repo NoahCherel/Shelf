@@ -140,6 +140,50 @@ export const scenes: Scene[] = [
     backend: { wifi_networks: () => fakeWifi({ on: false, networks: [] }) },
   },
   { id: "card-wifi-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:wifi", anchor: '[aria-label="Network"]' },
+  { id: "card-quick", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:quick", anchor: '[aria-label="Battery"]' },
+  {
+    id: "card-quick-desktop",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:quick",
+    anchor: '[aria-label="Quick settings"]',
+    backend: {
+      brightness_get: () => null,
+      system_status: () => ({ wifi: null, online: true, volume: { percent: 60, muted: false }, battery: null }),
+    },
+  },
+  {
+    id: "card-quick-radio-error",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:quick",
+    anchor: '[aria-label="Battery"]',
+    backend: {
+      radio_set: () => {
+        throw "Windows didn't allow Shelf to change this radio.";
+      },
+    },
+    steps: [{ click: '[role="switch"][aria-label="Bluetooth"]' }],
+  },
+  { id: "card-quick-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:quick", anchor: '[aria-label="Battery"]' },
+  {
+    id: "card-black-light",
+    size: TALL,
+    wallpaper: "pale",
+    theme: "light",
+    settings: { style: "black" },
+    dock: DOCK,
+    card: "__panel:quick",
+    anchor: '[aria-label="Battery"]',
+    measure: [
+      { name: "the card's text is dark on its white", expect: `getComputedStyle(document.querySelector(".bench__card .card__title")).color === "rgb(28, 28, 30)"` },
+      { name: "the bar's text stays light on its black", expect: `getComputedStyle(document.querySelector(".dock")).color === "rgb(245, 245, 247)"` },
+    ],
+  },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

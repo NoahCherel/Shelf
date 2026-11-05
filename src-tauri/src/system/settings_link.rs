@@ -4,7 +4,7 @@ use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-const PAGES: [&str; 8] = ["sound", "network-wifi", "bluetooth", "display", "batterysaver", "nightlight", "quiethours", "privacy-location"];
+const PAGES: [&str; 9] = ["sound", "network-wifi", "network-airplanemode", "bluetooth", "display", "batterysaver", "nightlight", "quiethours", "privacy-location"];
 
 /// Only these pages, whatever the page asks: this ends up in ShellExecute.
 fn settings_uri(page: &str) -> Option<String> {
@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn only_known_settings_pages_open() {
-        for page in ["sound", "network-wifi", "bluetooth", "display", "batterysaver", "nightlight", "quiethours", "privacy-location"] {
+        for page in ["sound", "network-wifi", "network-airplanemode", "bluetooth", "display", "batterysaver", "nightlight", "quiethours", "privacy-location"] {
             assert_eq!(settings_uri(page), Some(format!("ms-settings:{page}")));
         }
         assert_eq!(settings_uri("windowsupdate"), None);

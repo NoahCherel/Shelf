@@ -37,10 +37,10 @@ describe("opens Windows' own panels", () => {
     expect(mockInvoke).not.toHaveBeenCalledWith("shell_panel", expect.anything());
   });
 
-  it("the battery icon opens quick settings", () => {
+  it("the battery icon opens Shelf's own card", () => {
     render(<T data={DATA} status="ready" />);
     press("Battery");
-    expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "quick" });
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:quick" }));
   });
 
   it("the bell opens notifications", () => {
@@ -83,6 +83,8 @@ describe("shows the real state", () => {
   it("a machine with no battery has no battery icon", () => {
     render(<T data={{ ...DATA, battery: null }} status="ready" />);
     expect(screen.queryByRole("button", { name: "Battery" })).toBeNull();
+    press("Quick settings");
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:quick" }));
   });
 
   it("draws before the first reading", () => {
