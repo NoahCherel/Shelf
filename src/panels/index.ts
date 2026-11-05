@@ -15,8 +15,7 @@ export interface PanelDef {
   width: number;
 }
 
-/** Each panel adds itself here as it's built. */
-export const panels: Partial<Record<PanelId, PanelDef>> = {
+export const panels: Record<PanelId, PanelDef> = {
   sound: { Card: SoundCard, width: 340 },
   wifi: { Card: WifiCard, width: 340 },
   bluetooth: { Card: BluetoothCard, width: 340 },
@@ -33,10 +32,6 @@ export function panelCardId(id: PanelId): string {
 /** Opens a panel centred over the thing that was clicked. */
 export function openPanel(id: PanelId, anchor: HTMLElement): void {
   const panel = panels[id];
-  if (!panel) {
-    invoke("shell_panel", { kind: id }).catch(() => {});
-    return;
-  }
   const r = anchor.getBoundingClientRect();
   invoke("open_card", {
     widgetId: panelCardId(id),
@@ -49,8 +44,7 @@ export function openPanel(id: PanelId, anchor: HTMLElement): void {
 
 /** From inside a card: the same place, a different panel. */
 export function goToPanel(id: PanelId): void {
-  const panel = panels[id];
-  if (panel) invoke("swap_card", { widgetId: panelCardId(id), width: panel.width }).catch(() => {});
+  invoke("swap_card", { widgetId: panelCardId(id), width: panels[id].width }).catch(() => {});
 }
 
 /** The card and the dock are separate windows, so a change has to be announced for the tile to follow. */

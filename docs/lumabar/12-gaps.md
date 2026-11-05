@@ -35,7 +35,9 @@ These replace the study's values, on the owner's word, 2026-11-04:
 - The gap under the dock is 6 logical px by default, not 17, and adjustable.
 - Clock & Weather has no red block. The reference's colour blocks looked wrong on the glass.
 - Each app gets 0.96T of width, not the reference's 0.78T, as on Windows' and macOS' own docks.
-- A Search button sits beside Start, and a Status tile shows Wi-Fi, sound, battery and notifications. Both open Windows' own panels rather than the reference's cards.
+- A Search button sits beside Start, and a Status tile shows Wi-Fi, sound, battery and notifications. Each opens Shelf's own card right above it, except notifications, as Windows' panels open at fixed places, unrelated to the tile (2026-11-05).
+- With the Battery widget on the dock, the Status tile's battery gives way to a Quick Settings icon, and the widget opens that card, so the battery shows once.
+- An app's previews follow Windows rather than the reference: live pictures, peek, and a click on several windows shows them.
 - Right-clicking an app shows Windows' own menu with Task Manager, End task and Close added; right-clicking Start shows Windows' quick menu. Shelf's menu stays on everything else.
 - Clicking the dock no longer takes focus from the current app, and Start toggles from its tile.
 - The app in focus gets a lit plate behind its icon, and a longer dot. The reference's identical dots don't show which one it is.

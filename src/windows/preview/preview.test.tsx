@@ -131,21 +131,36 @@ describe("resting on a picture", () => {
     expect(peeks()).toEqual([]);
   });
 
-  it("leaving the picture puts things back", async () => {
+  it("leaving the picture puts things back after a moment", async () => {
     await openIt();
     fireEvent.mouseEnter(picture("First window"));
     await act(() => vi.advanceTimersByTimeAsync(250));
-    fireEvent.mouseLeave(picture("First window"));
+    fireEvent.mouseLeave(picture("First window"), { relatedTarget: document.querySelector(".pv") });
+    expect(peeks()).toEqual([11]);
+    await act(() => vi.advanceTimersByTimeAsync(120));
     expect(peeks()).toEqual([11, null]);
   });
 
-  it("moving between pictures follows straight away", async () => {
+  it("moving between pictures goes straight from one window to the other", async () => {
     await openIt();
     fireEvent.mouseEnter(picture("First window"));
     await act(() => vi.advanceTimersByTimeAsync(250));
     // Leaving towards the next picture is also what enters it.
     fireEvent.mouseLeave(picture("First window"), { relatedTarget: picture("Second window") });
-    expect(peeks()).toEqual([11, null, 22]);
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(peeks()).toEqual([11, 22]);
+  });
+
+  it("crossing the gap between two pictures doesn't flash back", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    fireEvent.mouseLeave(picture("First window"), { relatedTarget: document.querySelector(".pv") });
+    await act(() => vi.advanceTimersByTimeAsync(60));
+    // Leaving the strip's background towards a picture is what enters that picture.
+    fireEvent.mouseLeave(document.querySelector(".pv") as HTMLElement, { relatedTarget: picture("Second window") });
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(peeks()).toEqual([11, 22]);
   });
 
   it("once the pointer has left the strip, the pause comes back", async () => {
@@ -153,8 +168,32 @@ describe("resting on a picture", () => {
     fireEvent.mouseEnter(picture("First window"));
     await act(() => vi.advanceTimersByTimeAsync(250));
     fireEvent.mouseLeave(picture("First window"));
-    fireEvent.mouseLeave(document.querySelector(".pv") as HTMLElement);
+    await act(() => vi.advanceTimersByTimeAsync(120));
     fireEvent.mouseEnter(picture("Second window"));
     expect(peeks()).toEqual([11, null]);
+  });
+
+  it("the pointer moving on a picture wins it back if the page lost track", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    fireEvent.mouseLeave(picture("First window"), { relatedTarget: document.querySelector(".pv") });
+    await act(() => vi.advanceTimersByTimeAsync(120));
+    fireEvent.mouseMove(picture("First window"));
+    expect(peeks()).toEqual([11, null, 11]);
+    fireEvent.mouseMove(picture("First window"));
+    expect(peeks()).toEqual([11, null, 11]);
+  });
+
+  it("requests are numbered, and keep rising when the strip reopens", async () => {
+    await openIt();
+    fireEvent.mouseEnter(picture("First window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    const seqs = () => mockInvoke.mock.calls.filter((c) => c[0] === "preview_peek").map((c) => (c[1] as { seq: number }).seq);
+    await act(async () => handler("preview-closed")(undefined));
+    await act(async () => handler("preview-show")(SHOWN));
+    fireEvent.mouseEnter(picture("Second window"));
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    expect(seqs()[1]).toBeGreaterThan(seqs()[0]);
   });
 });

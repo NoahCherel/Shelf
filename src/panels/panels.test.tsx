@@ -12,6 +12,7 @@ vi.mock("../core/tauri", () => ({
 }));
 
 const mockInvoke = vi.mocked(invoke);
+const realSound = panels.sound;
 const left = vi.fn();
 
 function FakePanel() {
@@ -35,7 +36,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete panels.sound;
+  panels.sound = realSound;
 });
 
 async function openIt() {
@@ -77,7 +78,7 @@ it("reopening a card starts it fresh", async () => {
 });
 
 it("every panel has its card", () => {
-  for (const id of ["wifi", "quick", "bluetooth", "search"] as const) expect(panels[id]).toBeTruthy();
+  for (const id of ["sound", "wifi", "quick", "bluetooth", "search"] as const) expect(panels[id]).toBeTruthy();
 });
 
 it("goToPanel swaps the card without moving it", () => {

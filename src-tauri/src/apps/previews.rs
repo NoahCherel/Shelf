@@ -31,9 +31,11 @@ const SCREEN_MARGIN: f64 = 8.0;
 /// Padding, the title row and the picture, as in preview.css.
 const HEIGHT: f64 = 170.0;
 const DOCK_GAP: f64 = 8.0;
-/// Long enough to cross from the icon to the strip.
-const LEAVE_GRACE: Duration = Duration::from_millis(200);
-const POINTER_CHECK: Duration = Duration::from_millis(400);
+/// Long enough to cross from the icon to the strip, even slowly.
+const LEAVE_GRACE: Duration = Duration::from_millis(400);
+const POINTER_CHECK: Duration = Duration::from_millis(300);
+/// In a row, so a brief trip outside on the way to the strip doesn't count.
+const CHECKS_OUTSIDE: u32 = 2;
 
 fn strip_width(count: usize, slot: f64) -> f64 {
     let count = count as f64;
@@ -69,12 +71,27 @@ fn fitted(source: (i32, i32), slot: Box4) -> Box4 {
     Box4 { left, top, right: left + w, bottom: top + h }
 }
 
-/// On the dock, on the strip, or in the gap between the two when crossing it.
+/// On the strip, or in the gap between it and the dock.
+fn heading_for_strip(pointer: (i32, i32), dock: Rect, strip: Rect) -> bool {
+    let (x, y) = pointer;
+    x >= strip.x && x < strip.x + strip.w && y >= strip.y && y < dock.y
+}
+
 fn pointer_within(pointer: (i32, i32), dock: Rect, strip: Rect) -> bool {
     let (x, y) = pointer;
     let on_dock = x >= dock.x && x < dock.x + dock.w && y >= dock.y && y < dock.y + dock.h;
-    let over_strip = x >= strip.x && x < strip.x + strip.w && y >= strip.y && y < dock.y;
-    on_dock || over_strip
+    on_dock || heading_for_strip(pointer, dock, strip)
+}
+
+fn real_pointer() -> Option<(i32, i32)> {
+    let mut pointer = POINT::default();
+    unsafe { GetCursorPos(&mut pointer) }.ok()?;
+    Some((pointer.x, pointer.y))
+}
+
+/// Calls can finish out of order, and a late "stop" would end the peek under the pointer.
+fn is_newest(last: &AtomicU64, seq: u64) -> bool {
+    last.fetch_max(seq, Ordering::SeqCst) < seq
 }
 
 fn is_listed(entries: &[AppEntry], raw: isize) -> bool {
@@ -105,6 +122,10 @@ static SHOWN: Mutex<Option<String>> = Mutex::new(None);
 static PICTURES: Mutex<Vec<isize>> = Mutex::new(Vec::new());
 static ON_STRIP: Mutex<Vec<isize>> = Mutex::new(Vec::new());
 static PEEKING: AtomicBool = AtomicBool::new(false);
+static LAST_PEEK: AtomicU64 = AtomicU64::new(0);
+static OPENINGS: AtomicU64 = AtomicU64::new(0);
+/// Where the dock and strip are, while the strip shows.
+static AREA: Mutex<Option<(Rect, Rect)>> = Mutex::new(None);
 
 #[derive(Serialize, Clone)]
 struct ShownWindow {
@@ -148,6 +169,7 @@ fn clear_pictures() {
 }
 
 fn hide(app: &AppHandle) -> Result<(), String> {
+    ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
     let _ = set_peek(app, None);
     clear_pictures();
     *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = None;
@@ -162,15 +184,24 @@ fn watch_pointer(app: AppHandle, dock: Rect, strip: Rect) {
     if crate::preview::is_on() {
         return;
     }
-    std::thread::spawn(move || loop {
-        std::thread::sleep(POINTER_CHECK);
-        if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_none() {
-            return;
-        }
-        let mut pointer = POINT::default();
-        if unsafe { GetCursorPos(&mut pointer) }.is_ok() && !pointer_within((pointer.x, pointer.y), dock, strip) {
-            let _ = hide(&app);
-            return;
+    *AREA.lock().unwrap_or_else(|e| e.into_inner()) = Some((dock, strip));
+    // A newer strip brings its own watcher.
+    let mine = OPENINGS.fetch_add(1, Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        let mut outside = 0;
+        loop {
+            std::thread::sleep(POINTER_CHECK);
+            if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_none() || OPENINGS.load(Ordering::SeqCst) != mine {
+                return;
+            }
+            outside = match real_pointer() {
+                Some(pointer) if !pointer_within(pointer, dock, strip) => outside + 1,
+                _ => 0,
+            };
+            if outside >= CHECKS_OUTSIDE {
+                let _ = hide(&app);
+                return;
+            }
         }
     });
 }
@@ -325,7 +356,10 @@ pub fn preview_slots(app: AppHandle, slots: Vec<Slot>) -> Result<(), String> {
 
 /// Nothing here lasts: the window goes back when the pointer leaves or the strip closes.
 #[tauri::command(async)]
-pub fn preview_peek(app: AppHandle, hwnd: Option<isize>) -> Result<(), String> {
+pub fn preview_peek(app: AppHandle, hwnd: Option<isize>, seq: u64) -> Result<(), String> {
+    if !is_newest(&LAST_PEEK, seq) {
+        return Ok(());
+    }
     if hwnd.is_some_and(|raw| !may_peek(&ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()), raw)) {
         return Err("not on the strip".into());
     }
@@ -342,7 +376,13 @@ pub fn preview_leave(app: AppHandle) {
     let token = HOVER.leave();
     std::thread::spawn(move || {
         std::thread::sleep(LEAVE_GRACE);
-        if HOVER.still_leaving(token) {
+        if !HOVER.still_leaving(token) {
+            return;
+        }
+        // The page isn't always told when the pointer reaches the strip, but the pointer itself knows.
+        let area = *AREA.lock().unwrap_or_else(|e| e.into_inner());
+        let heading = !crate::preview::is_on() && area.zip(real_pointer()).is_some_and(|((dock, strip), pointer)| heading_for_strip(pointer, dock, strip));
+        if !heading {
             let _ = hide(&app);
         }
     });
@@ -443,6 +483,24 @@ mod tests {
         let shown = vec![11, 22];
         assert!(may_peek(&shown, 22));
         assert!(!may_peek(&shown, 33));
+    }
+
+    #[test]
+    fn requests_arriving_out_of_order_are_dropped() {
+        let last = AtomicU64::new(0);
+        assert!(is_newest(&last, 2));
+        assert!(!is_newest(&last, 1), "a leave overtaken by the next hover must not end the peek");
+        assert!(is_newest(&last, 3));
+    }
+
+    #[test]
+    fn a_slow_trip_from_the_icon_to_the_strip_isnt_leaving() {
+        let dock = Rect { x: 300, y: 1000, w: 1000, h: 70 };
+        let strip = Rect { x: 500, y: 820, w: 400, h: 170 };
+        assert!(heading_for_strip((600, 900), dock, strip), "on the strip");
+        assert!(heading_for_strip((600, 995), dock, strip), "in the gap");
+        assert!(!heading_for_strip((600, 1030), dock, strip), "back on the dock, as moving to another tile");
+        assert!(!heading_for_strip((100, 100), dock, strip));
     }
 
     #[test]

@@ -1,7 +1,6 @@
 //! What the taskbar's corner shows: network and sound, and the way into Windows' own panels.
 
 use serde::Serialize;
-use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 use windows::Win32::Media::Audio::{eMultimedia, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
@@ -12,9 +11,7 @@ use windows::Win32::NetworkManagement::WiFi::{
 };
 use windows::Win32::Networking::NetworkListManager::{INetworkListManager, NetworkListManager};
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
-use windows::Win32::UI::Input::KeyboardAndMouse::{VK_A, VK_CONTROL, VK_LWIN, VK_N, VK_S, VK_V};
-use windows::Win32::UI::Shell::ShellExecuteW;
-use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use windows::Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_N};
 
 use super::{battery, tap_keys, Battery};
 
@@ -38,25 +35,15 @@ pub struct Status {
     battery: Option<Battery>,
 }
 
+/// Windows' own panels Shelf still opens. Only this one: the rest are Shelf's own cards.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Panel {
-    Quick,
     Notifications,
-    Search,
-    Sound,
-    Wifi,
 }
 
 /// Only these, whatever the page asks.
 pub fn panel_for(kind: &str) -> Option<Panel> {
-    match kind {
-        "quick" => Some(Panel::Quick),
-        "notifications" => Some(Panel::Notifications),
-        "search" => Some(Panel::Search),
-        "sound" => Some(Panel::Sound),
-        "wifi" => Some(Panel::Wifi),
-        _ => None,
-    }
+    (kind == "notifications").then_some(Panel::Notifications)
 }
 
 fn ssid_text(raw: &[u8], length: u32) -> String {
@@ -133,18 +120,12 @@ pub fn system_status() -> Status {
     }
 }
 
-/// Windows' own panels, opened the way its keyboard shortcuts do. They work with the taskbar hidden.
+/// Opened the way Windows' keyboard shortcut does, which works with the taskbar hidden.
 #[tauri::command]
 pub fn shell_panel(kind: String) -> Result<(), String> {
     crate::preview::guard()?;
     match panel_for(&kind).ok_or("unknown panel")? {
-        Panel::Quick => tap_keys(&[VK_LWIN, VK_A]),
         Panel::Notifications => tap_keys(&[VK_LWIN, VK_N]),
-        Panel::Search => tap_keys(&[VK_LWIN, VK_S]),
-        Panel::Sound => tap_keys(&[VK_LWIN, VK_CONTROL, VK_V]),
-        Panel::Wifi => unsafe {
-            ShellExecuteW(None, w!("open"), w!("ms-availablenetworks:"), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);
-        },
     }
     Ok(())
 }
@@ -174,13 +155,10 @@ mod tests {
     }
 
     #[test]
-    fn each_panel_has_its_shortcut() {
-        use Panel::*;
-        assert_eq!(panel_for("quick"), Some(Quick));
-        assert_eq!(panel_for("notifications"), Some(Notifications));
-        assert_eq!(panel_for("search"), Some(Search));
-        assert_eq!(panel_for("sound"), Some(Sound));
-        assert_eq!(panel_for("wifi"), Some(Wifi));
-        assert_eq!(panel_for("calc.exe"), None, "only these, whatever the page asks");
+    fn only_notifications_is_still_windows_own() {
+        assert_eq!(panel_for("notifications"), Some(Panel::Notifications));
+        for gone in ["sound", "wifi", "quick", "search", "calc.exe"] {
+            assert_eq!(panel_for(gone), None, "{gone}");
+        }
     }
 }

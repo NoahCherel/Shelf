@@ -32,32 +32,53 @@ function AppIcon({ appKey, name }: { appKey: string; name: string }) {
 }
 
 const PEEK_PAUSE_MS = 250;
+/** Long enough to cross the gap to the next picture, without the window flashing back. */
+const LET_GO_MS = 120;
+
+/** Rust drops anything older than the newest it has seen, so this has to outlive the strip. */
+let lastPeek = 0;
 
 /** Resting on a picture shows that window, and the next picture follows at once. */
 function usePeek() {
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const peeking = useRef(false);
-  const send = (hwnd: number | null) => invoke("preview_peek", { hwnd }).catch(() => {});
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const pause = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const letGo = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const shown = useRef<number | null>(null);
+  const warm = useRef(false);
+  const send = (hwnd: number | null) => {
+    shown.current = hwnd;
+    invoke("preview_peek", { hwnd, seq: ++lastPeek }).catch(() => {});
+  };
+  useEffect(
+    () => () => {
+      clearTimeout(pause.current);
+      clearTimeout(letGo.current);
+    },
+    [],
+  );
   return {
-    enter(hwnd: number) {
-      clearTimeout(timer.current);
-      if (peeking.current) {
+    /** Also runs as the pointer moves, so a missed event can't leave it stuck the wrong way. */
+    over(hwnd: number) {
+      clearTimeout(letGo.current);
+      if (shown.current === hwnd) return;
+      if (warm.current) {
+        clearTimeout(pause.current);
         send(hwnd);
         return;
       }
-      timer.current = setTimeout(() => {
-        peeking.current = true;
+      clearTimeout(pause.current);
+      pause.current = setTimeout(() => {
+        warm.current = true;
         send(hwnd);
       }, PEEK_PAUSE_MS);
     },
-    leave() {
-      clearTimeout(timer.current);
-      if (peeking.current) send(null);
+    away() {
+      clearTimeout(pause.current);
+      if (shown.current === null) return;
+      clearTimeout(letGo.current);
+      letGo.current = setTimeout(() => send(null), LET_GO_MS);
     },
     leaveStrip() {
-      clearTimeout(timer.current);
-      peeking.current = false;
+      warm.current = false;
     },
   };
 }
@@ -95,8 +116,9 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
             key={window.hwnd}
             className="pv__window"
             onClick={() => invoke("preview_activate", { hwnd: window.hwnd }).catch(() => {})}
-            onMouseEnter={() => peek.enter(window.hwnd)}
-            onMouseLeave={peek.leave}
+            onMouseEnter={() => peek.over(window.hwnd)}
+            onMouseMove={() => peek.over(window.hwnd)}
+            onMouseLeave={peek.away}
           >
             <div className="pv__head">
               <span className="pv__title">{title}</span>
@@ -106,7 +128,7 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
                 aria-label={`Close ${title}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  peek.leave();
+                  peek.away();
                   invoke("preview_close_window", { hwnd: window.hwnd }).catch(() => {});
                   onClosed(window.hwnd);
                 }}

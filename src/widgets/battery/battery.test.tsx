@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import widget from "./index";
 
@@ -48,4 +48,49 @@ it("a machine with no battery shows a plain state instead of breaking", () => {
 it("is square, in the system category", () => {
   expect(widget.width).toBe(1);
   expect(widget.category).toBe("system");
+});
+
+describe("the water's motion", () => {
+  const fake = () => ({ pause: vi.fn(), play: vi.fn(), currentTime: 0 as number | null });
+  const stub = (animations: unknown[]) => {
+    (HTMLElement.prototype as unknown as { getAnimations: () => unknown[] }).getAnimations = () => animations;
+  };
+
+  afterEach(() => {
+    delete (HTMLElement.prototype as unknown as { getAnimations?: unknown }).getAnimations;
+    vi.useRealTimers();
+  });
+
+  it("while charging, moves eight times a second rather than at the screen's rate", () => {
+    vi.useFakeTimers();
+    const wave = fake();
+    stub([wave]);
+    render(<T data={state(50, true)} status="ready" />);
+    expect(wave.pause).toHaveBeenCalled();
+    vi.advanceTimersByTime(124);
+    expect(wave.currentTime).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(wave.currentTime).toBe(125);
+    vi.advanceTimersByTime(875);
+    expect(wave.currentTime).toBe(1000);
+  });
+
+  it("stops ticking when unplugged", () => {
+    vi.useFakeTimers();
+    const wave = fake();
+    stub([wave]);
+    const { rerender } = render(<T data={state(50, true)} status="ready" />);
+    rerender(<T data={state(50, false)} status="ready" />);
+    vi.advanceTimersByTime(1000);
+    expect(wave.currentTime).toBe(0);
+  });
+
+  it("not charging, nothing ticks", () => {
+    vi.useFakeTimers();
+    const wave = fake();
+    stub([wave]);
+    render(<T data={state(50, false)} status="ready" />);
+    vi.advanceTimersByTime(1000);
+    expect(wave.pause).not.toHaveBeenCalled();
+  });
 });

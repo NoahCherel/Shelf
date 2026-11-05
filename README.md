@@ -25,14 +25,17 @@ Right-click the dock for Widgets…, Settings, Lock dock and Quit. In Widgets…
 
 While Liquid Glass is on, the dock doesn't appear in screenshots or recordings, because that's how it avoids seeing itself in the glass. The Black style has no such effect.
 
+The Status tile and the loupe open Shelf's own cards, right above what you clicked: Sound, Wi-Fi, Bluetooth, Quick Settings and Search. Only notifications still open Windows' own panel. Resting on an open app shows live pictures of its windows, and resting on a picture brings that window up until the pointer leaves. Win+A, Win+S and Win+N still open Windows' panels, as taking those over needs a system-wide keyboard hook.
+
 ## How it's built
 
 ```
 src-tauri/src/
   shell/       taskbar, appbar, dock and card windows, shell events
-  apps/        pins, open windows, icons
+  apps/        pins, open windows, icons, window previews
+  search/      apps and files for the Search card
   glass/       screen capture for Liquid Glass
-  system/      CPU, memory, battery, startup
+  system/      CPU, memory, battery, startup, sound, Wi-Fi, Bluetooth, radios, brightness, toggles
   secrets.rs   keys, encrypted with DPAPI
   store.rs     JSON files under %APPDATA%\Shelf\data
   net.rs       HTTP, where keys get attached so they never reach a page
@@ -40,8 +43,9 @@ src-tauri/src/
 src/
   core/        widget contract, registry, layout, providers, settings
   design/      tokens, shared parts, the glass shader
+  panels/      Sound, Wi-Fi, Bluetooth, Quick Settings and Search cards
   widgets/     one folder per widget
-  windows/     dock, card, picker, settings, menu, gallery
+  windows/     dock, card, previews, picker, settings, menu, gallery, bench
 ```
 
 **To add a widget:** create `src/widgets/<id>/index.tsx` exporting `defineWidget({...})`. It then appears in the picker with search and categories, and nothing else changes. To remove one, delete its folder. A saved layout that still names it drops it on load.
@@ -57,6 +61,8 @@ Claude limits come only from the status line feed. Claude's own login is never r
 | `cargo test --lib` in `src-tauri` | Rust; never touches the real taskbar |
 | `sh src/test/e2e.sh <folder>` | Drives the built app through WebView2's debug port. Hides the taskbar |
 | `sh src/test/measure.sh` | CPU and memory at rest and with motion. Hides the taskbar |
+| `node src/test/preview.mjs <command>` | Runs the real app beside yours, with its own data, on the debug port. It refuses anything that changes the machine |
+| `node src/test/see.mjs <out.png>` | One picture of the whole screen with Shelf's windows drawn in. It shows what's on screen, so keep it out of the repo |
 | `src/test/probe.ps1` | Read-only look at the dock, work area and taskbar |
 | `node src/test/preview.mjs <command>` | Runs a command against the real app in preview mode, beside your Shelf. It uses its own data and leaves the taskbar alone, but its windows show on screen. `shelf.exe --preview` refuses anything that changes the machine |
 | `node src/test/see.mjs <out.png>` | One picture of the whole screen with Shelf's windows drawn in, under preview |
