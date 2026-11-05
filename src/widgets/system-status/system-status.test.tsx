@@ -29,10 +29,11 @@ describe("opens Windows' own panels", () => {
     expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "wifi" });
   });
 
-  it("the sound icon opens the sound panel", () => {
+  it("the sound icon opens Shelf's own card", () => {
     render(<T data={DATA} status="ready" />);
     press("Sound");
-    expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "sound" });
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:sound" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("shell_panel", expect.anything());
   });
 
   it("the battery icon opens quick settings", () => {

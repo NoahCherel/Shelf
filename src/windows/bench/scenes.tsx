@@ -1,4 +1,4 @@
-import { fakeApps } from "./fixtures";
+import { fakeApps, fakeAudio } from "./fixtures";
 
 export interface Scene {
   id: string;
@@ -61,6 +61,43 @@ export const scenes: Scene[] = [
   { id: "card-claude", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "claude-plan-usage" },
   { id: "card-date", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "clock-and-weather" },
   { id: "menu", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__menu:github-activity" },
+  { id: "card-sound", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:sound", anchor: '[aria-label="Sound"]' },
+  {
+    id: "card-sound-muted",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:sound",
+    anchor: '[aria-label="Sound"]',
+    backend: { audio_state: () => ({ ...fakeAudio(1), muted: true }) },
+  },
+  {
+    id: "card-sound-no-device",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:sound",
+    anchor: '[aria-label="Sound"]',
+    backend: { audio_state: () => ({ ...fakeAudio(0), device: null, devices: [] }) },
+  },
+  {
+    id: "card-sound-many-apps",
+    size: [1536, 800],
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:sound",
+    anchor: '[aria-label="Sound"]',
+    backend: { audio_state: () => fakeAudio(12) },
+    measure: [
+      { name: "the card stays under 640 px", expect: `document.querySelector(".bench__card .card").getBoundingClientRect().height <= 640` },
+      { name: "the card's foot stays in the card", expect: `document.querySelector(".bench__card .card__foot").getBoundingClientRect().bottom <= document.querySelector(".bench__card .card").getBoundingClientRect().bottom` },
+      { name: "the long list scrolls inside the card", expect: `(() => { const b = document.querySelector(".bench__card .card__body"); return b.scrollHeight > b.clientHeight; })()` },
+    ],
+  },
+  { id: "card-sound-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:sound", anchor: '[aria-label="Sound"]' },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

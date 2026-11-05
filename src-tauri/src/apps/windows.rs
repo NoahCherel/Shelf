@@ -224,6 +224,10 @@ pub fn take_foreground_raw(raw: isize) {
     }
 }
 
+pub fn exe_of_pid(pid: u32) -> String {
+    exe_path(pid)
+}
+
 pub fn pid_of(raw: isize) -> u32 {
     window_pid(hwnd(raw))
 }

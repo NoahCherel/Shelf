@@ -1,0 +1,132 @@
+.sound__master {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sound__mute {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--track);
+}
+
+.sound__mute:hover {
+  filter: brightness(1.25);
+}
+
+.sound__mute svg {
+  width: 19px;
+  height: 19px;
+}
+
+.sound__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sound__section .card__section {
+  margin: 0;
+}
+
+.sound__outputs {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-inner);
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.sound__output {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.sound__output + .sound__output {
+  border-top: 1px solid var(--hairline);
+}
+
+.sound__output:hover {
+  background: var(--fill);
+}
+
+.sound__output svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
+}
+
+.sound__apps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sound__app {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sound__icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.sound__icon--blank {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-inner);
+  background: var(--track);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sound__control {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sound__name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound__control .pslider {
+  height: 14px;
+}
+
+.sound__control .pslider::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+}
+
+.sound__none {
+  margin: 0;
+  color: var(--muted);
+}
+
+.sound__error {
+  margin: 0;
+  color: var(--error);
+  font-size: 12px;
+}

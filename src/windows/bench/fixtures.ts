@@ -12,6 +12,17 @@ const icon = (letter: string, color: string) =>
 
 const COLORS = ["#2d7ff9", "#ef6c33", "#22a06b", "#8f5bd6", "#d1417a", "#c99a1a"];
 
+export const fakeAudio = (apps = 2) => ({
+  volume: 64,
+  muted: false,
+  device: "Speakers (Realtek Audio)",
+  devices: [
+    { id: "a", name: "Speakers (Realtek Audio)", active: true },
+    { id: "b", name: "WH-1000XM5", active: false },
+  ],
+  apps: Array.from({ length: apps }, (_, i) => ({ pid: i + 1, name: ["Firefox", "Spotify", "Discord", "Teams", "Orca", "System sounds"][i % 6], exe: `app-${i}`, volume: 100 - i * 13, muted: false })),
+});
+
 export interface FakeApp {
   key: string;
   name: string;
@@ -76,6 +87,7 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     card_current: () => null,
     close_card: () => null,
     swap_card: () => null,
+    card_room: () => 640,
     open_settings: () => null,
     open_window: () => null,
     close_window: () => null,
@@ -100,6 +112,11 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     }),
     secret_has: () => false,
     autostart_get: () => false,
+    audio_state: () => fakeAudio(),
+    audio_app_icon: ({ exe }: { exe: string }) => {
+      const n = Number(exe.replace(/\D/g, "")) || 0;
+      return icon(String.fromCharCode(65 + (n % 26)), COLORS[n % COLORS.length]);
+    },
   };
 }
 

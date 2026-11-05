@@ -16,8 +16,13 @@ const SETTLE_MS: u64 = 250;
 /// Long lists scroll inside the card rather than reaching for the top of the screen.
 const MAX_HEIGHT: f64 = 640.0;
 
-fn limit_height(height: f64) -> f64 {
-    height.min(MAX_HEIGHT)
+fn limit_height(height: f64, room: f64) -> f64 {
+    height.min(MAX_HEIGHT).min(room)
+}
+
+/// Logical px between the top of the screen and the dock, less a margin at each end.
+fn room_above(dock: Rect, monitor: Rect, margin: i32, scale: f64) -> f64 {
+    (dock.y - monitor.y - 2 * margin) as f64 / scale
 }
 
 #[derive(Clone, Copy, Default)]
@@ -124,10 +129,28 @@ fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
         let tile = *TILE.lock().unwrap_or_else(|e| e.into_inner());
-        let wanted = ((logical.0 * scale).round() as i32, (limit_height(logical.1) * scale).round() as i32);
-        let r = card_rect(tile, dock_rect, monitor, wanted, (MARGIN * scale).round() as i32);
+        let margin = (MARGIN * scale).round() as i32;
+        let height = limit_height(logical.1, room_above(dock_rect, monitor, margin, scale));
+        let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
+        let r = card_rect(tile, dock_rect, monitor, wanted, margin);
         card.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
         card.set_position(PhysicalPosition::new(r.x, r.y))
+    };
+    run().map_err(|e| e.to_string())
+}
+
+/// How tall a card may be here, so its body can scroll inside that rather than being cut off.
+#[tauri::command]
+pub fn card_room(app: AppHandle) -> Result<f64, String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let run = || -> tauri::Result<f64> {
+        let Some(m) = dock.primary_monitor()? else { return Ok(MAX_HEIGHT) };
+        let scale = m.scale_factor();
+        let monitor = Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 };
+        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
+        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
+        let margin = (MARGIN * scale).round() as i32;
+        Ok(limit_height(f64::MAX, room_above(dock_rect, monitor, margin, scale)))
     };
     run().map_err(|e| e.to_string())
 }
@@ -289,8 +312,22 @@ mod tests {
 
     #[test]
     fn cards_stop_growing_at_640() {
-        assert_eq!(limit_height(300.0), 300.0);
-        assert_eq!(limit_height(2000.0), 640.0);
+        assert_eq!(limit_height(300.0, 900.0), 300.0);
+        assert_eq!(limit_height(2000.0, 900.0), 640.0);
+    }
+
+    #[test]
+    fn a_short_screen_limits_the_card_to_the_room_above_the_dock() {
+        assert_eq!(limit_height(2000.0, 500.0), 500.0);
+        assert_eq!(limit_height(300.0, 500.0), 300.0);
+    }
+
+    #[test]
+    fn the_room_is_what_lies_above_the_dock() {
+        let monitor = Rect { x: 0, y: 0, w: 1366, h: 768 };
+        let dock = Rect { x: 200, y: 700, w: 900, h: 68 };
+        assert_eq!(room_above(dock, monitor, 8, 1.0), 684.0);
+        assert_eq!(room_above(dock, monitor, 8, 2.0), 342.0);
     }
 
     #[test]

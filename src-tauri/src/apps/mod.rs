@@ -19,7 +19,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::system::tap_keys;
 
-pub use windows::{take_foreground_raw, watch_foreground};
+pub use windows::{exe_of_pid, store_string, take_foreground_raw, watch_foreground};
 
 /// Sent once per icon, so the icons aren't copied to the page on every refresh.
 static ICONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
@@ -65,6 +65,21 @@ pub fn apps_icon(key: String) -> Result<Option<String>, String> {
     if let Some(found) = &icon {
         let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
         cache.get_or_insert_with(HashMap::new).insert(key, found.clone());
+    }
+    Ok(icon)
+}
+
+/// A program's icon by its path, from the same cache as the apps themselves.
+pub fn icon_of_exe(exe: String) -> Result<Option<String>, String> {
+    let _one = ONE_LOOKUP.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(known) = ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&exe)) {
+        return Ok(Some(known.clone()));
+    }
+    let source = exe.clone();
+    let icon = on_com_thread(move || icons::icon(&source))?;
+    if let Some(found) = &icon {
+        let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
+        cache.get_or_insert_with(HashMap::new).insert(exe, found.clone());
     }
     Ok(icon)
 }

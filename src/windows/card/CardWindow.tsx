@@ -19,6 +19,10 @@ function Fitted({ width, children }: { width: number; children: ReactNode }) {
   useEffect(() => {
     const el = box.current;
     if (!el) return;
+    invoke<number | null>("card_room").then(
+      (room) => room && document.documentElement.style.setProperty("--card-max", `${room}px`),
+      () => {},
+    );
     const observer = new ResizeObserver(() => {
       invoke("fit_card", { width, height: el.offsetHeight }).catch(() => {});
     });

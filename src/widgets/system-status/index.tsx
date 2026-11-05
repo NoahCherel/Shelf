@@ -1,6 +1,6 @@
-import type { MouseEvent, ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { invoke } from "../../core/tauri";
-import { openPanel, type PanelId } from "../../panels";
+import { openPanel, statusChanged, type PanelId } from "../../panels";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
 import { signalBars, statusProvider, type StatusData } from "../_providers/status";
@@ -92,7 +92,7 @@ function BellGlyph() {
   );
 }
 
-function Part({ label, title, panel, preview, children }: { label: string; title?: string; panel: PanelId | "notifications"; preview?: boolean; children: ReactNode }) {
+function Part({ label, title, panel, preview, onScroll, children }: { label: string; title?: string; panel: PanelId | "notifications"; preview?: boolean; onScroll?: (up: boolean) => void; children: ReactNode }) {
   const open = (e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     if (preview) return;
@@ -101,7 +101,14 @@ function Part({ label, title, panel, preview, children }: { label: string; title
     else openPanel(panel, e.currentTarget);
   };
   return (
-    <button type="button" className="status__part" aria-label={label} title={title ?? label} onClick={open}>
+    <button
+      type="button"
+      className="status__part"
+      aria-label={label}
+      title={title ?? label}
+      onClick={open}
+      onWheel={(e) => !preview && onScroll?.(e.deltaY < 0)}
+    >
       {children}
     </button>
   );
@@ -112,13 +119,36 @@ function networkTitle(data: StatusData | null): string {
   return data?.online ? "Connected" : "Not connected";
 }
 
+const SCROLL_STEP = 2;
+
+function stepVolume(percent: number, up: boolean): number {
+  return Math.min(100, Math.max(0, percent + (up ? SCROLL_STEP : -SCROLL_STEP)));
+}
+
 function StatusTile({ data, preview }: TileProps<StatusData>) {
+  // Several scroll steps can land before the next reading, so they add up from the last one.
+  const scrolled = useRef<number | null>(null);
+  const reading = data?.volume?.percent;
+  useEffect(() => {
+    scrolled.current = null;
+  }, [reading]);
   return (
     <Tile width={widthFor(data)} className="status">
       <Part label="Network" title={networkTitle(data)} panel="wifi" preview={preview}>
         <NetworkGlyph data={data} />
       </Part>
-      <Part label="Sound" title={data?.volume ? `${data.volume.percent}%` : "Sound"} panel="sound" preview={preview}>
+      <Part
+        label="Sound"
+        title={data?.volume ? `${data.volume.percent}%` : "Sound"}
+        panel="sound"
+        preview={preview}
+        onScroll={(up) => {
+          if (!data?.volume) return;
+          const percent = stepVolume(data.volume.percent + (scrolled.current ?? 0), up);
+          scrolled.current = percent - data.volume.percent;
+          invoke("audio_set_volume", { percent }).then(statusChanged, () => {});
+        }}
+      >
         <SoundGlyph data={data} />
       </Part>
       {data?.battery && (

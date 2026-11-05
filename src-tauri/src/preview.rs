@@ -178,6 +178,11 @@ mod tests {
             (include_str!("apps/mod.rs"), "start_menu"),
             (include_str!("apps/mod.rs"), "start_quick_menu"),
             (include_str!("system/status.rs"), "shell_panel"),
+            (include_str!("system/audio.rs"), "audio_set_volume"),
+            (include_str!("system/audio.rs"), "audio_set_mute"),
+            (include_str!("system/audio.rs"), "audio_set_app_volume"),
+            (include_str!("system/audio.rs"), "audio_set_output"),
+            (include_str!("system/settings_link.rs"), "open_settings"),
         ];
         for (source, name) in sources {
             let at = source.find(&format!("fn {name}(")).unwrap_or_else(|| panic!("no fn {name}"));
