@@ -28,7 +28,7 @@ static ONE_LOOKUP: Mutex<()> = Mutex::new(());
 static SOURCES: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 
 /// Shell objects need their own COM apartment, so they get their own short-lived thread.
-fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, String> {
+pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, String> {
     std::thread::spawn(move || {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);

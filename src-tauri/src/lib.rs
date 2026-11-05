@@ -5,6 +5,7 @@ mod claude_usage;
 mod glass;
 mod net;
 mod preview;
+mod search;
 mod secrets;
 mod shell;
 mod store;
@@ -134,6 +135,11 @@ pub fn run() {
             system::system_stats,
             system::status::system_status,
             system::status::shell_panel,
+            search::search_apps,
+            search::search_files,
+            search::search_open,
+            search::search_web,
+            search::search_icon,
             system::toggles::toggles_state,
             system::toggles::toggle_set,
             system::bluetooth::bluetooth_devices,
@@ -175,6 +181,7 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
+            search::refresh_apps();
             shell::dock::start(app.handle())?;
             apps::watch_foreground(app.handle());
             build_tray(app.handle())?;

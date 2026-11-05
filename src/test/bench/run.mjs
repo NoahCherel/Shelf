@@ -115,6 +115,11 @@ try {
     await evaluate("document.fonts.ready.then(() => true)");
 
     for (const step of scene.steps ?? []) {
+      if (step.type) {
+        await send("Input.insertText", { text: step.type });
+        await sleep(400);
+        continue;
+      }
       const selector = step.hover ?? step.click;
       const at = await evaluate(`(() => {
         const e = document.querySelector(${JSON.stringify(selector)});

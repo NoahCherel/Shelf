@@ -4,6 +4,7 @@ import { refresh } from "../core/provider";
 import { statusProvider } from "../widgets/_providers/status";
 import { BluetoothCard } from "./bluetooth/BluetoothCard";
 import { QuickCard } from "./quick/QuickCard";
+import { SearchCard } from "./search/SearchCard";
 import { SoundCard } from "./sound/SoundCard";
 import { WifiCard } from "./wifi/WifiCard";
 
@@ -20,6 +21,7 @@ export const panels: Partial<Record<PanelId, PanelDef>> = {
   wifi: { Card: WifiCard, width: 340 },
   bluetooth: { Card: BluetoothCard, width: 340 },
   quick: { Card: QuickCard, width: 340 },
+  search: { Card: SearchCard, width: 560 },
 };
 
 const FIRST_HEIGHT = 300;

@@ -41,6 +41,15 @@ export const fakeWifi = (more: object = {}) => ({
   ...more,
 });
 
+const searchApp = (name: string, i: number) => ({ id: `app:${i}`, name, kind: "app" });
+
+export const fakeSearchApps = () => ["Paint", "Notepad", "Photos", "Phone Link", "Paramètres", "Calculator", "Firefox", "Discord"].map(searchApp);
+
+export const fakeSearchFiles = () => [
+  { id: "file:1", name: "Plan panneaux.pdf", kind: "file", detail: "Documents" },
+  { id: "file:2", name: "panorama.jpg", kind: "file", detail: "Pictures" },
+];
+
 export interface FakeApp {
   key: string;
   name: string;
@@ -145,6 +154,14 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     ],
     brightness_get: () => 70,
     brightness_set: () => null,
+    search_apps: () => fakeSearchApps(),
+    search_files: () => fakeSearchFiles(),
+    search_open: () => null,
+    search_web: () => null,
+    search_icon: ({ id }: { id: string }) => {
+      const n = Number(id.replace(/\D/g, "")) || 0;
+      return icon(id.startsWith("app") ? fakeSearchApps()[n % 8].name.charAt(0) : "F", COLORS[n % COLORS.length]);
+    },
     wifi_networks: () => fakeWifi(),
     wifi_scan: () => null,
     wifi_connect: () => null,

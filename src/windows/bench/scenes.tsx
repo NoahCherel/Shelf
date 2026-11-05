@@ -11,7 +11,8 @@ export interface Scene {
   view?: "picker" | "settings"; // a whole window instead of a dock
   settings?: Record<string, unknown>;
   backend?: Record<string, (args: any) => unknown>;
-  steps?: { hover?: string; click?: string }[]; // selectors, run through the debug port
+  /** type: text into what has focus. */
+  steps?: { hover?: string; click?: string; type?: string }[]; // selectors, run through the debug port
   measure?: { name: string; expect: string }[]; // JavaScript run in the page; each must be true
   scale?: number; // display scale, default 1.25 as on the owner's PC
 }
@@ -198,6 +199,36 @@ export const scenes: Scene[] = [
       { name: "the status tile gives way to the battery widget", expect: `!document.querySelector('[aria-label="Battery"]') && !!document.querySelector('[aria-label="Quick settings"]')` },
     ],
   },
+  { id: "card-search-empty", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]' },
+  {
+    id: "card-search-recent",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:search",
+    anchor: '[aria-label="Search"]',
+    backend: { store_load: ({ name }: { name: string }) => (name === "search-history" ? { Firefox: 5, Discord: 2, Paint: 1 } : null) },
+  },
+  { id: "card-search-results", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]', steps: [{ type: "pa" }] },
+  { id: "card-search-no-results", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]', backend: { search_files: () => [] }, steps: [{ type: "zzzz" }] },
+  {
+    id: "card-search-long-names",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    card: "__panel:search",
+    anchor: '[aria-label="Search"]',
+    backend: {
+      search_files: () => [
+        { id: "file:1", name: "pa un document au nom vraiment très très long qui ne tient absolument pas sur une seule ligne de la carte.pdf", kind: "file", detail: "Un dossier au nom également beaucoup trop long pour tenir" },
+      ],
+    },
+    steps: [{ type: "pa" }],
+    measure: [{ name: "a long name stays inside its row", expect: `[...document.querySelectorAll(".search__row")].every((r) => r.scrollWidth <= r.clientWidth)` }],
+  },
+  { id: "card-search-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:search", anchor: '[aria-label="Search"]', steps: [{ type: "pa" }] },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

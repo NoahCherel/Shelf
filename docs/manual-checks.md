@@ -72,6 +72,17 @@ These change real settings, so only the owner runs them.
 - [ ] **Bluetooth card:** paired devices are listed with the connected one first, and the row opens Settings.
 - [ ] **Battery widget:** with it on the dock, the status tile shows the sliders icon, and clicking the widget opens Quick Settings.
 
+## Search card
+
+These launch real things, so only the owner runs them.
+
+- [ ] **Open an app:** Enter or a click starts it, and the card closes.
+- [ ] **Open a file:** a file result opens in its usual app.
+- [ ] **Web:** the last row opens the browser on a search for the text.
+- [ ] **Recent:** what was opened comes back with an empty box next time.
+- [ ] **Reopen:** close the card, open it, and files still come back.
+- [ ] **Win+S:** still opens Windows' own search, as taking the shortcut over is out of scope.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

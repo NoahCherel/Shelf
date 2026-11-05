@@ -54,12 +54,6 @@ it("openPanel centres the card on the part that was clicked", () => {
   expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:sound", tileX: 700, tileWidth: 40, width: 340 }));
 });
 
-it("a panel not built yet still opens Windows' own", () => {
-  openPanel("search", anchor());
-  expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "search" });
-  expect(mockInvoke).not.toHaveBeenCalledWith("open_card", expect.anything());
-});
-
 it("closing a card unmounts it, so its providers stop", async () => {
   await openIt();
   await act(async () => handler("card-closed")());
@@ -82,8 +76,8 @@ it("reopening a card starts it fresh", async () => {
   expect((screen.getByLabelText("typed") as HTMLInputElement).value).toBe("");
 });
 
-it("every panel but search has its card", () => {
-  for (const id of ["wifi", "quick", "bluetooth"] as const) expect(panels[id]).toBeTruthy();
+it("every panel has its card", () => {
+  for (const id of ["wifi", "quick", "bluetooth", "search"] as const) expect(panels[id]).toBeTruthy();
 });
 
 it("goToPanel swaps the card without moving it", () => {

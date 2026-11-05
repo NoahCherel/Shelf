@@ -82,7 +82,8 @@ it("has a Search button beside Start, as on Windows", () => {
   const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
   expect(names).toEqual(["Start", "Search"]);
   fireEvent.click(screen.getByRole("button", { name: "Search" }));
-  expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "search" });
+  expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:search", width: 560 }));
+  expect(mockInvoke).not.toHaveBeenCalledWith("shell_panel", expect.anything());
 });
 
 it("right-clicking an app asks for Windows' menu, not Shelf's", () => {
