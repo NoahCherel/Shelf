@@ -127,6 +127,8 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Smooth:** a new app opens up and fades in, with the rest of the dock following.
 - [ ] **Edge:** the bar's right edge doesn't visibly clip as it grows.
 - [ ] **Starting Shelf:** nothing animates at launch.
+- [ ] **Closing:** an app's icon folds away where it was, and a pinned app's icon stays.
+- [ ] **Reopening at once:** opening the app again as it folds leaves one icon, not two.
 
 ## A day of use
 

@@ -307,3 +307,83 @@ describe("an app arriving on the dock", () => {
     expect(icon("b").className).not.toContain("app--new");
   });
 });
+
+describe("an app leaving the dock", () => {
+  const leaving = (container: HTMLElement) => [...container.querySelectorAll(".app--leaving")];
+  const order = (container: HTMLElement) => [...container.querySelectorAll(".app")].map((e) => e.getAttribute("data-key")).filter(Boolean);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stays for a moment to fold away, then goes", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    expect(leaving(container)).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(299));
+    expect(leaving(container)).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(1));
+    expect(leaving(container)).toHaveLength(0);
+    expect(order(container)).toEqual(["a"]);
+  });
+
+  it("folds away where it was, not at the end", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a", true), app("b", true), app("c", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true), app("c", true)]} status="ready" />);
+    expect(order(container)).toEqual(["a", "b", "c"]);
+  });
+
+  it("can't be clicked or right-clicked while it goes", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    mockInvoke.mockClear();
+    const gone = leaving(container)[0];
+    fireEvent.click(gone);
+    fireEvent.contextMenu(gone);
+    fireEvent.mouseEnter(gone);
+    act(() => vi.advanceTimersByTime(100));
+    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(gone.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("coming back while it folds keeps one icon, and it's no longer leaving", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    expect(leaving(container)).toHaveLength(0);
+    expect(order(container)).toEqual(["a", "b"]);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(order(container)).toEqual(["a", "b"]);
+  });
+
+  it("several leaving together each go", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a", true), app("b", true), app("c", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    expect(leaving(container)).toHaveLength(2);
+    act(() => vi.advanceTimersByTime(300));
+    expect(order(container)).toEqual(["a"]);
+  });
+
+  it("a pinned app closing keeps its icon", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a")]} status="ready" />);
+    expect(leaving(container)).toHaveLength(0);
+  });
+
+  it("the picker's sample doesn't animate", () => {
+    const { container, rerender } = render(<AppsTile data={[app("a"), app("b")]} status="sample" preview />);
+    rerender(<AppsTile data={[app("a")]} status="sample" preview />);
+    expect(leaving(container)).toHaveLength(0);
+  });
+
+  it("closing the dock mid-way leaves no timer behind", () => {
+    const { rerender, unmount } = render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
