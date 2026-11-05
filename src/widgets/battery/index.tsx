@@ -55,6 +55,7 @@ export default defineWidget<SystemData>({
   category: "system",
   width: 1,
   sample: { cpu: 0, memory: 0, battery: { percent: 86, charging: true } },
+  panel: "quick",
   Tile: BatteryTile,
   provider: systemProvider,
 });

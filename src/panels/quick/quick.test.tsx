@@ -19,6 +19,8 @@ const RADIOS = [
 ];
 
 let radios = RADIOS;
+const TOGGLES = { airplane: false, dnd: false, night_light: true, energy_saver: false };
+let toggles = TOGGLES as Record<string, boolean | null>;
 let brightness: number | null = 70;
 let status = STATUS as { wifi: null; online: boolean; volume: null; battery: { percent: number; charging: boolean } | null };
 
@@ -28,11 +30,13 @@ beforeEach(() => {
   vi.useFakeTimers();
   radios = RADIOS;
   brightness = 70;
+  toggles = TOGGLES;
   status = STATUS;
   mockInvoke.mockReset();
   mockInvoke.mockImplementation(async (cmd) => {
     if (cmd === "radios_state") return radios;
     if (cmd === "brightness_get") return brightness;
+    if (cmd === "toggles_state") return toggles;
     if (cmd === "audio_state") return AUDIO;
     if (cmd === "system_status") return status;
     return null;
@@ -77,10 +81,10 @@ it("the chevron on Wi-Fi moves to the Wi-Fi card", async () => {
   expect(mockInvoke).toHaveBeenCalledWith("swap_card", { widgetId: "__panel:wifi", width: 340 });
 });
 
-it("Bluetooth's chevron opens Windows' Bluetooth settings", async () => {
+it("Bluetooth's chevron moves to the Bluetooth card", async () => {
   await openCard();
-  fireEvent.click(screen.getByRole("button", { name: "Bluetooth settings" }));
-  expect(mockInvoke).toHaveBeenCalledWith("open_settings", { page: "bluetooth" });
+  fireEvent.click(screen.getByRole("button", { name: "Bluetooth devices" }));
+  expect(mockInvoke).toHaveBeenCalledWith("swap_card", { widgetId: "__panel:bluetooth", width: 340 });
 });
 
 it("a switch that fails goes back and says why", async () => {
@@ -88,6 +92,7 @@ it("a switch that fails goes back and says why", async () => {
     if (cmd === "radio_set") throw "Windows didn't allow Shelf to change this radio.";
     if (cmd === "radios_state") return radios;
     if (cmd === "brightness_get") return brightness;
+    if (cmd === "toggles_state") return toggles;
     if (cmd === "audio_state") return AUDIO;
     return status;
   });
@@ -127,16 +132,56 @@ it("a machine with no battery hides that row", async () => {
   expect(screen.queryByRole("button", { name: /Energy saver/ })).toBeNull();
 });
 
-it("what can't be built links to Settings and is never shown as a dead switch", async () => {
+it("airplane mode, do not disturb, night light and energy saver are real switches", async () => {
   await openCard();
-  expect(screen.getAllByRole("switch")).toHaveLength(2);
-  for (const [name, page] of [
-    ["Airplane mode", "network-airplanemode"],
-    ["Do not disturb", "quiethours"],
-    ["Night light", "nightlight"],
-    ["Energy saver", "batterysaver"],
-  ]) {
-    fireEvent.click(screen.getByRole("button", { name }));
-    expect(mockInvoke).toHaveBeenCalledWith("open_settings", { page });
+  expect(toggle("Night light").getAttribute("aria-checked")).toBe("true");
+  for (const [name, kind, on] of [
+    ["Airplane mode", "airplane", true],
+    ["Do not disturb", "dnd", true],
+    ["Night light", "night_light", false],
+    ["Energy saver", "energy_saver", true],
+  ] as const) {
+    fireEvent.click(toggle(name));
+    expect(mockInvoke).toHaveBeenCalledWith("toggle_set", { kind, on });
   }
+});
+
+it("no battery hides the energy saver switch", async () => {
+  status = { ...STATUS, battery: null };
+  toggles = { ...TOGGLES, energy_saver: null };
+  await openCard();
+  expect(screen.queryByRole("switch", { name: "Energy saver" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Energy saver/ })).toBeNull();
+});
+
+it("a setting Windows won't tell us about is a link, never a dead switch", async () => {
+  toggles = { ...TOGGLES, night_light: null };
+  await openCard();
+  expect(screen.queryByRole("switch", { name: "Night light" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Night light" }));
+  expect(mockInvoke).toHaveBeenCalledWith("open_settings", { page: "nightlight" });
+});
+
+it("a change Windows quietly ignores goes back to what's true", async () => {
+  await openCard();
+  fireEvent.click(toggle("Do not disturb"));
+  expect(toggle("Do not disturb").getAttribute("aria-checked")).toBe("true");
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  expect(toggle("Do not disturb").getAttribute("aria-checked")).toBe("false");
+});
+
+it("a setting that refuses says why", async () => {
+  mockInvoke.mockImplementation(async (cmd) => {
+    if (cmd === "toggle_set") throw "Energy saver only turns on when running on battery.";
+    if (cmd === "radios_state") return radios;
+    if (cmd === "brightness_get") return brightness;
+    if (cmd === "toggles_state") return toggles;
+    if (cmd === "audio_state") return AUDIO;
+    return status;
+  });
+  await openCard();
+  fireEvent.click(toggle("Energy saver"));
+  await flush();
+  expect(toggle("Energy saver").getAttribute("aria-checked")).toBe("false");
+  expect(screen.getByText(/running on battery/)).toBeTruthy();
 });

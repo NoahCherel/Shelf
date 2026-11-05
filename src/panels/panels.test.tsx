@@ -82,6 +82,10 @@ it("reopening a card starts it fresh", async () => {
   expect((screen.getByLabelText("typed") as HTMLInputElement).value).toBe("");
 });
 
+it("every panel but search has its card", () => {
+  for (const id of ["wifi", "quick", "bluetooth"] as const) expect(panels[id]).toBeTruthy();
+});
+
 it("goToPanel swaps the card without moving it", () => {
   goToPanel("sound");
   expect(mockInvoke).toHaveBeenCalledWith("swap_card", { widgetId: "__panel:sound", width: 340 });

@@ -9,6 +9,7 @@ import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { GlassLayer } from "../../design/glass/GlassLayer";
+import { openPanel } from "../../panels";
 import "./dock.css";
 
 const DEFAULT_CARD_WIDTH = 340;
@@ -40,7 +41,9 @@ function Slot({ def }: { def: WidgetDef }) {
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: def.id, disabled: locked });
 
   const openCard = (e: MouseEvent<HTMLDivElement>) => {
-    if (!def.Card || pickerOpen) return;
+    if (pickerOpen) return;
+    if (def.panel) return openPanel(def.panel, e.currentTarget);
+    if (!def.Card) return;
     const r = e.currentTarget.getBoundingClientRect();
     invoke("open_card", {
       widgetId: def.id,

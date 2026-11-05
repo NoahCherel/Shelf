@@ -2,11 +2,12 @@ import type { FC } from "react";
 import { invoke } from "../core/tauri";
 import { refresh } from "../core/provider";
 import { statusProvider } from "../widgets/_providers/status";
+import { BluetoothCard } from "./bluetooth/BluetoothCard";
 import { QuickCard } from "./quick/QuickCard";
 import { SoundCard } from "./sound/SoundCard";
 import { WifiCard } from "./wifi/WifiCard";
 
-export type PanelId = "sound" | "wifi" | "quick" | "search";
+export type PanelId = "sound" | "wifi" | "bluetooth" | "quick" | "search";
 
 export interface PanelDef {
   Card: FC;
@@ -17,6 +18,7 @@ export interface PanelDef {
 export const panels: Partial<Record<PanelId, PanelDef>> = {
   sound: { Card: SoundCard, width: 340 },
   wifi: { Card: WifiCard, width: 340 },
+  bluetooth: { Card: BluetoothCard, width: 340 },
   quick: { Card: QuickCard, width: 340 },
 };
 

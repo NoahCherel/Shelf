@@ -136,6 +136,13 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
       { kind: "bluetooth", on: false },
     ],
     radio_set: () => null,
+    toggles_state: () => ({ airplane: false, dnd: false, night_light: true, energy_saver: false }),
+    toggle_set: () => null,
+    bluetooth_devices: () => [
+      { id: "a", name: "WH-1000XM5", connected: true },
+      { id: "b", name: "MX Master 3", connected: false },
+      { id: "c", name: "AirPods Pro", connected: false },
+    ],
     brightness_get: () => 70,
     brightness_set: () => null,
     wifi_networks: () => fakeWifi(),

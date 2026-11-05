@@ -6,9 +6,13 @@ export interface RadioInfo {
   on: boolean;
 }
 
+export type ToggleKind = "airplane" | "dnd" | "night_light" | "energy_saver";
+
 export interface QuickState {
   radios: RadioInfo[];
   brightness: number | null;
+  /** Null when Windows won't say, and the card links to Settings instead. */
+  toggles: Record<ToggleKind, boolean | null>;
 }
 
 export const quickProvider: Provider<QuickState> = {
@@ -16,7 +20,11 @@ export const quickProvider: Provider<QuickState> = {
   intervalMs: 2000,
   cache: false,
   fetch: async () => {
-    const [radios, brightness] = await Promise.all([invoke<RadioInfo[]>("radios_state"), invoke<number | null>("brightness_get")]);
-    return { radios, brightness };
+    const [radios, brightness, toggles] = await Promise.all([
+      invoke<RadioInfo[]>("radios_state"),
+      invoke<number | null>("brightness_get"),
+      invoke<QuickState["toggles"]>("toggles_state"),
+    ]);
+    return { radios, brightness, toggles };
   },
 };

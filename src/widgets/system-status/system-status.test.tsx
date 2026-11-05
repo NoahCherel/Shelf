@@ -1,6 +1,7 @@
 import { beforeEach, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { invoke } from "../../core/tauri";
+import { setDockIds } from "../../core/dockIds";
 import widget from "./index";
 import type { StatusData } from "../_providers/status";
 import { signalBars } from "../_providers/status";
@@ -78,6 +79,15 @@ describe("shows the real state", () => {
   it("a muted speaker is marked", () => {
     const { container } = render(<T data={{ ...DATA, volume: { percent: 40, muted: true } }} status="ready" />);
     expect(container.querySelector("[data-muted='true']")).toBeTruthy();
+  });
+
+  it("with the battery widget on the dock, the battery icon gives way to quick settings", () => {
+    setDockIds(["system-status", "battery"]);
+    render(<T data={DATA} status="ready" />);
+    expect(screen.queryByRole("button", { name: "Battery" })).toBeNull();
+    press("Quick settings");
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:quick" }));
+    setDockIds([]);
   });
 
   it("a machine with no battery has no battery icon", () => {

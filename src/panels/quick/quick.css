@@ -103,15 +103,6 @@
   height: 19px;
 }
 
-.quick__battery {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: var(--radius-inner);
-  background: var(--fill);
-}
-
 .quick__links {
   display: grid;
   grid-template-columns: 1fr 1fr;

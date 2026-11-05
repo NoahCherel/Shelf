@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { invoke } from "../../core/tauri";
+import { useDockIds } from "../../core/dockIds";
 import { openPanel, statusChanged, type PanelId } from "../../panels";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
@@ -134,6 +135,7 @@ function stepVolume(percent: number, up: boolean): number {
 }
 
 function StatusTile({ data, preview }: TileProps<StatusData>) {
+  const batteryWidget = useDockIds((s) => s.ids.includes("battery"));
   // Several scroll steps can land before the next reading, so they add up from the last one.
   const scrolled = useRef<number | null>(null);
   const reading = data?.volume?.percent;
@@ -159,7 +161,7 @@ function StatusTile({ data, preview }: TileProps<StatusData>) {
       >
         <SoundGlyph data={data} />
       </Part>
-      {data?.battery ? (
+      {data?.battery && !batteryWidget ? (
         <Part label="Battery" title={`${data.battery.percent}%`} panel="quick" preview={preview}>
           <BatteryGlyph battery={data.battery} />
         </Part>

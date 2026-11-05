@@ -1,10 +1,12 @@
 //! Machine facts for widgets, and a few Windows settings.
 
 pub mod audio;
+pub mod bluetooth;
 pub mod brightness;
 pub mod radios;
 pub mod settings_link;
 pub mod status;
+pub mod toggles;
 pub mod wifi;
 
 use std::sync::Mutex;

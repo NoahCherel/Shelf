@@ -4,6 +4,10 @@ import widget from "./index";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
+it("clicking it opens quick settings", () => {
+  expect(widget.panel).toBe("quick");
+});
+
 const T = widget.Tile;
 const state = (percent: number, charging: boolean) => ({ cpu: 0, memory: 0, battery: { percent, charging } });
 

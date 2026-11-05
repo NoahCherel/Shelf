@@ -28,6 +28,17 @@ Read-only probes on the owner's PC, 2026-11-05, from an unpackaged process. They
 
 No dead switches: what can't be built is a link that says where it goes.
 
+**Revised the same day, at the owner's request.** "No public API" turned out to be too cautious a reason not to build these, and all four read correctly on this PC, so they're now real switches. Each falls back to its Settings link if an update breaks the read.
+
+| Feature | How | Checked here |
+|---|---|---|
+| Airplane mode | Undocumented `IRadioManager`, behind Windows' own button | Read only: scripted radio changes are off limits |
+| Do not disturb | Undocumented WNF state `0x0d83063ea3bf1c75` | Written and restored. Whether notifications really stop is a manual check |
+| Night light | Undocumented registry state: byte 18, two extra bytes, and the time at bytes 10 to 14 | Written both ways, and an off stayed off for 30 s. Whether the screen's tint follows is a manual check |
+| Energy saver | Public read. Writes set the battery level it starts at to 100, and keep the old level to restore | Level read as 30. The write hasn't run: this PC was plugged in, where it refuses |
+
+Connecting a Bluetooth device still has no public way, so that stays in Settings.
+
 ## Limits
 
 One PC, one run, with one output and few audio sessions. The owner's Bluetooth is off, so nothing here shows how paired devices behave.

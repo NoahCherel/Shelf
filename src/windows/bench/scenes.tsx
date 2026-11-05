@@ -151,6 +151,7 @@ export const scenes: Scene[] = [
     anchor: '[aria-label="Quick settings"]',
     backend: {
       brightness_get: () => null,
+      toggles_state: () => ({ airplane: false, dnd: true, night_light: false, energy_saver: null }),
       system_status: () => ({ wifi: null, online: true, volume: { percent: 60, muted: false }, battery: null }),
     },
   },
@@ -182,6 +183,19 @@ export const scenes: Scene[] = [
     measure: [
       { name: "the card's text is dark on its white", expect: `getComputedStyle(document.querySelector(".bench__card .card__title")).color === "rgb(28, 28, 30)"` },
       { name: "the bar's text stays light on its black", expect: `getComputedStyle(document.querySelector(".dock")).color === "rgb(245, 245, 247)"` },
+    ],
+  },
+  { id: "card-quick-links", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__panel:quick", anchor: '[aria-label="Battery"]', backend: { toggles_state: () => ({ airplane: null, dnd: null, night_light: false, energy_saver: false }) } },
+  { id: "card-bluetooth", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:bluetooth", anchor: '[aria-label="Battery"]', backend: { radios_state: () => [{ kind: "wifi", on: true }, { kind: "bluetooth", on: true }] } },
+  { id: "card-bluetooth-off", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__panel:bluetooth", anchor: '[aria-label="Battery"]' },
+  {
+    id: "dock-battery-widget",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: [...DOCK, "battery"],
+    measure: [
+      { name: "the status tile gives way to the battery widget", expect: `!document.querySelector('[aria-label="Battery"]') && !!document.querySelector('[aria-label="Quick settings"]')` },
     ],
   },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },

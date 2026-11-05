@@ -1,0 +1,61 @@
+.bt__power {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.bt__list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-inner);
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.bt__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.bt__row + .bt__row {
+  border-top: 1px solid var(--hairline);
+}
+
+.bt__row:hover {
+  background: var(--fill);
+}
+
+.bt__name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bt__state {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.bt__state--on {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.bt__note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.bt__error {
+  margin: 0;
+  color: var(--error);
+  font-size: 12px;
+}

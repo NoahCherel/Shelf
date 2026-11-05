@@ -61,6 +61,17 @@ it("skips an id with no widget instead of breaking", () => {
   expect(slots(container).map((s) => s.dataset.widgetId)).toEqual(["clock"]);
 });
 
+it("a widget can open a panel instead of a card of its own", async () => {
+  const { invoke } = await import("../../core/tauri");
+  const { byId } = await import("../../core/registry");
+  (byId("clock") as { panel?: unknown }).panel = "quick";
+  const { container } = render(<DockBar />);
+  vi.mocked(invoke).mockClear();
+  fireEvent.click(slots(container)[0]);
+  expect(invoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:quick" }));
+  delete (byId("clock") as { panel?: unknown }).panel;
+});
+
 it("opens a card over its tile on click, only for widgets that have one", async () => {
   const { invoke } = await import("../../core/tauri");
   const { byId } = await import("../../core/registry");

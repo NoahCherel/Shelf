@@ -65,7 +65,12 @@ These change real settings, so only the owner runs them.
 - [ ] **Wi-Fi switch:** turning it off drops the connection, the dock's icon follows, and it turns back on.
 - [ ] **Brightness slider:** the screen follows the drag, ends on the last value, and stays there.
 - [ ] **Outside monitor only:** the slider is gone and a Display link is there instead.
-- [ ] **Links:** Airplane mode, Do not disturb, Night light and Energy saver each open the right page.
+- [ ] **Airplane mode:** turns every radio off and back on, and Windows' own panel agrees.
+- [ ] **Do not disturb:** notifications really stop, and Windows' own panel agrees.
+- [ ] **Night light:** the screen's tint follows the switch.
+- [ ] **Energy saver:** on battery, it turns on and off, and the level set in Windows comes back afterwards. Plugged in, it says it only runs on battery.
+- [ ] **Bluetooth card:** paired devices are listed with the connected one first, and the row opens Settings.
+- [ ] **Battery widget:** with it on the dock, the status tile shows the sliders icon, and clicking the widget opens Quick Settings.
 
 ## A day of use
 

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { setDockIds } from "./dockIds";
 import { invoke, listen } from "./tauri";
 import { widgets } from "./registry";
 
@@ -58,6 +59,8 @@ export const useLayout = create<Layout>((set, get) => {
     },
   };
 });
+
+useLayout.subscribe((layout) => setDockIds(layout.ids));
 
 /** Loads the layout and follows changes made in other windows. */
 export function syncLayout(): void {
