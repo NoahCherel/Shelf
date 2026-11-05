@@ -94,6 +94,15 @@ fn is_newest(last: &AtomicU64, seq: u64) -> bool {
     last.fetch_max(seq, Ordering::SeqCst) < seq
 }
 
+/// A minimized window reports a tiny size, though its picture still has the shape it had when open.
+fn source_shape(reported: (i32, i32), minimized: bool, normal: (i32, i32)) -> (i32, i32) {
+    if minimized && normal.0 > 0 && normal.1 > 0 {
+        normal
+    } else {
+        reported
+    }
+}
+
 fn is_listed(entries: &[AppEntry], raw: isize) -> bool {
     entries.iter().any(|e| e.windows.iter().any(|w| w.hwnd == raw))
 }
@@ -333,7 +342,8 @@ pub fn preview_slots(app: AppHandle, slots: Vec<Slot>) -> Result<(), String> {
         unsafe {
             let Ok(picture) = DwmRegisterThumbnail(HWND(target.0), hwnd_of(slot.hwnd)) else { continue };
             pictures.push(picture);
-            let source = DwmQueryThumbnailSourceSize(picture).map_or((0, 0), |s| (s.cx, s.cy));
+            let reported = DwmQueryThumbnailSourceSize(picture).map_or((0, 0), |s| (s.cx, s.cy));
+            let source = source_shape(reported, windows::is_minimized(slot.hwnd), windows::normal_size(slot.hwnd));
             let room = Box4 {
                 left: (slot.x * scale).round() as i32,
                 top: (slot.y * scale).round() as i32,
@@ -465,6 +475,14 @@ mod tests {
         assert_eq!(fitted((1920, 480), slot), Box4 { left: 10, top: 45, right: 210, bottom: 95 });
         // A tall one.
         assert_eq!(fitted((500, 1000), slot), Box4 { left: 85, top: 20, right: 135, bottom: 120 });
+    }
+
+    #[test]
+    fn a_minimized_window_keeps_the_shape_it_had_when_open() {
+        let tiny = (160, 28);
+        assert_eq!(source_shape(tiny, true, (1600, 900)), (1600, 900));
+        assert_eq!(source_shape((1200, 800), false, (1600, 900)), (1200, 800));
+        assert_eq!(source_shape(tiny, true, (0, 0)), tiny, "no shape known");
     }
 
     #[test]

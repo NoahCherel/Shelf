@@ -140,6 +140,13 @@ pub fn search_recent_files() -> Vec<SearchItem> {
         .collect()
 }
 
+#[tauri::command(async)]
+pub fn search_forget_file(id: String) -> Result<(), String> {
+    crate::preview::guard()?;
+    let target = KNOWN.lock().unwrap_or_else(|e| e.into_inner()).target(&id).ok_or("unknown item")?;
+    files::forget(&target)
+}
+
 fn shell_open(target: &str) {
     unsafe {
         ShellExecuteW(None, w!("open"), &HSTRING::from(target), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);

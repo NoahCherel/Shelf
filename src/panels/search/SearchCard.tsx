@@ -131,6 +131,21 @@ export function SearchCard() {
     );
   };
 
+  /** Off the recent list only: an app can still be searched for, and a file stays where it is. */
+  const remove = (row: SearchItem) => {
+    if (row.kind === "search") {
+      saveSearches(searches.filter((s) => s !== row.name));
+    } else if (row.kind === "app") {
+      const value = { ...history };
+      delete value[row.name];
+      setHistory(value);
+      invoke("store_save", { name: HISTORY, value }).catch(() => {});
+    } else {
+      setRecentFiles((files) => files.filter((f) => f.id !== row.id));
+      invoke("search_forget_file", { id: row.id }).catch(() => {});
+    }
+  };
+
   const key = (e: KeyboardEvent) => {
     if (e.key === "ArrowDown" && rows.length) setSelected((current + 1) % rows.length);
     else if (e.key === "ArrowUp" && rows.length) setSelected((current - 1 + rows.length) % rows.length);
@@ -176,14 +191,14 @@ export function SearchCard() {
                 {row.id === WEB_ID ? WEB_ICON : row.kind === "search" ? CLOCK_ICON : <ItemIcon item={row} />}
                 <span className="search__name">{row.name}</span>
                 {row.detail && <span className="search__detail">{row.detail}</span>}
-                {row.kind === "search" && (
+                {!text && (
                   <button
                     type="button"
                     className="search__remove"
                     aria-label={`Remove ${row.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      saveSearches(searches.filter((s) => s !== row.name));
+                      remove(row);
                       box.current?.focus();
                     }}
                   >

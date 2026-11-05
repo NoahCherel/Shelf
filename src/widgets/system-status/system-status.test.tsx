@@ -23,7 +23,24 @@ beforeEach(() => {
 
 const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
-describe("opens Windows' own panels", () => {
+describe("the bell", () => {
+  it("shows how many notifications are waiting", () => {
+    render(<T data={{ ...DATA, notifications: 3 }} status="ready" />);
+    expect(screen.getByRole("button", { name: "Notifications" }).querySelector(".status__count")?.textContent).toBe("3");
+  });
+
+  it("shows no count with none waiting", () => {
+    render(<T data={{ ...DATA, notifications: 0 }} status="ready" />);
+    expect(screen.getByRole("button", { name: "Notifications" }).querySelector(".status__count")).toBeNull();
+  });
+
+  it("a large count stays short", () => {
+    render(<T data={{ ...DATA, notifications: 42 }} status="ready" />);
+    expect(screen.getByRole("button", { name: "Notifications" }).querySelector(".status__count")?.textContent).toBe("9+");
+  });
+});
+
+describe("opens its own card", () => {
   it("the Wi-Fi icon opens Shelf's own card", () => {
     render(<T data={DATA} status="ready" />);
     press("Network");
@@ -47,7 +64,8 @@ describe("opens Windows' own panels", () => {
   it("the bell opens notifications", () => {
     render(<T data={DATA} status="ready" />);
     press("Notifications");
-    expect(mockInvoke).toHaveBeenCalledWith("shell_panel", { kind: "notifications" });
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__panel:notifications" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("shell_panel", expect.anything());
   });
 
   it("does nothing in the picker", () => {

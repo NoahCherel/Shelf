@@ -3,6 +3,7 @@
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
+pub mod notifications;
 pub mod radios;
 pub mod settings_link;
 pub mod status;

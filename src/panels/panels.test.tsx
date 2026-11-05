@@ -78,7 +78,7 @@ it("reopening a card starts it fresh", async () => {
 });
 
 it("every panel has its card", () => {
-  for (const id of ["sound", "wifi", "quick", "bluetooth", "search"] as const) expect(panels[id]).toBeTruthy();
+  for (const id of ["sound", "wifi", "quick", "bluetooth", "search", "notifications"] as const) expect(panels[id]).toBeTruthy();
 });
 
 it("goToPanel swaps the card without moving it", () => {

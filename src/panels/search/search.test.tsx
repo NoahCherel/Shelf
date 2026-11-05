@@ -264,6 +264,49 @@ describe("with an empty box", () => {
   });
 });
 
+describe("removing recent items", () => {
+  const FILE = { id: "file:r", name: "budget.xlsx", kind: "file" };
+
+  it("an app goes from the recent list, and keeps the other's count", async () => {
+    history = { Notepad: 2, Paint: 1 };
+    await openCard();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Notepad" }));
+    expect(mockInvoke).toHaveBeenCalledWith("store_save", { name: "search-history", value: { Paint: 1 } });
+    expect(rows()).toEqual(["Paint"]);
+    expect(mockInvoke).not.toHaveBeenCalledWith("search_open", expect.anything());
+  });
+
+  it("a removed app can still be searched for", async () => {
+    history = { Notepad: 2 };
+    await openCard();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Notepad" }));
+    type("notepad");
+    expect(rows()).toContain("Notepad");
+  });
+
+  it("a file goes from the recent list, without opening it", async () => {
+    recentFiles = [FILE];
+    await openCard();
+    fireEvent.click(screen.getByRole("button", { name: "Remove budget.xlsx" }));
+    expect(mockInvoke).toHaveBeenCalledWith("search_forget_file", { id: "file:r" });
+    expect(mockInvoke).not.toHaveBeenCalledWith("search_open", expect.anything());
+    expect(rows()).toEqual([]);
+  });
+
+  it("the box keeps focus for what comes next", async () => {
+    history = { Notepad: 2 };
+    await openCard();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Notepad" }));
+    expect(document.activeElement).toBe(box());
+  });
+
+  it("results for typed text have no remove button", async () => {
+    await openCard();
+    type("paint");
+    expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
+  });
+});
+
 describe("remembering a search", () => {
   const saved = () => mockInvoke.mock.calls.filter((c) => c[0] === "store_save" && (c[1] as { name: string }).name === "search-recent").map((c) => (c[1] as { value: string[] }).value);
 

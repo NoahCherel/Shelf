@@ -93,11 +93,18 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Focus:** the app you're in keeps focus while previews show.
 - [ ] **Switch:** clicking a picture brings that window forward.
 - [ ] **Close:** the cross closes that window, and an unsaved document still asks first.
-- [ ] **Minimized:** shows the app's icon, and clicking restores the window.
+- [ ] **Minimized:** shows its picture, or the icon if Windows has none, and clicking restores the window.
 - [ ] **Peek:** resting on a picture shows that window over the others until the pointer leaves it, and moving to the next picture follows. Afterwards, everything is back as it was.
 - [ ] **Two dots:** an app with several windows shows them.
 - [ ] **Click:** on several windows, a click shows them and another closes them. On one window, it brings it forward.
 - [ ] **Scale:** pictures sit in their frames at 100%, 125% and 150%.
+
+## Notifications
+
+- [ ] **Bell:** a new notification raises the count within a few seconds.
+- [ ] **Card:** each shows its app, text and age, and a new one appears while it's open.
+- [ ] **Dismiss:** the cross and Clear all also clear them from Windows' own panel.
+- [ ] **Open:** a click opens the notification's app, not the message itself: Windows doesn't allow more.
 
 ## A day of use
 

@@ -1,5 +1,5 @@
 import type { Shown } from "../preview/PreviewWindow";
-import { fakeApps, fakeAudio, fakeSearchFiles, fakeWifi } from "./fixtures";
+import { fakeApps, fakeAudio, fakeNotifications, fakeSearchFiles, fakeWifi } from "./fixtures";
 
 export interface Scene {
   id: string;
@@ -271,6 +271,18 @@ export const scenes: Scene[] = [
         { hwnd: 3, title: "A minimized window", minimized: true },
       ],
     },
+  },
+  { id: "card-notifications", size: TALL, wallpaper: "glow", theme: "dark", dock: DOCK, card: "__panel:notifications", anchor: '[aria-label="Notifications"]', backend: { notifications_list: () => fakeNotifications() } },
+  { id: "card-notifications-empty", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__panel:notifications", anchor: '[aria-label="Notifications"]' },
+  { id: "card-notifications-refused", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__panel:notifications", anchor: '[aria-label="Notifications"]', backend: { notifications_list: () => ({ access: false, items: [] }) } },
+  { id: "card-notifications-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__panel:notifications", anchor: '[aria-label="Notifications"]', backend: { notifications_list: () => fakeNotifications() } },
+  {
+    id: "dock-notification-count",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    backend: { system_status: () => ({ wifi: { ssid: "Home", signal: 90 }, online: true, volume: { percent: 60, muted: false }, battery: { percent: 64, charging: false }, notifications: 3 }) },
   },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },

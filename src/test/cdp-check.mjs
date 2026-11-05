@@ -214,6 +214,7 @@ for (const [selector, marker, name] of [
   ['[aria-label="Network"]', "Wi-Fi", "Wi-Fi"],
   ['[aria-label="Sound"]', "OUTPUT", "Sound"],
   ['[aria-label="Search"]', "", "Search"],
+  ['[aria-label="Notifications"]', "Notification settings", "Notifications"],
 ]) {
   const part = await dock.centre(selector);
   const at = await dock.eval(`(${screenBox.slice(1, -1)})`);

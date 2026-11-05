@@ -6,6 +6,7 @@
 }
 
 .status__part {
+  position: relative;
   display: grid;
   place-items: center;
   flex: 0 0 calc(var(--T) * 0.56);
@@ -22,4 +23,21 @@
   display: block;
   width: calc(var(--T) * 0.42);
   height: calc(var(--T) * 0.42);
+}
+
+.status__count {
+  position: absolute;
+  top: calc(var(--T) * 0.04);
+  right: calc(var(--T) * 0.02);
+  min-width: calc(var(--T) * 0.26);
+  height: calc(var(--T) * 0.26);
+  padding: 0 calc(var(--T) * 0.05);
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: calc(var(--T) * 0.18);
+  font-weight: 700;
+  line-height: calc(var(--T) * 0.26);
+  text-align: center;
 }

@@ -18,7 +18,7 @@ use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumWindows, PostMessageW, WM_CLOSE, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
+    BringWindowToTop, EnumWindows, GetWindowPlacement, PostMessageW, WINDOWPLACEMENT, WM_CLOSE, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, EVENT_SYSTEM_FOREGROUND,
     GWL_EXSTYLE, GW_OWNER, SW_MINIMIZE, SW_RESTORE, WINEVENT_OUTOFCONTEXT, WS_EX_APPWINDOW,
     WS_EX_TOOLWINDOW,
@@ -258,6 +258,16 @@ pub fn focus(raw: isize) {
 
 pub fn is_minimized(raw: isize) -> bool {
     unsafe { IsIconic(hwnd(raw)).as_bool() }
+}
+
+/// Its size when not minimized.
+pub fn normal_size(raw: isize) -> (i32, i32) {
+    let mut placement = WINDOWPLACEMENT { length: size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
+    if unsafe { GetWindowPlacement(hwnd(raw), &mut placement) }.is_err() {
+        return (0, 0);
+    }
+    let r = placement.rcNormalPosition;
+    (r.right - r.left, r.bottom - r.top)
 }
 
 /// Asks, as the window's own close button does, so it can still offer to save.

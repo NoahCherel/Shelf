@@ -91,13 +91,11 @@ function BellGlyph() {
   );
 }
 
-function Part({ label, title, panel, preview, onScroll, children }: { label: string; title?: string; panel: PanelId | "notifications"; preview?: boolean; onScroll?: (up: boolean) => void; children: ReactNode }) {
+function Part({ label, title, panel, preview, onScroll, children }: { label: string; title?: string; panel: PanelId; preview?: boolean; onScroll?: (up: boolean) => void; children: ReactNode }) {
   const open = (e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     if (preview) return;
-    // Notifications stay Windows' own: see docs/lumabar/16-panels-spike.md.
-    if (panel === "notifications") invoke("shell_panel", { kind: panel }).catch(() => {});
-    else openPanel(panel, e.currentTarget);
+    openPanel(panel, e.currentTarget);
   };
   return (
     <button
@@ -129,6 +127,7 @@ function networkTitle(data: StatusData | null): string {
 }
 
 const SCROLL_STEP = 2;
+const MOST_COUNTED = 9;
 
 function stepVolume(percent: number, up: boolean): number {
   return Math.min(100, Math.max(0, percent + (up ? SCROLL_STEP : -SCROLL_STEP)));
@@ -172,6 +171,7 @@ function StatusTile({ data, preview }: TileProps<StatusData>) {
       )}
       <Part label="Notifications" panel="notifications" preview={preview}>
         <BellGlyph />
+        {(data?.notifications ?? 0) > 0 && <span className="status__count">{data!.notifications! > MOST_COUNTED ? `${MOST_COUNTED}+` : data!.notifications}</span>}
       </Part>
     </Tile>
   );

@@ -1,6 +1,7 @@
 //! File names in the user's folders, through Windows' own search index.
 
 use std::ffi::c_void;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use windows::core::{w, GUID, HSTRING, PCWSTR};
@@ -32,11 +33,28 @@ pub fn recent_name(shortcut: &str) -> &str {
     shortcut.strip_suffix(SHORTCUT).unwrap_or(shortcut)
 }
 
+fn recent_folder() -> Option<PathBuf> {
+    std::env::var_os("APPDATA").map(|d| PathBuf::from(d).join(r"Microsoft\Windows\Recent"))
+}
+
+/// Only Windows' own shortcuts to recent files, and never a file itself.
+fn may_forget(path: &str, folder: &Path) -> bool {
+    let path = Path::new(path);
+    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("lnk")) && path.parent() == Some(folder)
+}
+
+/// Takes it off Windows' recent list, as its own "Remove from Recent" does. The file stays.
+pub fn forget(path: &str) -> Result<(), String> {
+    let folder = recent_folder().ok_or("no recent folder")?;
+    if !may_forget(path, &folder) {
+        return Err("not a recent file".into());
+    }
+    std::fs::remove_file(path).map_err(|e| e.to_string())
+}
+
 /// Paths of the shortcuts for recently opened files, as Windows itself keeps them.
 pub fn recent() -> Vec<String> {
-    let Some(folder) = std::env::var_os("APPDATA").map(|d| std::path::PathBuf::from(d).join(r"Microsoft\Windows\Recent")) else {
-        return Vec::new();
-    };
+    let Some(folder) = recent_folder() else { return Vec::new() };
     let Ok(entries) = std::fs::read_dir(&folder) else { return Vec::new() };
     let found = entries
         .flatten()
@@ -112,6 +130,16 @@ mod tests {
     #[test]
     fn a_recent_file_is_named_without_its_shortcut() {
         assert_eq!(recent_name("report.final.pdf.lnk"), "report.final.pdf");
+    }
+
+    #[test]
+    fn only_a_shortcut_in_the_recent_folder_can_be_forgotten() {
+        let folder = std::path::Path::new(r"C:\Users\me\Recent");
+        assert!(may_forget(r"C:\Users\me\Recent\report.pdf.lnk", folder));
+        assert!(!may_forget(r"C:\Users\me\Documents\report.pdf", folder), "a real file");
+        assert!(!may_forget(r"C:\Users\me\Documents\report.pdf.lnk", folder), "somewhere else");
+        assert!(!may_forget(r"C:\Users\me\Recent\report.pdf", folder), "not a shortcut");
+        assert!(!may_forget(r"C:\Users\me\Recent\..\Documents\a.lnk", folder), "climbing out");
     }
 
     #[test]

@@ -25,7 +25,7 @@ Right-click the dock for Widgets…, Settings, Lock dock and Quit. In Widgets…
 
 While Liquid Glass is on, the dock doesn't appear in screenshots or recordings, because that's how it avoids seeing itself in the glass. The Black style has no such effect.
 
-The Status tile and the loupe open Shelf's own cards, right above what you clicked: Sound, Wi-Fi, Bluetooth, Quick Settings and Search. Only notifications still open Windows' own panel. Resting on an open app shows live pictures of its windows, and resting on a picture brings that window up until the pointer leaves. Win+A, Win+S and Win+N still open Windows' panels, as taking those over needs a system-wide keyboard hook.
+The Status tile and the loupe open Shelf's own cards, right above what you clicked: Sound, Wi-Fi, Bluetooth, Quick Settings, Search and Notifications. Resting on an open app shows live pictures of its windows, and resting on a picture brings that window up until the pointer leaves. Win+A, Win+S and Win+N still open Windows' panels, as taking those over needs a system-wide keyboard hook.
 
 ## How it's built
 
@@ -43,7 +43,7 @@ src-tauri/src/
 src/
   core/        widget contract, registry, layout, providers, settings
   design/      tokens, shared parts, the glass shader
-  panels/      Sound, Wi-Fi, Bluetooth, Quick Settings and Search cards
+  panels/      Sound, Wi-Fi, Bluetooth, Quick Settings, Search and Notifications cards
   widgets/     one folder per widget
   windows/     dock, card, previews, picker, settings, menu, gallery, bench
 ```

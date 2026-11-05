@@ -50,6 +50,15 @@ export const fakeSearchFiles = () => [
   { id: "file:2", name: "panorama.jpg", kind: "file", detail: "Pictures" },
 ];
 
+export const fakeNotifications = () => ({
+  access: true,
+  items: [
+    { id: 1, app: "Discord", title: "Alex", body: "On se voit ce soir ?", at: BENCH_NOW - 5 * 60_000 },
+    { id: 2, app: "Outlook", title: "Facture de novembre", body: "Votre facture est disponible. Elle sera prélevée le 12 du mois, sans rien à faire de votre côté, et reste consultable dans votre espace client pendant un an.", at: BENCH_NOW - 3 * 3_600_000 },
+    { id: 3, app: "Windows Security", title: "Scan finished", body: "", at: BENCH_NOW - 26 * 3_600_000 },
+  ],
+});
+
 export interface FakeApp {
   key: string;
   name: string;
@@ -160,6 +169,11 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     preview_keep: () => null,
     preview_leave: () => null,
     preview_hide: () => null,
+    notifications_list: () => ({ access: true, items: [] }),
+    notification_dismiss: () => null,
+    notifications_clear: () => null,
+    notification_open: () => null,
+    search_forget_file: () => null,
     search_apps: () => fakeSearchApps(),
     search_files: () => fakeSearchFiles(),
     search_recent_files: () => [],

@@ -138,13 +138,10 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
                 </svg>
               </button>
             </div>
-            {window.minimized ? (
-              <div className="pv__frame">
-                <AppIcon appKey={shown.key} name={shown.name} />
-              </div>
-            ) : (
-              <div className="pv__frame" data-hwnd={window.hwnd} />
-            )}
+            {/* Windows may have no picture of a window minimized since it started, so the icon waits underneath. */}
+            <div className="pv__frame" data-hwnd={window.hwnd}>
+              {window.minimized && <AppIcon appKey={shown.key} name={shown.name} />}
+            </div>
           </div>
         );
       })}

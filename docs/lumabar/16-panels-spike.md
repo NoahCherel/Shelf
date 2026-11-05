@@ -14,7 +14,7 @@ Read-only probes on the owner's PC, 2026-11-05, from an unpackaged process. They
 | Brightness | PowerShell reads WMI's brightness, and the set method's class is reachable from Rust. A plain Rust query got 0 rows, probably needing `CoSetProxyBlanket` | **Build in Task 7**, falling back to a Settings link |
 | Apps | 241 apps with names, in about 1.1 s | **Build**, listing them ahead of time as it's too slow to do on opening |
 | Files | `search-ms:` from Rust returned nothing in 38 ms. `ISearchFolderItemFactory` with a name condition, retried in Task 8, found real files in 0.4 to 1.4 s | **Build** |
-| Notifications | `GetAccessStatus` reports allowed | **Possible.** Reading them is untested, so this is a follow-up plan, not this one |
+| Notifications | `GetAccessStatus` reports allowed, and reading gave the app and text | **Built.** Nothing lets another app press a notification, so a click opens its app |
 
 ## What has no public API
 

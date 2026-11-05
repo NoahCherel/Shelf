@@ -44,15 +44,17 @@ it("shows each window with its title", async () => {
   expect(screen.getByText("Second window")).toBeTruthy();
 });
 
-it("tells Windows where each live picture goes, but not for a minimized window", async () => {
+it("tells Windows where each picture goes, minimized windows included", async () => {
   await openIt();
-  expect(lastSlots()).toEqual([11, 22]);
+  expect(lastSlots()).toEqual([11, 22, 33]);
 });
 
-it("a minimized window shows the app's icon instead", async () => {
+it("a minimized window keeps the app's icon under its picture, for when Windows has none", async () => {
   await openIt();
   expect(mockInvoke).toHaveBeenCalledWith("apps_icon", { key: "firefox" });
-  expect(document.querySelectorAll(".pv__icon")).toHaveLength(1);
+  const frame = document.querySelector('[data-hwnd="33"]');
+  expect(frame?.querySelector(".pv__icon")).toBeTruthy();
+  expect(document.querySelector('[data-hwnd="11"]')?.querySelector(".pv__icon")).toBeNull();
 });
 
 it("clicking a window brings it forward and closes the previews", async () => {
@@ -67,7 +69,7 @@ it("the cross closes that window only, and its row goes", async () => {
   expect(mockInvoke).toHaveBeenCalledWith("preview_close_window", { hwnd: 11 });
   expect(mockInvoke).not.toHaveBeenCalledWith("preview_activate", expect.anything());
   expect(screen.queryByText("First window")).toBeNull();
-  expect(lastSlots()).toEqual([22]);
+  expect(lastSlots()).toEqual([22, 33]);
 });
 
 it("closing the last window closes the previews", async () => {

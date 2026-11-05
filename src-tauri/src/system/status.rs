@@ -1,4 +1,4 @@
-//! What the taskbar's corner shows: network and sound, and the way into Windows' own panels.
+//! What the taskbar's corner shows: network, sound, battery and how many notifications wait.
 
 use serde::Serialize;
 use windows::Win32::Foundation::HANDLE;
@@ -11,9 +11,8 @@ use windows::Win32::NetworkManagement::WiFi::{
 };
 use windows::Win32::Networking::NetworkListManager::{INetworkListManager, NetworkListManager};
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
-use windows::Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_N};
 
-use super::{battery, tap_keys, Battery};
+use super::{battery, notifications, Battery};
 
 #[derive(Serialize)]
 pub struct Wifi {
@@ -33,17 +32,7 @@ pub struct Status {
     online: bool,
     volume: Option<Volume>,
     battery: Option<Battery>,
-}
-
-/// Windows' own panels Shelf still opens. Only this one: the rest are Shelf's own cards.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum Panel {
-    Notifications,
-}
-
-/// Only these, whatever the page asks.
-pub fn panel_for(kind: &str) -> Option<Panel> {
-    (kind == "notifications").then_some(Panel::Notifications)
+    notifications: u32,
 }
 
 fn ssid_text(raw: &[u8], length: u32) -> String {
@@ -116,18 +105,8 @@ unsafe fn current_volume() -> Option<Volume> {
 pub fn system_status() -> Status {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        Status { wifi: current_wifi(), online: is_online(), volume: current_volume(), battery: battery() }
+        Status { wifi: current_wifi(), online: is_online(), volume: current_volume(), battery: battery(), notifications: notifications::count() }
     }
-}
-
-/// Opened the way Windows' keyboard shortcut does, which works with the taskbar hidden.
-#[tauri::command]
-pub fn shell_panel(kind: String) -> Result<(), String> {
-    crate::preview::guard()?;
-    match panel_for(&kind).ok_or("unknown panel")? {
-        Panel::Notifications => tap_keys(&[VK_LWIN, VK_N]),
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -152,13 +131,5 @@ mod tests {
         assert_eq!(percent(0.404), 40);
         assert_eq!(percent(1.0), 100);
         assert_eq!(percent(-0.1), 0);
-    }
-
-    #[test]
-    fn only_notifications_is_still_windows_own() {
-        assert_eq!(panel_for("notifications"), Some(Panel::Notifications));
-        for gone in ["sound", "wifi", "quick", "search", "calc.exe"] {
-            assert_eq!(panel_for(gone), None, "{gone}");
-        }
     }
 }

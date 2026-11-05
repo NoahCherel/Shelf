@@ -6,6 +6,7 @@ export interface StatusData {
   online: boolean;
   volume: { percent: number; muted: boolean } | null;
   battery: { percent: number; charging: boolean } | null;
+  notifications?: number;
 }
 
 /** Windows' own steps: one bar whenever connected, four when strong. */

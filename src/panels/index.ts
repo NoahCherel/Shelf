@@ -3,12 +3,13 @@ import { invoke } from "../core/tauri";
 import { refresh } from "../core/provider";
 import { statusProvider } from "../widgets/_providers/status";
 import { BluetoothCard } from "./bluetooth/BluetoothCard";
+import { NotificationsCard } from "./notifications/NotificationsCard";
 import { QuickCard } from "./quick/QuickCard";
 import { SearchCard } from "./search/SearchCard";
 import { SoundCard } from "./sound/SoundCard";
 import { WifiCard } from "./wifi/WifiCard";
 
-export type PanelId = "sound" | "wifi" | "bluetooth" | "quick" | "search";
+export type PanelId = "sound" | "wifi" | "bluetooth" | "quick" | "search" | "notifications";
 
 export interface PanelDef {
   Card: FC;
@@ -21,6 +22,7 @@ export const panels: Record<PanelId, PanelDef> = {
   bluetooth: { Card: BluetoothCard, width: 340 },
   quick: { Card: QuickCard, width: 340 },
   search: { Card: SearchCard, width: 560 },
+  notifications: { Card: NotificationsCard, width: 340 },
 };
 
 const FIRST_HEIGHT = 300;
