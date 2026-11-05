@@ -7,6 +7,7 @@ export interface Scene {
   theme: "dark" | "light";
   dock?: string[]; // widget ids, drawn in a real bar with the real shader
   card?: string; // card id, drawn above the bar
+  anchor?: string; // selector the card centres on, when it isn't a tile's id
   view?: "picker" | "settings"; // a whole window instead of a dock
   settings?: Record<string, unknown>;
   backend?: Record<string, (args: any) => unknown>;

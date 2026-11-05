@@ -1,5 +1,6 @@
 //! Machine facts for widgets, and a few Windows settings.
 
+pub mod settings_link;
 pub mod status;
 
 use std::sync::Mutex;

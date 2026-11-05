@@ -75,6 +75,8 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[])
     fit_card: () => null,
     card_current: () => null,
     close_card: () => null,
+    swap_card: () => null,
+    open_settings: () => null,
     open_window: () => null,
     close_window: () => null,
     apps_list: () => fakeApps(5, 2),

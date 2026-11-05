@@ -2,7 +2,8 @@
 .card-window {
   height: 100vh;
   overflow-y: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--track) transparent;
 }
 
 .card-slide {

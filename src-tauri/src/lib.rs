@@ -122,6 +122,8 @@ pub fn run() {
             shell::card::fit_card,
             shell::card::card_current,
             shell::card::close_card,
+            shell::card::swap_card,
+            system::settings_link::open_settings,
             shell::windows::open_window,
             shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,

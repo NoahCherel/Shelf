@@ -4,12 +4,14 @@ import { byId } from "../../core/registry";
 import { invoke, listen } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
+import { panels, type PanelId } from "../../panels";
 import { dockMenuItems, Menu } from "../menu/Menu";
 import "./card-window.css";
 
 const DEFAULT_CARD_WIDTH = 340;
 const MENU_WIDTH = 210;
 const MENU_PREFIX = "__menu:";
+const PANEL_PREFIX = "__panel:";
 
 /** Height fits what's shown; Rust keeps it on the screen. */
 function Fitted({ width, children }: { width: number; children: ReactNode }) {
@@ -51,6 +53,17 @@ function MenuBody({ def }: { def: WidgetDef | undefined }) {
 
 /** What the card window shows for an id: a widget's card or a menu. */
 export function CardContent({ id, n }: { id: string; n: number }) {
+  if (id.startsWith(PANEL_PREFIX)) {
+    const panel = panels[id.slice(PANEL_PREFIX.length) as PanelId];
+    if (!panel) return null;
+    return (
+      <div className="card-window">
+        <Fitted key={n} width={panel.width}>
+          <panel.Card />
+        </Fitted>
+      </div>
+    );
+  }
   if (id.startsWith(MENU_PREFIX)) {
     return (
       <div className="card-window">
@@ -89,6 +102,11 @@ export function CardWindow() {
     };
     const off = listen<string>("card-open", show);
     off.then(catchUp);
+    // Unmounting is what stops a closed card's providers and drops anything typed into it.
+    const offClosed = listen("card-closed", () => {
+      current = null;
+      setShown(null);
+    });
     window.addEventListener("focus", catchUp);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") invoke("close_card").catch(() => {});
@@ -96,6 +114,7 @@ export function CardWindow() {
     window.addEventListener("keydown", onKey);
     return () => {
       off.then((stop) => stop());
+      offClosed.then((stop) => stop());
       window.removeEventListener("focus", catchUp);
       window.removeEventListener("keydown", onKey);
     };

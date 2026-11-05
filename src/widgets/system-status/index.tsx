@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
 import { invoke } from "../../core/tauri";
+import { openPanel, type PanelId } from "../../panels";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
 import { signalBars, statusProvider, type StatusData } from "../_providers/status";
@@ -91,10 +92,13 @@ function BellGlyph() {
   );
 }
 
-function Part({ label, title, panel, preview, children }: { label: string; title?: string; panel: string; preview?: boolean; children: ReactNode }) {
-  const open = (e: MouseEvent) => {
+function Part({ label, title, panel, preview, children }: { label: string; title?: string; panel: PanelId | "notifications"; preview?: boolean; children: ReactNode }) {
+  const open = (e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
-    if (!preview) invoke("shell_panel", { kind: panel }).catch(() => {});
+    if (preview) return;
+    // Notifications stay Windows' own: see docs/lumabar/16-panels-spike.md.
+    if (panel === "notifications") invoke("shell_panel", { kind: panel }).catch(() => {});
+    else openPanel(panel, e.currentTarget);
   };
   return (
     <button type="button" className="status__part" aria-label={label} title={title ?? label} onClick={open}>

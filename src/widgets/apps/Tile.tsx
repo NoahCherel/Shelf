@@ -1,5 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { invoke, listen } from "../../core/tauri";
+import { openPanel } from "../../panels";
 import type { TileProps } from "../../core/widget";
 import "./apps.css";
 
@@ -126,7 +127,7 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
         className="app"
         aria-label="Search"
         title="Search"
-        onClick={() => !preview && invoke("shell_panel", { kind: "search" }).catch(() => {})}
+        onClick={(e) => !preview && openPanel("search", e.currentTarget)}
       >
         <SearchGlyph />
       </button>

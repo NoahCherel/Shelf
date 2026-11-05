@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { setDockSize } from "../../design/theme";
+import { panels, type PanelId } from "../../panels";
 import { CardContent } from "../card/CardWindow";
 import { DockWindow } from "../dock/DockWindow";
 import { PickerWindow } from "../picker/PickerWindow";
@@ -17,7 +18,7 @@ function useCardPlacement(scene: Scene) {
       const el = card.current;
       if (!el) return;
       const tileId = scene.card!.replace("__menu:", "");
-      const tile = document.querySelector(`[data-widget-id="${tileId}"]`)?.getBoundingClientRect();
+      const tile = document.querySelector(scene.anchor ?? `[data-widget-id="${tileId}"]`)?.getBoundingClientRect();
       if (!tile) return;
       const width = el.getBoundingClientRect().width;
       const left = Math.min(innerWidth - width - 8, Math.max(8, tile.left + tile.width / 2 - width / 2));
@@ -31,7 +32,8 @@ function useCardPlacement(scene: Scene) {
 
 function CardLayer({ scene }: { scene: Scene }) {
   const card = useCardPlacement(scene);
-  const width = scene.card!.startsWith("__menu:") ? 210 : 340;
+  const id = scene.card!;
+  const width = id.startsWith("__menu:") ? 210 : id.startsWith("__panel:") ? panels[id.slice(8) as PanelId]?.width : 340;
   return (
     <div className="bench__card" ref={card} style={{ width }}>
       <CardContent id={scene.card!} n={1} />
