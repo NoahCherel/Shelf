@@ -360,7 +360,9 @@ pub fn preview_peek(app: AppHandle, hwnd: Option<isize>, seq: u64) -> Result<(),
     if !is_newest(&LAST_PEEK, seq) {
         return Ok(());
     }
-    if hwnd.is_some_and(|raw| !may_peek(&ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()), raw)) {
+    // Held throughout: closing the strip clears this first, so a peek can't start just after it closed.
+    let on_strip = ON_STRIP.lock().unwrap_or_else(|e| e.into_inner());
+    if hwnd.is_some_and(|raw| !may_peek(&on_strip, raw)) {
         return Err("not on the strip".into());
     }
     set_peek(&app, hwnd)
