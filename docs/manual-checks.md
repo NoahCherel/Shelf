@@ -108,10 +108,25 @@ These need a real pointer, and closing or switching real windows.
 
 ## Right-clicking an app
 
-- [ ] **Menu:** the app's name, pin or unpin, End task and close, in Windows' language.
+- [ ] **Menu:** the app's icon and name, pin or unpin, and close, in Windows' language, looking like Windows' own.
 - [ ] **Pin:** pinning an open app keeps its icon after closing it, and after restarting Shelf.
 - [ ] **Unpin:** unpinning takes it off the dock. It's still pinned on Windows' own taskbar, which Shelf leaves alone.
 - [ ] **Close:** with several windows it reads "close all", and an unsaved document still asks first.
+
+## Hidden icons
+
+- [ ] **Open:** the chevron opens Windows' own grid right above it, in both taskbar modes, and it doesn't jump into place too visibly.
+- [ ] **Icons:** clicking and right-clicking an icon does what it does on Windows.
+- [ ] **Close:** clicking the chevron again, or anywhere else, closes it, and it doesn't reopen by itself.
+- [ ] **Taskbar:** it never appears while doing this.
+- [ ] **Focus:** after closing, the app you were in has the focus again.
+- [ ] **No hidden icons:** with every icon set to show, nothing surprising opens. Windows has no chevron then, so its shortcut lands on the first icon.
+
+## A new app arriving
+
+- [ ] **Smooth:** a new app opens up and fades in, with the rest of the dock following.
+- [ ] **Edge:** the bar's right edge doesn't visibly clip as it grows.
+- [ ] **Starting Shelf:** nothing animates at launch.
 
 ## A day of use
 

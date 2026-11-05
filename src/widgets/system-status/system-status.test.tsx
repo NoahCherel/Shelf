@@ -23,6 +23,26 @@ beforeEach(() => {
 
 const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
+describe("hidden icons", () => {
+  it("the chevron comes first, as on Windows", () => {
+    render(<T data={DATA} status="ready" />);
+    expect(screen.getAllByRole("button")[0].getAttribute("aria-label")).toBe("Hidden icons");
+  });
+
+  it("the chevron asks for Windows' own grid, above it", () => {
+    render(<T data={DATA} status="ready" />);
+    press("Hidden icons");
+    expect(mockInvoke).toHaveBeenCalledWith("tray_toggle", expect.objectContaining({ tileX: expect.any(Number), tileWidth: expect.any(Number) }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("open_card", expect.anything());
+  });
+
+  it("does nothing in the picker", () => {
+    render(<T data={DATA} status="sample" preview />);
+    press("Hidden icons");
+    expect(mockInvoke).not.toHaveBeenCalledWith("tray_toggle", expect.anything());
+  });
+});
+
 describe("the bell", () => {
   it("shows how many notifications are waiting", () => {
     render(<T data={{ ...DATA, notifications: 3 }} status="ready" />);

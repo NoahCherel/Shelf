@@ -11,12 +11,14 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use ::windows::core::{w, HSTRING, PCWSTR};
+use ::windows::Win32::Globalization::GetUserDefaultUILanguage;
 use ::windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 use ::windows::Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_X};
 use ::windows::Win32::UI::Shell::ShellExecuteW;
 use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use menu::Own;
 use merge::{click_plan, merge, AppEntry, Click};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::system::tap_keys;
 
@@ -128,18 +130,29 @@ pub fn start_quick_menu() -> Result<(), String> {
     Ok(())
 }
 
-/// The taskbar's menu for an app. It runs on the main thread, as the dock window owns it.
+/// What right-clicking this app offers, in Windows' language.
 #[tauri::command(async)]
-pub fn apps_context_menu(app: AppHandle, key: String) -> Result<(), String> {
-    crate::preview::guard()?;
+pub fn apps_menu(key: String) -> Result<menu::AppMenu, String> {
     let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let raw = dock.hwnd().map_err(|e| e.to_string())?.0 as isize;
-    let handle = app.clone();
-    app.run_on_main_thread(move || {
-        menu::show(raw, &entry, |value| {
-            let _ = crate::store::store_save(handle.clone(), pins::OVERLAY.to_string(), value);
-        })
-    })
-    .map_err(|e| e.to_string())
+    Ok(menu::menu_for(&entry, unsafe { GetUserDefaultUILanguage() }))
+}
+
+#[tauri::command(async)]
+pub fn apps_menu_choose(app: AppHandle, key: String, id: String) -> Result<(), String> {
+    crate::preview::guard()?;
+    let choice = menu::own_from(&id).ok_or("unknown choice")?;
+    let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
+    match choice {
+        Own::Open => {
+            if let Some(path) = &entry.launch {
+                unsafe {
+                    ShellExecuteW(None, w!("open"), &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);
+                }
+            }
+        }
+        Own::Pin => crate::store::store_save(app, pins::OVERLAY.to_string(), pins::pin(&entry))?,
+        Own::Unpin => crate::store::store_save(app, pins::OVERLAY.to_string(), pins::unpin(&entry.key))?,
+        Own::Close | Own::CloseAll => entry.windows.iter().for_each(|w| windows::close(w.hwnd)),
+    }
+    Ok(())
 }

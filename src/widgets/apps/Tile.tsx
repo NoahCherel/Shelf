@@ -23,6 +23,9 @@ export function stableOrder(previous: AppEntry[], next: AppEntry[]): AppEntry[] 
   return [...kept, ...next.filter((e) => !known.has(e.key))];
 }
 
+const APP_MENU_PREFIX = "__appmenu:";
+const APP_MENU_WIDTH = 300;
+const APP_MENU_HEIGHT = 120;
 const PREVIEW_PAUSE_MS = 350;
 const ICON_RETRY_MS = 2500;
 const ICON_TRIES = 6;
@@ -145,8 +148,22 @@ function useAppPreviews(preview?: boolean) {
   return { enter, leave, press, toggle };
 }
 
+/** Apps that have turned up since the dock first loaded, for as long as they stay. */
+function useArrivals(entries: AppEntry[] | null, preview?: boolean): Set<string> {
+  const known = useRef<Set<string> | null>(null);
+  const arrived = useRef(new Set<string>());
+  if (entries && !preview) {
+    const now = new Set(entries.map((e) => e.key));
+    for (const key of now) if (known.current && !known.current.has(key)) arrived.current.add(key);
+    for (const key of arrived.current) if (!now.has(key)) arrived.current.delete(key);
+    known.current = now;
+  }
+  return arrived.current;
+}
+
 export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
   const previews = useAppPreviews(preview);
+  const arrived = useArrivals(data, preview);
   const entries = data ?? [];
   const [startOpen, setStartOpen] = useState(false);
   useEffect(() => {
@@ -188,7 +205,7 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
         <button
           type="button"
           key={entry.key}
-          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}`}
+          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}`}
           aria-label={entry.name}
           title={entry.windows.length > 0 ? undefined : entry.name}
           onMouseEnter={(e) => previews.enter(e, entry)}
@@ -199,7 +216,14 @@ export function AppsTile({ data, preview }: TileProps<AppEntry[]>) {
             if (entry.windows.length > 1) previews.toggle(e, entry);
             else invoke("apps_activate", { key: entry.key }).catch(() => {});
           }}
-          onContextMenu={(e) => windowsMenu(e, "apps_context_menu", { key: entry.key })}
+          onContextMenu={(e) => {
+            if (preview) return;
+            e.preventDefault();
+            e.stopPropagation();
+            previews.press({ ...entry, windows: [] });
+            const r = e.currentTarget.getBoundingClientRect();
+            invoke("open_card", { widgetId: `${APP_MENU_PREFIX}${entry.key}`, tileX: r.left, tileWidth: r.width, width: APP_MENU_WIDTH, height: APP_MENU_HEIGHT }).catch(() => {});
+          }}
         >
           <AppIcon entry={entry} preview={preview} />
           {entry.windows.length > 0 && <span className="app__dot" />}

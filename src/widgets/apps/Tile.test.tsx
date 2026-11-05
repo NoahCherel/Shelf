@@ -86,18 +86,6 @@ it("has a Search button beside Start, as on Windows", () => {
   expect(mockInvoke).not.toHaveBeenCalledWith("shell_panel", expect.anything());
 });
 
-it("right-clicking an app asks for Windows' menu, not Shelf's", () => {
-  const dock = vi.fn();
-  render(
-    <div onContextMenu={dock}>
-      <AppsTile data={[app("code", true)]} status="ready" />
-    </div>,
-  );
-  fireEvent.contextMenu(screen.getByRole("button", { name: "code" }));
-  expect(mockInvoke).toHaveBeenCalledWith("apps_context_menu", { key: "code" });
-  expect(dock).not.toHaveBeenCalled();
-});
-
 it("right-clicking Start asks for Windows' quick menu", () => {
   const dock = vi.fn();
   render(
@@ -113,7 +101,7 @@ it("right-clicking Start asks for Windows' quick menu", () => {
 it("right-click does nothing in the picker", () => {
   render(<AppsTile data={[app("code", true)]} status="sample" preview />);
   fireEvent.contextMenu(screen.getByRole("button", { name: "code" }));
-  expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_context_menu")).toEqual([]);
+  expect(mockInvoke).not.toHaveBeenCalledWith("open_card", expect.anything());
 });
 
 it("marks Start while its menu is open", async () => {
@@ -260,10 +248,62 @@ describe("several windows and previews", () => {
     expect(mockInvoke).toHaveBeenCalledWith("apps_activate", { key: "a" });
   });
 
+  it("right-clicking an app opens Shelf's menu for it, above it, and hides its previews", () => {
+    render(<AppsTile data={[two("a")]} status="ready" />);
+    fireEvent.contextMenu(button("a"));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_hide");
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__appmenu:a" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("apps_context_menu", expect.anything());
+  });
+
   it("the picker's sample shows no previews", () => {
     render(<AppsTile data={[app("a", true)]} status="sample" preview />);
     fireEvent.mouseEnter(button("a"));
     act(() => vi.advanceTimersByTime(1000));
     expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+  });
+});
+
+describe("an app arriving on the dock", () => {
+  const icon = (name: string) => screen.getByRole("button", { name });
+
+  it("what's there when the dock first loads doesn't animate", () => {
+    const { rerender } = render(<AppsTile data={null} status="loading" />);
+    rerender(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    expect(icon("a").className).not.toContain("app--new");
+    expect(icon("b").className).not.toContain("app--new");
+  });
+
+  it("a new app slides in", () => {
+    const { rerender } = render(<AppsTile data={[app("a", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    expect(icon("b").className).toContain("app--new");
+    expect(icon("a").className).not.toContain("app--new");
+  });
+
+  it("another update mid-animation doesn't cut it short", () => {
+    const { rerender } = render(<AppsTile data={[app("a", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true), app("b", true, true)]} status="ready" />);
+    expect(icon("b").className).toContain("app--new");
+  });
+
+  it("an app that closes and comes back slides in again", () => {
+    const { rerender } = render(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true), app("b", true)]} status="ready" />);
+    expect(icon("b").className).toContain("app--new");
+  });
+
+  it("a pinned app opening doesn't slide, as its icon was already there", () => {
+    const { rerender } = render(<AppsTile data={[app("a")]} status="ready" />);
+    rerender(<AppsTile data={[app("a", true)]} status="ready" />);
+    expect(icon("a").className).not.toContain("app--new");
+  });
+
+  it("the picker's sample stays still", () => {
+    const { rerender } = render(<AppsTile data={[app("a")]} status="sample" preview />);
+    rerender(<AppsTile data={[app("a"), app("b")]} status="sample" preview />);
+    expect(icon("b").className).not.toContain("app--new");
   });
 });

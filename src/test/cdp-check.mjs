@@ -243,10 +243,27 @@ check("its chevron moves to the Wi-Fi card", await card.eval(`document.body.text
 await card.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 await sleep(600);
 
+// Right-clicking an app shows its menu above it, with nothing that ends a process.
+{
+  const app = await dock.eval(`(() => { const a = [...document.querySelectorAll(".app")].find((e) => e.querySelector(".app__dot")); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  if (app) {
+    await dock.clickAt(app.x, app.y, "right");
+    await sleep(1000);
+    const rows = await card.eval(`[...document.querySelectorAll(".amenu__row")].map((e) => e.textContent)`);
+    check("right-clicking an app offers its taskbar menu", rows?.length >= 2, rows?.join(", "));
+    check("nothing in it ends a task", !rows?.some((r) => /fin de t|end task/i.test(r)));
+    await card.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await sleep(600);
+  }
+}
+
 // Hovering an open app shows its live previews.
 const openApp = await dock.eval(`(() => { const a = [...document.querySelectorAll(".app")].find((e) => e.querySelector(".app__dot")); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
 if (openApp) {
   const strip = await Page.open("preview");
+  // The right-click above left the pointer on this icon, and arriving is what counts as a hover.
+  await dock.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 2 });
+  await sleep(200);
   await dock.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: openApp.x - 1, y: openApp.y });
   await dock.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: openApp.x, y: openApp.y });
   let seen = false;

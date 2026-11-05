@@ -10,7 +10,7 @@ import "./system-status.css";
 const PART = 0.56;
 const PADDING = 0.16;
 
-const PARTS = 4;
+const PARTS = 5;
 
 function widthFor() {
   return PARTS * PART + PADDING;
@@ -143,6 +143,22 @@ function StatusTile({ data, preview }: TileProps<StatusData>) {
   }, [reading]);
   return (
     <Tile width={widthFor()} className="status">
+      <button
+        type="button"
+        className="status__part"
+        aria-label="Hidden icons"
+        title="Hidden icons"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (preview) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          invoke("tray_toggle", { tileX: r.left, tileWidth: r.width }).catch(() => {});
+        }}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 14.500 12 8.500l6 6" />
+        </svg>
+      </button>
       <Part label="Network" title={networkTitle(data)} panel="wifi" preview={preview}>
         <NetworkGlyph data={data} />
       </Part>

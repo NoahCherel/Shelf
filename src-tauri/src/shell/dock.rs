@@ -300,6 +300,7 @@ pub fn start(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn stop() {
+    crate::system::tray::close_grid();
     let raw = DOCK_HWND.load(Ordering::Relaxed);
     if raw != 0 {
         appbar::unregister(raw);

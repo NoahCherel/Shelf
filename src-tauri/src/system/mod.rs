@@ -8,6 +8,7 @@ pub mod radios;
 pub mod settings_link;
 pub mod status;
 pub mod toggles;
+pub mod tray;
 pub mod wifi;
 
 use std::sync::Mutex;

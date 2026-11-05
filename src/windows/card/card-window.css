@@ -16,3 +16,8 @@
     opacity: 0;
   }
 }
+
+/* Sized by what's inside, so it can tell the window how wide to be. */
+.card-slide--snug {
+  width: max-content;
+}
