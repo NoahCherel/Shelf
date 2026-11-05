@@ -1,44 +1,32 @@
-//! Right-click on an app shows Windows' own menu for it, plus what a taskbar button adds.
+//! Right-click on an app shows what a Windows taskbar button offers: open, pin, end, close. It's a
+//! real Windows menu, built here rather than borrowed from the app's file, which would be File
+//! Explorer's menu for a shortcut.
 
-use std::cell::RefCell;
-
-use ::windows::core::{w, Interface, HSTRING, PCSTR, PCWSTR};
-use ::windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, LRESULT, POINT, WPARAM};
+use ::windows::core::{w, HSTRING, PCWSTR};
+use ::windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, WPARAM};
 use ::windows::Win32::Globalization::GetUserDefaultUILanguage;
 use ::windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
-use ::windows::Win32::UI::Shell::{
-    BHID_SFUIObject, IContextMenu, IContextMenu3, IShellItem, SHCreateItemFromParsingName, ShellExecuteW,
-    CMF_NORMAL, CMINVOKECOMMANDINFO,
-};
+use ::windows::Win32::UI::Shell::ShellExecuteW;
 use ::windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, PostMessageW, TrackPopupMenuEx, HMENU, MF_SEPARATOR,
-    MF_STRING, SW_SHOWNORMAL, TPM_BOTTOMALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_CLOSE, WM_DRAWITEM,
-    WM_INITMENUPOPUP, WM_MEASUREITEM, WM_MENUCHAR, WM_NULL,
+    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, PostMessageW, TrackPopupMenuEx, MF_SEPARATOR, MF_STRING, SW_SHOWNORMAL, TPM_BOTTOMALIGN,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_CLOSE, WM_NULL,
 };
 
 use super::merge::AppEntry;
+use super::pins;
 use super::windows;
-
-/// Menu ids: the shell's items count up from here, and ours sit above anything it could use.
-const SHELL_FIRST: u32 = 1;
-const SHELL_LAST: u32 = 0x6FFF;
-const OWN_FIRST: u32 = 0x7000;
 
 /// A click that closes Start arrives this soon after it closed.
 const START_REOPEN_GUARD_MS: u64 = 400;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Own {
-    TaskManager,
+    Open,
+    Pin,
+    Unpin,
     EndTask,
     Close,
-}
-
-#[derive(PartialEq, Debug)]
-pub enum Chosen {
-    Nothing,
-    Shell(u32),
-    Own(Own),
+    CloseAll,
 }
 
 fn file_name(path: &str) -> &str {
@@ -51,47 +39,47 @@ pub fn can_end_task(exe: &str) -> bool {
     !name.is_empty() && !name.eq_ignore_ascii_case("explorer.exe") && !name.eq_ignore_ascii_case("ApplicationFrameHost.exe")
 }
 
-pub fn own_items(has_windows: bool, can_end: bool) -> Vec<Own> {
-    let mut items = vec![Own::TaskManager];
-    if has_windows && can_end {
-        items.push(Own::EndTask);
+/// In Windows' order: the app, its pin, then what acts on what's open.
+pub fn items(pinned: bool, windows: usize, can_end: bool) -> Vec<Own> {
+    let mut list = vec![Own::Open, if pinned { Own::Unpin } else { Own::Pin }];
+    if windows > 0 && can_end {
+        list.push(Own::EndTask);
     }
-    if has_windows {
-        items.push(Own::Close);
+    match windows {
+        0 => {}
+        1 => list.push(Own::Close),
+        _ => list.push(Own::CloseAll),
     }
-    items
+    list
 }
 
-/// The shell's items come in Windows' language, so ours follow it. `lang` is a Windows language id.
+/// Windows' own words, so the menu reads as it would on the taskbar. `lang` is a Windows language id.
+/// Open is labelled with the app's name.
 pub fn label(item: Own, lang: u16) -> &'static str {
     let french = lang & 0x3FF == 0x0C;
     match (item, french) {
-        (Own::TaskManager, true) => "Gestionnaire des tâches",
-        (Own::TaskManager, false) => "Task Manager",
+        (Own::Open, _) => "",
+        (Own::Pin, true) => "Épingler à la barre des tâches",
+        (Own::Pin, false) => "Pin to taskbar",
+        (Own::Unpin, true) => "Détacher de la barre des tâches",
+        (Own::Unpin, false) => "Unpin from taskbar",
         (Own::EndTask, true) => "Fin de tâche",
         (Own::EndTask, false) => "End task",
         (Own::Close, true) => "Fermer la fenêtre",
         (Own::Close, false) => "Close window",
+        (Own::CloseAll, true) => "Fermer toutes les fenêtres",
+        (Own::CloseAll, false) => "Close all windows",
     }
 }
+
+const ALL: [Own; 6] = [Own::Open, Own::Pin, Own::Unpin, Own::EndTask, Own::Close, Own::CloseAll];
 
 fn own_id(item: Own) -> u32 {
-    OWN_FIRST
-        + match item {
-            Own::TaskManager => 0,
-            Own::EndTask => 1,
-            Own::Close => 2,
-        }
+    ALL.iter().position(|i| *i == item).map_or(0, |p| p as u32 + 1)
 }
 
-pub fn chosen(id: u32) -> Chosen {
-    match id {
-        0 => Chosen::Nothing,
-        id if id == own_id(Own::TaskManager) => Chosen::Own(Own::TaskManager),
-        id if id == own_id(Own::EndTask) => Chosen::Own(Own::EndTask),
-        id if id == own_id(Own::Close) => Chosen::Own(Own::Close),
-        id => Chosen::Shell(id - SHELL_FIRST),
-    }
+pub fn chosen(id: u32) -> Option<Own> {
+    id.checked_sub(1).and_then(|i| ALL.get(i as usize)).copied()
 }
 
 pub fn should_press_start(open_now: bool, since_closed_ms: Option<u64>) -> bool {
@@ -101,32 +89,6 @@ pub fn should_press_start(open_now: bool, since_closed_ms: Option<u64>) -> bool 
 pub fn is_start_host(exe: &str) -> bool {
     let name = file_name(exe);
     name.eq_ignore_ascii_case("SearchHost.exe") || name.eq_ignore_ascii_case("StartMenuExperienceHost.exe")
-}
-
-thread_local! {
-    /// The open menu's shell handler. Its submenus and icons draw themselves through it.
-    static OPEN_MENU: RefCell<Option<IContextMenu3>> = const { RefCell::new(None) };
-}
-
-/// Called from the dock's message handler, which owns the menu. Some(result) means it was handled.
-pub fn forward(msg: u32, wparam: WPARAM, lparam: LPARAM) -> Option<LRESULT> {
-    if !matches!(msg, WM_INITMENUPOPUP | WM_DRAWITEM | WM_MEASUREITEM | WM_MENUCHAR) {
-        return None;
-    }
-    OPEN_MENU.with_borrow(|open| {
-        let handler = open.as_ref()?;
-        let mut result = LRESULT(0);
-        unsafe { handler.HandleMenuMsg2(msg, wparam, lparam, Some(&mut result)).ok()? };
-        Some(result)
-    })
-}
-
-/// Fills the menu with Windows' own items for this app, when it has some to offer.
-unsafe fn add_shell_items(menu: HMENU, source: &str) -> Option<IContextMenu> {
-    let item: IShellItem = SHCreateItemFromParsingName(&HSTRING::from(source), None).ok()?;
-    let handler: IContextMenu = item.BindToHandler(None, &BHID_SFUIObject).ok()?;
-    handler.QueryContextMenu(menu, 0, SHELL_FIRST, SHELL_LAST, CMF_NORMAL).ok().ok()?;
-    Some(handler)
 }
 
 unsafe fn end_task(entry: &AppEntry) {
@@ -139,21 +101,20 @@ unsafe fn end_task(entry: &AppEntry) {
 }
 
 /// Runs on the main thread, whose message loop the menu borrows until it closes.
-pub fn show(dock_raw: isize, entry: &AppEntry) {
+pub fn show(dock_raw: isize, entry: &AppEntry, saved: impl Fn(serde_json::Value)) {
     let owner = HWND(dock_raw as *mut _);
     let previous = windows::foreground();
     let can_end = entry.windows.iter().all(|w| can_end_task(&windows::exe_of(w.hwnd)));
     unsafe {
         let Ok(menu) = CreatePopupMenu() else { return };
-        let shell = entry.icon_source.as_deref().and_then(|source| add_shell_items(menu, source));
-        if shell.is_some() {
-            let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
-        }
         let lang = GetUserDefaultUILanguage();
-        for item in own_items(!entry.windows.is_empty(), can_end) {
-            let _ = AppendMenuW(menu, MF_STRING, own_id(item) as usize, &HSTRING::from(label(item, lang)));
+        for item in items(entry.pinned, entry.windows.len(), can_end) {
+            if matches!(item, Own::EndTask) || (matches!(item, Own::Close | Own::CloseAll) && !can_end) {
+                let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+            }
+            let text = if item == Own::Open { entry.name.as_str() } else { label(item, lang) };
+            let _ = AppendMenuW(menu, MF_STRING, own_id(item) as usize, &HSTRING::from(text));
         }
-        OPEN_MENU.with_borrow_mut(|open| *open = shell.as_ref().and_then(|s| s.cast().ok()));
 
         let mut at = POINT::default();
         let _ = GetCursorPos(&mut at);
@@ -161,35 +122,28 @@ pub fn show(dock_raw: isize, entry: &AppEntry) {
         windows::take_foreground_raw(dock_raw);
         let id = TrackPopupMenuEx(menu, (TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN).0, at.x, at.y, owner, None).0 as u32;
         let _ = PostMessageW(Some(owner), WM_NULL, WPARAM(0), LPARAM(0));
-        OPEN_MENU.with_borrow_mut(|open| *open = None);
+        let _ = DestroyMenu(menu);
 
+        let close_all = || {
+            for window in &entry.windows {
+                let _ = PostMessageW(Some(HWND(window.hwnd as *mut _)), WM_CLOSE, WPARAM(0), LPARAM(0));
+            }
+        };
         match chosen(id) {
-            Chosen::Nothing => windows::take_foreground_raw(previous),
-            Chosen::Shell(offset) => {
-                if let Some(handler) = &shell {
-                    let info = CMINVOKECOMMANDINFO {
-                        cbSize: std::mem::size_of::<CMINVOKECOMMANDINFO>() as u32,
-                        hwnd: owner,
-                        // The API takes a small number here, in the place of a verb's name.
-                        lpVerb: PCSTR(offset as usize as *const u8),
-                        nShow: SW_SHOWNORMAL.0,
-                        ..Default::default()
-                    };
-                    let _ = handler.InvokeCommand(&info);
+            Some(Own::Open) => {
+                if let Some(path) = &entry.launch {
+                    ShellExecuteW(None, w!("open"), &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);
                 }
             }
-            Chosen::Own(Own::TaskManager) => {
-                ShellExecuteW(None, w!("open"), w!("taskmgr.exe"), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);
-            }
-            Chosen::Own(Own::EndTask) => end_task(entry),
-            Chosen::Own(Own::Close) => {
-                for window in &entry.windows {
-                    let _ = PostMessageW(Some(HWND(window.hwnd as *mut _)), WM_CLOSE, WPARAM(0), LPARAM(0));
-                }
+            Some(Own::Pin) => saved(pins::pin(entry)),
+            Some(Own::Unpin) => saved(pins::unpin(&entry.key)),
+            Some(Own::EndTask) => end_task(entry),
+            Some(Own::Close | Own::CloseAll) => {
+                close_all();
                 windows::take_foreground_raw(previous);
             }
+            None => windows::take_foreground_raw(previous),
         }
-        let _ = DestroyMenu(menu);
     }
 }
 
@@ -201,19 +155,28 @@ mod tests {
     const ENGLISH: u16 = 0x0409;
 
     #[test]
-    fn an_open_app_can_be_closed_or_ended() {
-        let items = own_items(true, true);
-        assert_eq!(items, vec![Own::TaskManager, Own::EndTask, Own::Close]);
+    fn an_open_pinned_app_offers_what_a_taskbar_button_does() {
+        assert_eq!(items(true, 1, true), vec![Own::Open, Own::Unpin, Own::EndTask, Own::Close]);
     }
 
     #[test]
-    fn a_closed_app_only_offers_task_manager() {
-        assert_eq!(own_items(false, false), vec![Own::TaskManager]);
+    fn an_open_app_that_isnt_pinned_can_be_pinned() {
+        assert_eq!(items(false, 1, true), vec![Own::Open, Own::Pin, Own::EndTask, Own::Close]);
+    }
+
+    #[test]
+    fn several_windows_close_together() {
+        assert_eq!(items(true, 3, true), vec![Own::Open, Own::Unpin, Own::EndTask, Own::CloseAll]);
+    }
+
+    #[test]
+    fn a_pinned_app_that_isnt_open_can_only_be_opened_or_unpinned() {
+        assert_eq!(items(true, 0, false), vec![Own::Open, Own::Unpin]);
     }
 
     #[test]
     fn apps_that_must_not_be_killed_offer_no_end_task() {
-        assert_eq!(own_items(true, false), vec![Own::TaskManager, Own::Close]);
+        assert_eq!(items(true, 1, false), vec![Own::Open, Own::Unpin, Own::Close]);
     }
 
     #[test]
@@ -227,20 +190,22 @@ mod tests {
 
     #[test]
     fn labels_follow_the_windows_language() {
-        assert_eq!(label(Own::TaskManager, FRENCH), "Gestionnaire des tâches");
+        assert_eq!(label(Own::Pin, FRENCH), "Épingler à la barre des tâches");
+        assert_eq!(label(Own::Unpin, FRENCH), "Détacher de la barre des tâches");
         assert_eq!(label(Own::EndTask, FRENCH), "Fin de tâche");
         assert_eq!(label(Own::Close, FRENCH), "Fermer la fenêtre");
-        assert_eq!(label(Own::TaskManager, ENGLISH), "Task Manager");
+        assert_eq!(label(Own::CloseAll, FRENCH), "Fermer toutes les fenêtres");
+        assert_eq!(label(Own::Pin, ENGLISH), "Pin to taskbar");
         assert_eq!(label(Own::Close, 0x0407), "Close window");
     }
 
     #[test]
-    fn menu_ids_tell_the_shell_and_our_own_items_apart() {
-        assert_eq!(chosen(0), Chosen::Nothing);
-        assert_eq!(chosen(SHELL_FIRST + 4), Chosen::Shell(4));
-        assert_eq!(chosen(OWN_FIRST), Chosen::Own(Own::TaskManager));
-        assert_eq!(chosen(OWN_FIRST + 1), Chosen::Own(Own::EndTask));
-        assert_eq!(chosen(OWN_FIRST + 2), Chosen::Own(Own::Close));
+    fn each_menu_id_is_its_own_item() {
+        assert_eq!(chosen(0), None);
+        for item in [Own::Open, Own::Pin, Own::Unpin, Own::EndTask, Own::Close, Own::CloseAll] {
+            assert_eq!(chosen(own_id(item)), Some(item));
+        }
+        assert_eq!(chosen(9999), None);
     }
 
     #[test]

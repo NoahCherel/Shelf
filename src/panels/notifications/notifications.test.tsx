@@ -77,6 +77,19 @@ it("clicking one opens its app and closes the card", async () => {
   expect(mockInvoke).toHaveBeenCalledWith("close_card");
 });
 
+it("one that can't be opened stays, and says so", async () => {
+  mockInvoke.mockImplementation(async (cmd) => {
+    if (cmd === "notification_open") throw "Windows has no way to open this one.";
+    return cmd === "notifications_list" ? list : null;
+  });
+  await openCard();
+  fireEvent.click(screen.getByText("Alex"));
+  await flush();
+  expect(mockInvoke).not.toHaveBeenCalledWith("close_card");
+  expect(screen.getByText("Alex")).toBeTruthy();
+  expect(screen.getByText(/no way to open this one/)).toBeTruthy();
+});
+
 it("clear all empties the list", async () => {
   await openCard();
   fireEvent.click(screen.getByRole("button", { name: "Clear all" }));

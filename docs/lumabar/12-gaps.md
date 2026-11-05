@@ -38,7 +38,7 @@ These replace the study's values, on the owner's word, 2026-11-04:
 - A Search button sits beside Start, and a Status tile shows Wi-Fi, sound, battery and notifications. Each opens Shelf's own card right above it, except notifications, as Windows' panels open at fixed places, unrelated to the tile (2026-11-05).
 - With the Battery widget on the dock, the Status tile's battery gives way to a Quick Settings icon, and the widget opens that card, so the battery shows once.
 - An app's previews follow Windows rather than the reference: live pictures, peek, and a click on several windows shows them.
-- Right-clicking an app shows Windows' own menu with Task Manager, End task and Close added; right-clicking Start shows Windows' quick menu. Shelf's menu stays on everything else.
+- Right-clicking an app shows what a Windows taskbar button offers: its name to open it, pin or unpin, End task and close (2026-11-05). Right-clicking Start shows Windows' quick menu, which has Task Manager. Shelf's menu stays on everything else.
 - Clicking the dock no longer takes focus from the current app, and Start toggles from its tile.
 - The app in focus gets a lit plate behind its icon, and a longer dot. The reference's identical dots don't show which one it is.
 

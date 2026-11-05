@@ -233,9 +233,6 @@ unsafe extern "system" fn on_message(
     _id: usize,
     _data: usize,
 ) -> LRESULT {
-    if let Some(result) = crate::apps::menu::forward(msg, wparam, lparam) {
-        return result;
-    }
     let event = match msg {
         WM_DISPLAYCHANGE | WM_DPICHANGED => Some(ShellEvent::DisplayChange),
         WM_POWERBROADCAST if matches!(wparam.0, PBT_APMRESUMEAUTOMATIC | PBT_APMRESUMESUSPEND) => {

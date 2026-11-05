@@ -85,14 +85,49 @@ pub fn notifications_clear() -> Result<(), String> {
     UserNotificationListener::Current().and_then(|l| l.ClearNotifications()).map_err(|e| e.to_string())
 }
 
-/// Windows lets no one else press a notification, so this opens its app and clears it.
+struct AppMatch {
+    key: String,
+    name: String,
+    hwnd: Option<isize>,
+}
+
+const SHORTEST_NAME_MATCH: usize = 3;
+
+/// A notification names its app differently from the app's window, so the id is tried first, then
+/// the name, which can be longer or shorter on either side, as "Mozilla Firefox" and "Firefox".
+fn window_for(apps: &[AppMatch], app_id: &str, name: &str) -> Option<isize> {
+    let open = || apps.iter().filter(|a| a.hwnd.is_some());
+    let wanted = name.to_lowercase();
+    let similar = |a: &&AppMatch| {
+        let theirs = a.name.to_lowercase();
+        theirs == wanted
+            || (theirs.len() >= SHORTEST_NAME_MATCH && wanted.len() >= SHORTEST_NAME_MATCH && (theirs.contains(&wanted) || wanted.contains(&theirs)))
+    };
+    open().find(|a| a.key.eq_ignore_ascii_case(app_id)).or_else(|| open().find(similar)).and_then(|a| a.hwnd)
+}
+
+/// Windows lets no one else press a notification, so its exact message can't be reached. This goes
+/// to its app: the window if it's open, or starting it if not, and clears the notification.
 #[tauri::command(async)]
 pub fn notification_open(id: u32) -> Result<(), String> {
     crate::preview::guard()?;
-    let found = all().map_err(|e| e.to_string())?.into_iter().find(|n| n.Id().is_ok_and(|i| i == id)).ok_or("notification is gone")?;
-    let app = found.AppInfo().and_then(|a| a.AppUserModelId()).map_err(|e| e.to_string())?;
-    unsafe {
-        ShellExecuteW(None, w!("open"), &HSTRING::from(format!(r"shell:AppsFolder\{app}")), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL);
+    let found = all().map_err(|e| e.to_string())?.into_iter().find(|n| n.Id().is_ok_and(|i| i == id)).ok_or("This notification has gone.")?;
+    let info = found.AppInfo().map_err(|e| e.to_string())?;
+    let app_id = info.AppUserModelId().map_or(String::new(), |a| a.to_string());
+    let name = info.DisplayInfo().and_then(|d| d.DisplayName()).map_or(String::new(), |n| n.to_string());
+    let apps: Vec<AppMatch> = crate::apps::current()?
+        .into_iter()
+        .map(|e| AppMatch { hwnd: e.windows.first().map(|w| w.hwnd), key: e.key, name: e.name })
+        .collect();
+    match window_for(&apps, &app_id, &name) {
+        Some(window) => crate::apps::bring_forward(window),
+        None => {
+            let started = unsafe { ShellExecuteW(None, w!("open"), &HSTRING::from(format!(r"shell:AppsFolder\{app_id}")), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) };
+            // Below this number, it's an error rather than something started.
+            if (started.0 as isize) <= 32 {
+                return Err("Windows has no way to open this one.".into());
+            }
+        }
     }
     notification_dismiss(id)
 }
@@ -121,6 +156,46 @@ mod tests {
         assert_eq!(to_unix_ms(116_444_736_000_000_000), 0);
         assert_eq!(to_unix_ms(116_444_736_000_000_000 + 10_000), 1);
         assert_eq!(to_unix_ms(0), 0, "never before 1970");
+    }
+
+    fn open(key: &str, name: &str) -> AppMatch {
+        AppMatch { key: key.into(), name: name.into(), hwnd: Some(5) }
+    }
+
+    #[test]
+    fn its_window_is_found_by_the_apps_id() {
+        let apps = vec![open("308046b0af4a39cb", "Firefox")];
+        assert_eq!(window_for(&apps, "308046B0AF4A39CB", "Something else"), Some(5));
+    }
+
+    #[test]
+    fn its_window_is_found_by_name_when_the_ids_differ() {
+        let apps = vec![open(r"c:\apps\discord.exe", "Discord")];
+        assert_eq!(window_for(&apps, "com.squirrel.Discord.Discord", "Discord"), Some(5));
+    }
+
+    #[test]
+    fn a_longer_or_shorter_name_still_matches() {
+        assert_eq!(window_for(&[open("a", "Firefox")], "x", "Mozilla Firefox"), Some(5));
+        assert_eq!(window_for(&[open("a", "OUTLOOK")], "x", "Outlook"), Some(5));
+        assert_eq!(window_for(&[open("a", "Microsoft Teams")], "x", "Teams"), Some(5));
+    }
+
+    #[test]
+    fn a_very_short_name_doesnt_match_by_accident() {
+        assert_eq!(window_for(&[open("a", "Go")], "x", "Google Chrome"), None);
+    }
+
+    #[test]
+    fn an_app_with_no_window_isnt_a_match() {
+        let closed = AppMatch { key: "a".into(), name: "Discord".into(), hwnd: None };
+        assert_eq!(window_for(&[closed], "a", "Discord"), None);
+    }
+
+    #[test]
+    fn the_exact_id_wins_over_a_similar_name() {
+        let apps = vec![AppMatch { key: "b".into(), name: "Discord".into(), hwnd: Some(1) }, AppMatch { key: "a".into(), name: "Other".into(), hwnd: Some(2) }];
+        assert_eq!(window_for(&apps, "a", "Discord"), Some(2));
     }
 
     #[test]

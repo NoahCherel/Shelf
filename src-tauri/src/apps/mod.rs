@@ -41,7 +41,7 @@ pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) 
 }
 
 pub(crate) fn current() -> Result<Vec<AppEntry>, String> {
-    let pins = on_com_thread(pins::list)?;
+    let pins = pins::with_overlay(on_com_thread(pins::list)?);
     let entries = merge(&pins, windows::list(), windows::foreground());
     let sources = entries.iter().filter_map(|e| Some((e.key.clone(), e.icon_source.clone()?))).collect();
     *SOURCES.lock().unwrap_or_else(|e| e.into_inner()) = Some(sources);
@@ -68,6 +68,10 @@ pub fn apps_icon(key: String) -> Result<Option<String>, String> {
         cache.get_or_insert_with(HashMap::new).insert(key, found.clone());
     }
     Ok(icon)
+}
+
+pub fn bring_forward(raw: isize) {
+    windows::focus(raw);
 }
 
 /// A program's icon by its path, from the same cache as the apps themselves.
@@ -124,12 +128,18 @@ pub fn start_quick_menu() -> Result<(), String> {
     Ok(())
 }
 
-/// Windows' menu for an app. The menu runs on the main thread, as the dock window owns it.
+/// The taskbar's menu for an app. It runs on the main thread, as the dock window owns it.
 #[tauri::command(async)]
 pub fn apps_context_menu(app: AppHandle, key: String) -> Result<(), String> {
     crate::preview::guard()?;
     let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let raw = dock.hwnd().map_err(|e| e.to_string())?.0 as isize;
-    app.run_on_main_thread(move || menu::show(raw, &entry)).map_err(|e| e.to_string())
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        menu::show(raw, &entry, |value| {
+            let _ = crate::store::store_save(handle.clone(), pins::OVERLAY.to_string(), value);
+        })
+    })
+    .map_err(|e| e.to_string())
 }

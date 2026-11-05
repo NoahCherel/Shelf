@@ -104,7 +104,14 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Bell:** a new notification raises the count within a few seconds.
 - [ ] **Card:** each shows its app, text and age, and a new one appears while it's open.
 - [ ] **Dismiss:** the cross and Clear all also clear them from Windows' own panel.
-- [ ] **Open:** a click opens the notification's app, not the message itself: Windows doesn't allow more.
+- [ ] **Open:** a click brings the notification's app forward, or starts it. Not the message itself: Windows doesn't allow more.
+
+## Right-clicking an app
+
+- [ ] **Menu:** the app's name, pin or unpin, End task and close, in Windows' language.
+- [ ] **Pin:** pinning an open app keeps its icon after closing it, and after restarting Shelf.
+- [ ] **Unpin:** unpinning takes it off the dock. It's still pinned on Windows' own taskbar, which Shelf leaves alone.
+- [ ] **Close:** with several windows it reads "close all", and an unsaved document still asks first.
 
 ## A day of use
 

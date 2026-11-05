@@ -23,6 +23,7 @@ function age(at: number): string {
 export function NotificationsCard() {
   const { data } = useProvider(notificationsProvider);
   const [gone, setGone] = useState<number[]>([]);
+  const [failed, setFailed] = useState<{ id: number; text: string } | null>(null);
 
   const changed = () => {
     refresh(notificationsProvider);
@@ -44,10 +45,14 @@ export function NotificationsCard() {
     invoke("notification_dismiss", { id: item.id }).then(changed, () => setGone((ids) => ids.filter((id) => id !== item.id)));
   };
   const open = (item: NotificationRow) => {
-    invoke("notification_open", { id: item.id }).then(() => {
-      changed();
-      invoke("close_card").catch(() => {});
-    }, () => {});
+    setFailed(null);
+    invoke("notification_open", { id: item.id }).then(
+      () => {
+        changed();
+        invoke("close_card").catch(() => {});
+      },
+      (e) => setFailed({ id: item.id, text: String(e) }),
+    );
   };
   const clearAll = () => {
     const ids = items.map((n) => n.id);
@@ -85,6 +90,7 @@ export function NotificationsCard() {
               </div>
               <div className="nt__title">{item.title}</div>
               {item.body && <div className="nt__body">{item.body}</div>}
+              {failed?.id === item.id && <div className="nt__error">{failed.text}</div>}
             </div>
           ))}
         </div>
