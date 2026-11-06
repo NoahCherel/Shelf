@@ -2,6 +2,7 @@
 
 mod apps;
 mod claude_usage;
+mod diag;
 mod glass;
 mod net;
 mod preview;

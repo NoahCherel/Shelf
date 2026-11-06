@@ -134,6 +134,7 @@ fn card_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 /// The only place the card hides. The page unmounts what it shows, which stops its providers
 /// and drops anything typed into it.
 fn hide_card(app: &AppHandle) -> Result<(), String> {
+    crate::diag::note("card hidden");
     let card = card_window(app)?;
     card.hide().map_err(|e| e.to_string())?;
     let _ = app.emit_to("card", "card-closed", ());
@@ -188,7 +189,9 @@ pub fn open_card(
 ) -> Result<(), String> {
     let card = card_window(&app)?;
     let focused = card.is_focused().unwrap_or(true);
-    match with_state(|s| s.request(&widget_id, now(), focused)) {
+    let request = with_state(|s| s.request(&widget_id, now(), focused));
+    crate::diag::note(&format!("card asked for {widget_id}, focused {focused}: {request:?}"));
+    match request {
         CardMove::Ignore => return Ok(()),
         CardMove::Close => return hide_card(&app),
         CardMove::Open => {}
@@ -293,7 +296,9 @@ fn close_at_next_press_outside(app: AppHandle) {
 
 /// Clicking away closes the card.
 pub fn on_blur(window: &tauri::Window) {
-    if !blur_is_click_away(button_down()) {
+    let down = button_down();
+    crate::diag::note(&format!("card lost the focus, button down {down}"));
+    if !blur_is_click_away(down) {
         close_at_next_press_outside(window.app_handle().clone());
         return;
     }
