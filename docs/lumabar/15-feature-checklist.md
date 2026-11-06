@@ -8,6 +8,8 @@ Every feature, numbered, for the implementation plan to trace back to. Prioritie
 
 **Status, 2026-11-04:** Milestone 1 delivers every P1 below except where noted, with F-006 (size slider) from P2 too. Not in M1: the P1 widgets moved to M2 and M3 by the plan, and F-026, where the dock is only on the primary screen and the taskbar is hidden on all of them. F-086 is targeted but only run on Windows 11. What only the owner can verify is in [manual checks](../manual-checks.md).
 
+**Status, 2026-11-06:** the [bar and apps plan](../superpowers/plans/2026-11-05-bar-and-apps.md) adds F-004, F-005, F-008, F-010 and F-011. By the owner's choice it leaves out the several-screen features (F-017, F-018, F-019, F-026) and keyboard shortcuts (F-054, F-090).
+
 ## Dock
 
 | ID | P | Feature | Doc |

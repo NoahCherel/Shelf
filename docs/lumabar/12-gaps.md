@@ -42,6 +42,14 @@ These replace the study's values, on the owner's word, 2026-11-04:
 - Clicking the dock no longer takes focus from the current app, and Start toggles from its tile.
 - The app in focus gets a lit plate behind its icon, and a longer dot. The reference's identical dots don't show which one it is.
 
+### The bar and apps batch (2026-11-05)
+
+- No several-screen work: there is one screen to test on. Shelf hides the taskbar on every screen, so a second screen would have neither dock nor taskbar.
+- No keyboard shortcuts, as catching them means watching the whole keyboard. Win+T isn't built. The Windows key still brings an auto-hidden dock back, by noticing Start open.
+- The dock can be put at the top from Settings too, not only by dragging.
+- Full width sits right on the edge, as in the reference's pictures, whatever the distance from the edge is set to.
+- Auto-hide wakes along the whole edge, like the taskbar, and keeps the taskbar hidden even in its Auto-hide mode.
+
 ## Limits of this study
 
 - Nothing here was seen in a running copy, because you chose public sources only [I]

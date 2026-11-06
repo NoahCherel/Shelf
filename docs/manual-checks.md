@@ -130,6 +130,25 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Closing:** an app's icon folds away where it was, and a pinned app's icon stays.
 - [ ] **Reopening at once:** opening the app again as it folds leaves one icon, not two.
 
+## Where the dock sits
+
+- [ ] **To the top:** dragging the dock by an empty spot moves it, and letting go in the top half keeps it there after a restart.
+- [ ] **Locked:** with Lock dock on, dragging an empty spot does nothing, until the picker is open.
+- [ ] **Below it:** at the top, cards, menus, previews and the hidden icons open below the dock, and none runs off the screen.
+- [ ] **Start:** Windows' Start menu likely still opens at the bottom. Say whether that bothers you.
+- [ ] **Full width:** the dock spans the whole edge, right on it, with the widgets in the middle, and its glass doesn't bend at the two ends.
+- [ ] **Spacing:** the slider changes the space between widgets, and the default looks as before.
+
+## Auto-hide
+
+- [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.
+- [ ] **Coming back:** touching the edge with the pointer, anywhere along it, brings it back, and so does the Windows key.
+- [ ] **Staying:** it stays up while a card, a menu, previews, the hidden icons, Start, the picker or Settings is open.
+- [ ] **Fullscreen:** in a game or a video, touching the edge never brings it back.
+- [ ] **Taskbar:** with auto-hide on, Windows' taskbar never comes up beside it, even in its Auto-hide mode.
+- [ ] **Desktop:** with Stay up on the desktop on, it stays up while no app is in front.
+- [ ] **Sleep:** after sleep or unlocking, a hidden dock stays hidden until you call it.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?
