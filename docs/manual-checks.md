@@ -144,6 +144,14 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Narrow:** pulling an end of the pill narrows it, the rest scrolls with the wheel or a swipe, and a double-click on an end brings it back.
 - [ ] **Volume:** over a narrowed dock, the wheel on the sound icon still sets the volume.
 
+## Styles
+
+- [ ] **iOS Glass:** like Liquid Glass with a deeper tint, and switching between the two is instant.
+- [ ] **Midnight:** deep black with a fine rim, dark in light mode too.
+- [ ] **White:** solid white with readable dark text, in both modes.
+- [ ] **Clear:** no bar, and each widget and the apps stand out in frosted, black or white. Gaps between widgets still catch clicks, which don't reach the app behind.
+- [ ] **Accent:** your own colour applies everywhere the nine do.
+
 ## Auto-hide
 
 - [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.
