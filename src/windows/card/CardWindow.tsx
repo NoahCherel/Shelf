@@ -124,6 +124,9 @@ export function CardWindow() {
       setShown(null);
     });
     window.addEventListener("focus", catchUp);
+    // For the diagnostic trace: whether WebView2 thinks this window can be seen.
+    const onVisibility = () => invoke("diag_note", { what: `card page ${document.visibilityState}` }).catch(() => {});
+    document.addEventListener("visibilitychange", onVisibility);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") invoke("close_card").catch(() => {});
     };
@@ -132,6 +135,7 @@ export function CardWindow() {
       off.then((stop) => stop());
       offClosed.then((stop) => stop());
       window.removeEventListener("focus", catchUp);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("keydown", onKey);
     };
   }, []);

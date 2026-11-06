@@ -31,3 +31,9 @@ pub fn note(what: &str) {
         let _ = file.write_all(line.as_bytes());
     }
 }
+
+/// Lets a page add to the trace, such as the card window being told it's hidden.
+#[tauri::command]
+pub fn diag_note(what: String) {
+    note(&what.chars().take(200).collect::<String>());
+}

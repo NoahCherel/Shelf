@@ -188,6 +188,7 @@ pub fn run() {
             apps::apps_unpin,
             claude_usage,
             claude_connect,
+            diag::diag_note,
             quit,
         ])
         .on_window_event(|window, event| match (event, window.label()) {
