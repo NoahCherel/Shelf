@@ -69,7 +69,13 @@ pub struct CardState {
 }
 
 impl CardState {
-    pub fn request(&mut self, id: &str, now: u64) -> CardMove {
+    /// `focused` is whether the card window has the focus. One that doesn't was covered by another app
+    /// the moment it opened, so a click on its tile brings it back rather than closing what can't be seen.
+    pub fn request(&mut self, id: &str, now: u64, focused: bool) -> CardMove {
+        if self.open.as_deref() == Some(id) && !focused {
+            self.opened_at = now;
+            return CardMove::Open;
+        }
         if self.open.as_deref() == Some(id) {
             self.closed(now);
             return CardMove::Close;
@@ -176,7 +182,8 @@ pub fn open_card(
     height: f64,
 ) -> Result<(), String> {
     let card = card_window(&app)?;
-    match with_state(|s| s.request(&widget_id, now())) {
+    let focused = card.is_focused().unwrap_or(true);
+    match with_state(|s| s.request(&widget_id, now(), focused)) {
         CardMove::Ignore => return Ok(()),
         CardMove::Close => return hide_card(&app),
         CardMove::Open => {}
@@ -312,23 +319,23 @@ mod tests {
     #[test]
     fn clicking_the_open_card_tile_closes_it() {
         let mut s = CardState::default();
-        assert_eq!(s.request("clock", 0), CardMove::Open);
-        assert_eq!(s.request("clock", 10), CardMove::Close);
+        assert_eq!(s.request("clock", 0, true), CardMove::Open);
+        assert_eq!(s.request("clock", 10, true), CardMove::Close);
     }
 
     #[test]
     fn the_blur_from_clicking_the_same_tile_does_not_reopen_it() {
         let mut s = CardState::default();
-        s.request("clock", 0);
+        s.request("clock", 0, true);
         s.closed(1000); // clicking the tile blurs the card before the click arrives
-        assert_eq!(s.request("clock", 1100), CardMove::Ignore);
-        assert_eq!(s.request("clock", 1400), CardMove::Open, "a later click is real");
+        assert_eq!(s.request("clock", 1100, true), CardMove::Ignore);
+        assert_eq!(s.request("clock", 1400, true), CardMove::Open, "a later click is real");
     }
 
     #[test]
     fn the_focus_settling_right_after_opening_does_not_close_it() {
         let mut s = CardState::default();
-        s.request("clock", 1000);
+        s.request("clock", 1000, true);
         assert!(!s.blur_closes(1100), "Windows moves focus into the web view as it opens");
         assert!(s.open.is_some());
         assert!(s.blur_closes(1400), "clicking away later does close it");
@@ -338,10 +345,10 @@ mod tests {
     #[test]
     fn after_a_swap_the_same_tile_closes_the_new_card() {
         let mut s = CardState::default();
-        s.request("quick", 0);
+        s.request("quick", 0, true);
         s.swap("wifi");
         assert_eq!(s.open.as_deref(), Some("wifi"));
-        assert_eq!(s.request("wifi", 1000), CardMove::Close);
+        assert_eq!(s.request("wifi", 1000, true), CardMove::Close);
     }
 
     #[test]
@@ -374,11 +381,21 @@ mod tests {
     }
 
     #[test]
+    fn a_card_another_app_came_in_front_of_is_brought_back_rather_than_closed() {
+        let mut s = CardState::default();
+        assert_eq!(s.request("__appmenu:orca", 0, true), CardMove::Open);
+        // Orca covered it at once, so it never had the focus: the next right-click shows it again.
+        assert_eq!(s.request("__appmenu:orca", 1000, false), CardMove::Open);
+        assert_eq!(s.open.as_deref(), Some("__appmenu:orca"));
+        assert_eq!(s.request("__appmenu:orca", 2000, true), CardMove::Close, "in front and focused, the same click closes it");
+    }
+
+    #[test]
     fn another_tile_opens_straight_away() {
         let mut s = CardState::default();
-        s.request("clock", 0);
+        s.request("clock", 0, true);
         s.closed(1000);
-        assert_eq!(s.request("battery", 1050), CardMove::Open);
+        assert_eq!(s.request("battery", 1050, true), CardMove::Open);
         assert_eq!(s.open.as_deref(), Some("battery"));
     }
 }
