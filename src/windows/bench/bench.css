@@ -74,3 +74,18 @@ body,
 .bench__previews .pv__frame[data-hwnd] {
   background: repeating-linear-gradient(45deg, #ffffff14 0 8px, #ffffff08 8px 16px);
 }
+
+:root[data-edge="top"] .bench__dock {
+  top: 6px;
+  bottom: auto;
+}
+
+:root[data-edge="top"] .bench__card {
+  top: calc(var(--bar-h) + 6px + 8px);
+  bottom: auto;
+}
+
+/* As the real window does: on the edge itself. */
+.bench__dock:has(.dock[data-width="full"]) {
+  bottom: 0;
+}

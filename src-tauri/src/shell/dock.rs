@@ -2,7 +2,7 @@
 //! in `react`, which is pure; `run_action` is the only part that touches Windows.
 
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -36,23 +36,58 @@ pub struct Rect {
     pub h: i32,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Edge {
+    Bottom,
+    Top,
+}
+
+impl Edge {
+    pub fn from_name(name: Option<&str>) -> Edge {
+        if name == Some("top") {
+            Edge::Top
+        } else {
+            Edge::Bottom
+        }
+    }
+}
+
 /// What the page reports, in logical pixels.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct DockLayout {
     pub width: f64,
     pub bar: f64,
     pub gap: f64,
-    /// Over other windows, reserving nothing. Otherwise maximized windows stop above the dock.
+    /// Over other windows, reserving nothing. Otherwise maximized windows stop short of the dock.
     pub float: bool,
+    pub edge: Edge,
 }
 
-/// Centred near the bottom edge of the monitor, in physical pixels. The window is only as
-/// tall as the bar: the gap below stays outside it, so it can't swallow clicks.
-pub fn dock_rect(monitor: Rect, scale: f64, logical_width: f64, bar: f64, gap: f64) -> Rect {
+/// Centred near an edge of the monitor, in physical pixels. The window is only as
+/// tall as the bar: the gap stays outside it, so it can't swallow clicks.
+pub fn dock_rect(monitor: Rect, scale: f64, logical_width: f64, bar: f64, gap: f64, edge: Edge) -> Rect {
     let w = ((logical_width * scale).ceil() as i32).clamp(1, monitor.w);
     let h = (bar * scale).round() as i32;
     let lift = (gap * scale).round() as i32;
-    Rect { x: monitor.x + (monitor.w - w) / 2, y: monitor.y + monitor.h - lift - h, w, h }
+    let y = match edge {
+        Edge::Bottom => monitor.y + monitor.h - lift - h,
+        Edge::Top => monitor.y + lift,
+    };
+    Rect { x: monitor.x + (monitor.w - w) / 2, y, w, h }
+}
+
+/// The strip of the screen to keep clear (left, top, right, bottom).
+pub fn reserved_rect(monitor: Rect, height: i32, edge: Edge) -> (i32, i32, i32, i32) {
+    let (left, right) = (monitor.x, monitor.x + monitor.w);
+    match edge {
+        Edge::Bottom => (left, monitor.y + monitor.h - height, right, monitor.y + monitor.h),
+        Edge::Top => (left, monitor.y, right, monitor.y + height),
+    }
+}
+
+/// Where the window goes while it's being dragged, `offset` logical px from where it rests.
+pub fn dragged_y(rest: Rect, monitor: Rect, scale: f64, offset: f64) -> i32 {
+    (rest.y + (offset * scale).round() as i32).clamp(monitor.y, monitor.y + monitor.h - rest.h)
 }
 
 /// How much of the screen edge to keep clear, in physical pixels; None when floating.
@@ -139,7 +174,9 @@ pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
 }
 
 /// As last reported by the page; `start` fills it from the saved settings.
-static LAYOUT: Mutex<DockLayout> = Mutex::new(DockLayout { width: 400.0, bar: 55.0, gap: 6.0, float: true });
+static LAYOUT: Mutex<DockLayout> = Mutex::new(DockLayout { width: 400.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom });
+/// Being dragged: the pointer decides where it is, and the glass waits until it lands.
+static MOVING: AtomicBool = AtomicBool::new(false);
 static DOCK_HWND: AtomicIsize = AtomicIsize::new(0);
 static EVENTS: OnceLock<Sender<ShellEvent>> = OnceLock::new();
 static TASKBAR_CREATED: OnceLock<u32> = OnceLock::new();
@@ -157,23 +194,27 @@ fn monitor_rect(dock: &WebviewWindow) -> Option<(Rect, f64)> {
 fn place(dock: &WebviewWindow) {
     let Some((monitor, scale)) = monitor_rect(dock) else { return };
     let l = layout();
-    let r = dock_rect(monitor, scale, l.width, l.bar, l.gap);
+    let r = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge);
     let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
+    if MOVING.load(Ordering::Relaxed) {
+        return;
+    }
     let _ = dock.set_position(PhysicalPosition::new(r.x, r.y));
     glass::set_region(dock.app_handle(), Region { x: r.x, y: r.y, w: r.w, h: r.h });
 }
 
 /// The reserved edge stays the monitor's full width, so maximized windows
-/// keep stopping above the bar however narrow the bar is.
+/// keep stopping short of the bar however narrow the bar is.
 fn register_appbar(dock: &WebviewWindow) {
     let Some((m, scale)) = monitor_rect(dock) else { return };
     if !crate::preview::current().reserve_edge {
         return;
     }
     let raw = DOCK_HWND.load(Ordering::Relaxed);
-    match reserved_height(layout(), scale) {
+    let l = layout();
+    match reserved_height(l, scale) {
         Some(h) => {
-            appbar::register(raw, (m.x, m.y + m.h - h, m.x + m.w, m.y + m.h));
+            appbar::register(raw, reserved_rect(m, h, l.edge), l.edge);
         }
         None => appbar::unregister(raw),
     }
@@ -264,6 +305,10 @@ fn saved_layout(settings: Option<&serde_json::Value>) -> DockLayout {
         l.float = s["floatOverWindows"].as_bool().unwrap_or(l.float);
         l.gap = s["edgeGap"].as_f64().unwrap_or(l.gap);
         l.bar = s["size"].as_f64().map_or(l.bar, |t| (t * 1.09).ceil());
+        l.edge = Edge::from_name(s["edge"].as_str());
+        if s["dockWidth"].as_str() == Some("full") {
+            l.gap = 0.0;
+        }
     }
     l
 }
@@ -310,17 +355,38 @@ pub fn stop() {
 
 /// Fits the window to the bar. Anything but a new width also changes what's reserved.
 #[tauri::command]
-pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: bool) -> Result<(), String> {
+pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: bool, edge: String) -> Result<(), String> {
+    let edge = Edge::from_name(Some(&edge));
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let edge_changed = {
         let mut current = LAYOUT.lock().unwrap_or_else(|e| e.into_inner());
-        let changed = current.bar != bar || current.gap != gap || current.float != float;
-        *current = DockLayout { width, bar, gap, float };
+        let changed = current.bar != bar || current.gap != gap || current.float != float || current.edge != edge;
+        *current = DockLayout { width, bar, gap, float, edge };
         changed
     };
     if edge_changed {
         register_appbar(&dock);
     }
+    place(&dock);
+    Ok(())
+}
+
+/// The dock follows the pointer, `offset` logical px from where it rests.
+#[tauri::command]
+pub fn dock_drag(app: AppHandle, offset: f64) -> Result<(), String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let (monitor, scale) = monitor_rect(&dock).ok_or("no monitor")?;
+    let l = layout();
+    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge);
+    MOVING.store(true, Ordering::Relaxed);
+    dock.set_position(PhysicalPosition::new(rest.x, dragged_y(rest, monitor, scale, offset))).map_err(|e| e.to_string())
+}
+
+/// Let go: it goes back to where its layout says.
+#[tauri::command]
+pub fn dock_drag_end(app: AppHandle) -> Result<(), String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    MOVING.store(false, Ordering::Relaxed);
     place(&dock);
     Ok(())
 }
@@ -335,40 +401,71 @@ mod tests {
 
     #[test]
     fn dock_is_centred_on_monitor() {
-        let r = dock_rect(FHD, 1.0, 1000.0, 72.0, 0.0);
+        let r = dock_rect(FHD, 1.0, 1000.0, 72.0, 0.0, Edge::Bottom);
         assert_eq!(r, Rect { x: 460, y: 1008, w: 1000, h: 72 });
     }
 
     #[test]
     fn dock_never_exceeds_monitor_width() {
-        let r = dock_rect(FHD, 1.0, 5000.0, 72.0, 0.0);
+        let r = dock_rect(FHD, 1.0, 5000.0, 72.0, 0.0, Edge::Bottom);
         assert_eq!((r.x, r.w), (0, 1920));
     }
 
     #[test]
     fn dock_rect_is_correct_at_100_125_150_percent() {
-        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0), Rect { x: 560, y: 1008, w: 800, h: 72 });
-        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 0.0), Rect { x: 460, y: 990, w: 1000, h: 90 });
-        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 0.0), Rect { x: 360, y: 972, w: 1200, h: 108 });
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Bottom), Rect { x: 560, y: 1008, w: 800, h: 72 });
+        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 0.0, Edge::Bottom), Rect { x: 460, y: 990, w: 1000, h: 90 });
+        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 0.0, Edge::Bottom), Rect { x: 360, y: 972, w: 1200, h: 108 });
     }
 
     #[test]
     fn monitor_with_offset_origin_is_respected() {
         let left = Rect { x: -1920, y: 200, w: 1920, h: 1080 };
-        assert_eq!(dock_rect(left, 1.0, 1000.0, 72.0, 0.0), Rect { x: -1460, y: 1208, w: 1000, h: 72 });
+        assert_eq!(dock_rect(left, 1.0, 1000.0, 72.0, 0.0, Edge::Bottom), Rect { x: -1460, y: 1208, w: 1000, h: 72 });
     }
 
     #[test]
     fn the_gap_lifts_the_window_instead_of_adding_a_dead_strip_to_it() {
-        let r = dock_rect(FHD, 1.25, 800.0, 55.0, 6.0);
+        let r = dock_rect(FHD, 1.25, 800.0, 55.0, 6.0, Edge::Bottom);
         assert_eq!(r.h, 69, "only the bar");
         assert_eq!(r.y + r.h, 1080 - 8, "6 logical px above the edge at 125%");
     }
 
     #[test]
     fn floating_reserves_nothing_and_docked_reserves_bar_and_gap() {
-        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: true }, 1.25), None);
-        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: false }, 1.25), Some(77));
+        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom }, 1.25), None);
+        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: false, edge: Edge::Bottom }, 1.25), Some(77));
+    }
+
+    #[test]
+    fn at_the_top_the_gap_is_above_the_window() {
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Top), Rect { x: 560, y: 0, w: 800, h: 72 });
+        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 6.0, Edge::Top), Rect { x: 460, y: 8, w: 1000, h: 90 });
+        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 6.0, Edge::Top), Rect { x: 360, y: 9, w: 1200, h: 108 });
+    }
+
+    #[test]
+    fn the_reserved_strip_follows_the_edge_and_the_monitor() {
+        let m = Rect { x: -1920, y: 200, w: 1920, h: 1080 };
+        assert_eq!(reserved_rect(m, 77, Edge::Bottom), (-1920, 1203, 0, 1280));
+        assert_eq!(reserved_rect(m, 77, Edge::Top), (-1920, 200, 0, 277));
+    }
+
+    #[test]
+    fn dragging_stays_on_the_monitor() {
+        let r = Rect { x: 460, y: 1008, w: 1000, h: 72 };
+        assert_eq!(dragged_y(r, FHD, 1.0, -300.0), 708);
+        assert_eq!(dragged_y(r, FHD, 1.25, -100.0), 883);
+        assert_eq!(dragged_y(r, FHD, 1.0, -5000.0), 0);
+        assert_eq!(dragged_y(r, FHD, 1.0, 5000.0), 1008);
+    }
+
+    #[test]
+    fn the_saved_edge_is_used_from_the_first_placement_and_full_width_sits_on_the_edge() {
+        let top = saved_layout(Some(&serde_json::json!({ "edge": "top", "edgeGap": 10.0 })));
+        assert_eq!((top.edge, top.gap), (Edge::Top, 10.0));
+        let full = saved_layout(Some(&serde_json::json!({ "edgeGap": 10.0, "dockWidth": "full" })));
+        assert_eq!((full.edge, full.gap), (Edge::Bottom, 0.0));
     }
 
     #[test]

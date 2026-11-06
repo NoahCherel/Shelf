@@ -16,6 +16,8 @@ uniform float tintAmount;
 uniform float rimStrength;
 uniform vec4 tiles[16];
 uniform int tileCount;
+// 1 for a full-width bar: its ends run into the screen's edges, so they neither bend nor shine.
+uniform float openEnds;
 
 float box(vec2 q, vec2 b, float r) {
   vec2 d = abs(q) - b + r;
@@ -51,7 +53,8 @@ float underTile(vec2 px) {
 void main() {
   vec2 px = vec2(uv.x, 1.0 - uv.y) * size;
   vec2 c = size * 0.5;
-  float d = box(px - c, c, radius);
+  vec2 b = c + vec2(openEnds * size.x, 0.0);
+  float d = box(px - c, b, radius);
   if (d > 0.5) {
     gl_FragColor = vec4(0.0);
     return;
@@ -61,8 +64,8 @@ void main() {
   float k = clamp(1.0 + d / lensBand, 0.0, 1.0);
   float e = 1.0;
   vec2 n = normalize(vec2(
-    box(px - c + vec2(e, 0.0), c, radius) - box(px - c - vec2(e, 0.0), c, radius),
-    box(px - c + vec2(0.0, e), c, radius) - box(px - c - vec2(0.0, e), c, radius)
+    box(px - c + vec2(e, 0.0), b, radius) - box(px - c - vec2(e, 0.0), b, radius),
+    box(px - c + vec2(0.0, e), b, radius) - box(px - c - vec2(0.0, e), b, radius)
   ) + 1e-5);
   vec2 bent = px - n * k * k * k * lensStrength;
 

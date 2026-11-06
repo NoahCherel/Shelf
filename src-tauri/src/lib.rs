@@ -119,6 +119,8 @@ pub fn run() {
             net::http_get,
             events::shell_status,
             shell::dock::set_dock_width,
+            shell::dock::dock_drag,
+            shell::dock::dock_drag_end,
             shell::card::open_card,
             shell::card::fit_card,
             shell::card::card_current,

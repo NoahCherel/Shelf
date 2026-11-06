@@ -19,3 +19,11 @@ export function setAccent(color: string | null): void {
   if (color) root().style.setProperty("--accent", color);
   else root().style.removeProperty("--accent");
 }
+
+export function setEdge(edge: "bottom" | "top"): void {
+  root().dataset.edge = edge;
+}
+
+export function setSpacing(hundredths: number): void {
+  root().style.setProperty("--gap", `calc(var(--T) * ${hundredths / 100})`);
+}

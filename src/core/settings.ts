@@ -14,8 +14,13 @@ export interface SettingsData {
   lockDock: boolean;
   /** Over other windows, reserving nothing. Otherwise maximized windows stop above the dock. */
   floatOverWindows: boolean;
-  /** Logical px between the dock and the bottom of the screen. */
+  /** Logical px between the dock and its edge of the screen. */
   edgeGap: number;
+  edge: "bottom" | "top";
+  /** A pill as wide as its contents, or the whole edge like the taskbar. */
+  dockWidth: "pill" | "full";
+  /** The space between widgets, in hundredths of a tile's height. */
+  spacing: number;
   weather: { city: string };
   github: { user: string };
 }
@@ -23,6 +28,7 @@ export interface SettingsData {
 export const SIZE_MIN = 40;
 export const SIZE_MAX = 62;
 export const GAP_MAX = 24;
+export const SPACING_MAX = 24;
 
 export function defaults(): SettingsData {
   return {
@@ -36,6 +42,9 @@ export function defaults(): SettingsData {
     lockDock: false,
     floatOverWindows: true,
     edgeGap: 6,
+    edge: "bottom",
+    dockWidth: "pill",
+    spacing: 4,
     weather: { city: "" },
     github: { user: "" },
   };
@@ -63,6 +72,9 @@ export function sanitize(raw: unknown): SettingsData {
     lockDock: bool(raw.lockDock, d.lockDock),
     floatOverWindows: bool(raw.floatOverWindows, d.floatOverWindows),
     edgeGap: typeof raw.edgeGap === "number" && Number.isFinite(raw.edgeGap) ? Math.min(GAP_MAX, Math.max(0, raw.edgeGap)) : d.edgeGap,
+    edge: oneOf(raw.edge, ["bottom", "top"] as const, d.edge),
+    dockWidth: oneOf(raw.dockWidth, ["pill", "full"] as const, d.dockWidth),
+    spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
     weather: { city: text(weather.city, d.weather.city) },
     github: { user: text(github.user, d.github.user) },
   };

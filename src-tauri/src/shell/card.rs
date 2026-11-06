@@ -20,9 +20,15 @@ fn limit_height(height: f64, room: f64) -> f64 {
     height.min(MAX_HEIGHT).min(room)
 }
 
-/// Logical px between the top of the screen and the dock, less a margin at each end.
-fn room_above(dock: Rect, monitor: Rect, margin: i32, scale: f64) -> f64 {
-    (dock.y - monitor.y - 2 * margin) as f64 / scale
+/// A dock in the top half of the screen opens things below it.
+fn dock_is_at_top(dock: Rect, monitor: Rect) -> bool {
+    dock.y + dock.h / 2 < monitor.y + monitor.h / 2
+}
+
+/// Logical px between the dock and the far edge of the screen, less a margin at each end.
+fn room_for_card(dock: Rect, monitor: Rect, margin: i32, scale: f64) -> f64 {
+    let room = if dock_is_at_top(dock, monitor) { monitor.y + monitor.h - (dock.y + dock.h) } else { dock.y - monitor.y };
+    (room - 2 * margin) as f64 / scale
 }
 
 #[derive(Clone, Copy, Default)]
@@ -31,13 +37,17 @@ pub struct Span {
     pub w: i32,
 }
 
-/// Centred on the tile, above the dock, kept on the monitor. On a screen too
-/// small for it, the card gets shorter rather than rising off the top.
+/// Centred on the tile, on the screen side of the dock, kept on the monitor. On a
+/// screen too small for it, the card gets shorter rather than running off the edge.
 pub fn card_rect(tile: Span, dock: Rect, monitor: Rect, size: (i32, i32), margin: i32) -> Rect {
     let (w, h) = size;
     let min_x = monitor.x + margin;
     let max_x = (monitor.x + monitor.w - w - margin).max(min_x);
     let x = (tile.x + tile.w / 2 - w / 2).clamp(min_x, max_x);
+    if dock_is_at_top(dock, monitor) {
+        let top = dock.y + dock.h + margin;
+        return Rect { x, y: top, w, h: h.min(monitor.y + monitor.h - margin - top) };
+    }
     let bottom = dock.y - margin;
     let top = (bottom - h).max(monitor.y + margin);
     Rect { x, y: top, w, h: bottom - top }
@@ -130,7 +140,7 @@ fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
         let tile = *TILE.lock().unwrap_or_else(|e| e.into_inner());
         let margin = (MARGIN * scale).round() as i32;
-        let height = limit_height(logical.1, room_above(dock_rect, monitor, margin, scale));
+        let height = limit_height(logical.1, room_for_card(dock_rect, monitor, margin, scale));
         let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
         let r = card_rect(tile, dock_rect, monitor, wanted, margin);
         card.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
@@ -150,7 +160,7 @@ pub fn card_room(app: AppHandle) -> Result<f64, String> {
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
         let margin = (MARGIN * scale).round() as i32;
-        Ok(limit_height(f64::MAX, room_above(dock_rect, monitor, margin, scale)))
+        Ok(limit_height(f64::MAX, room_for_card(dock_rect, monitor, margin, scale)))
     };
     run().map_err(|e| e.to_string())
 }
@@ -266,6 +276,34 @@ mod tests {
         assert_eq!(r.h, 528 - 8 - 8, "height reduced, still above the dock");
     }
 
+    const TOP_DOCK: Rect = Rect { x: 460, y: 8, w: 1000, h: 72 };
+
+    #[test]
+    fn with_the_dock_at_the_top_the_card_opens_below_it() {
+        let r = card_rect(Span { x: 900, w: 100 }, TOP_DOCK, MONITOR, (300, 400), 8);
+        assert_eq!(r, Rect { x: 800, y: 88, w: 300, h: 400 });
+    }
+
+    #[test]
+    fn below_a_top_dock_the_card_never_passes_the_bottom_of_the_screen() {
+        let r = card_rect(Span { x: 900, w: 100 }, TOP_DOCK, MONITOR, (300, 5000), 8);
+        assert_eq!((r.y, r.y + r.h), (88, 1080 - 8));
+    }
+
+    #[test]
+    fn below_a_top_dock_the_room_is_what_lies_under_it() {
+        assert_eq!(room_for_card(TOP_DOCK, MONITOR, 8, 1.0), 984.0);
+        assert_eq!(room_for_card(TOP_DOCK, MONITOR, 8, 2.0), 492.0);
+    }
+
+    #[test]
+    fn a_top_dock_is_recognised_on_a_monitor_with_an_offset_origin() {
+        let m = Rect { x: 0, y: -1080, w: 1920, h: 1080 };
+        let dock = Rect { x: 460, y: -1072, w: 1000, h: 72 };
+        let r = card_rect(Span { x: 900, w: 100 }, dock, m, (300, 400), 8);
+        assert_eq!(r.y, -1072 + 72 + 8);
+    }
+
     #[test]
     fn clicking_the_open_card_tile_closes_it() {
         let mut s = CardState::default();
@@ -326,8 +364,8 @@ mod tests {
     fn the_room_is_what_lies_above_the_dock() {
         let monitor = Rect { x: 0, y: 0, w: 1366, h: 768 };
         let dock = Rect { x: 200, y: 700, w: 900, h: 68 };
-        assert_eq!(room_above(dock, monitor, 8, 1.0), 684.0);
-        assert_eq!(room_above(dock, monitor, 8, 2.0), 342.0);
+        assert_eq!(room_for_card(dock, monitor, 8, 1.0), 684.0);
+        assert_eq!(room_for_card(dock, monitor, 8, 2.0), 342.0);
     }
 
     #[test]

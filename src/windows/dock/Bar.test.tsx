@@ -1,6 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/react";
-import { DockBar, reportSize } from "./Bar";
+import { DockBar, edgeAt, reportSize } from "./Bar";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
 
@@ -51,8 +51,8 @@ it("reports its size with the gap and whether it floats", async () => {
   const { invoke } = await import("../../core/tauri");
   const el = document.createElement("div");
   el.getBoundingClientRect = () => ({ width: 700.4, height: 54.5 }) as DOMRect;
-  reportSize(el, 6, true);
-  expect(invoke).toHaveBeenCalledWith("set_dock_width", { width: 700.4, bar: 55, gap: 6, float: true });
+  reportSize(el, 6, true, "top");
+  expect(invoke).toHaveBeenCalledWith("set_dock_width", { width: 700.4, bar: 55, gap: 6, float: true, edge: "top" });
 });
 
 it("skips an id with no widget instead of breaking", () => {
@@ -83,4 +83,11 @@ it("opens a card over its tile on click, only for widgets that have one", async 
   expect(invoke).not.toHaveBeenCalledWith("open_card", expect.anything());
   fireEvent.click(clock);
   expect(invoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "clock" }));
+});
+
+it("the dock goes to whichever half of the screen it's let go in", () => {
+  expect(edgeAt(100, 864)).toBe("top");
+  expect(edgeAt(431, 864)).toBe("top");
+  expect(edgeAt(432, 864)).toBe("bottom");
+  expect(edgeAt(860, 864)).toBe("bottom");
 });

@@ -1,4 +1,4 @@
-import { setAccent, setDockSize, setStyle, setTheme } from "../design/theme";
+import { setAccent, setDockSize, setEdge, setSpacing, setStyle, setTheme } from "../design/theme";
 import { useSettings, type SettingsData } from "./settings";
 
 const prefersDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
@@ -8,6 +8,8 @@ function apply(s: SettingsData, fixedT?: number) {
   setTheme(s.theme === "auto" ? (prefersDark() ? "dark" : "light") : s.theme);
   setAccent(s.accent);
   setDockSize(fixedT ?? s.size);
+  setEdge(s.edge);
+  setSpacing(s.spacing);
 }
 
 /** Keeps this window's design tokens in line with the settings. */

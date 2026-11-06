@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { byId } from "../../core/registry";
 import { useLayout } from "../../core/layout";
-import { useSettings } from "../../core/settings";
+import { useSettings, type SettingsData } from "../../core/settings";
 import { usePicker, useShell } from "../../core/shell";
 import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
@@ -19,10 +19,45 @@ const MENU_HEIGHT = 190;
 /** A press that moves less than this is a click. */
 const DRAG_DISTANCE = 6;
 
+type Edge = SettingsData["edge"];
+
 /** Tells Rust how big the bar is and how it should sit on the screen. */
-export function reportSize(el: HTMLElement, gap: number, float: boolean): void {
+export function reportSize(el: HTMLElement, gap: number, float: boolean, edge: Edge): void {
   const { width, height } = el.getBoundingClientRect();
-  invoke("set_dock_width", { width, bar: Math.ceil(height), gap, float }).catch(() => {});
+  invoke("set_dock_width", { width, bar: Math.ceil(height), gap, float, edge }).catch(() => {});
+}
+
+export function edgeAt(screenY: number, screenHeight: number): Edge {
+  return screenY < screenHeight / 2 ? "top" : "bottom";
+}
+
+/** Dragging by an empty spot moves the dock, and letting go settles it on the nearer edge. */
+function useEdgeDrag() {
+  const start = useRef<number | null>(null);
+  const moved = useRef(false);
+  return {
+    onPointerDown(e: PointerEvent<HTMLDivElement>) {
+      const { lockDock } = useSettings.getState();
+      if (e.button !== 0 || e.target !== e.currentTarget || (lockDock && !usePicker.getState().open)) return;
+      start.current = e.screenY;
+      moved.current = false;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    onPointerMove(e: PointerEvent<HTMLDivElement>) {
+      if (start.current === null) return;
+      const offset = e.screenY - start.current;
+      if (!moved.current && Math.abs(offset) < DRAG_DISTANCE) return;
+      moved.current = true;
+      invoke("dock_drag", { offset }).catch(() => {});
+    },
+    onPointerUp(e: PointerEvent<HTMLDivElement>) {
+      if (start.current === null) return;
+      start.current = null;
+      if (!moved.current) return;
+      useSettings.getState().update({ edge: edgeAt(e.screenY, window.screen.height) });
+      invoke("dock_drag_end").catch(() => {});
+    },
+  };
 }
 
 export function handleDragEnd({ active, over }: { active: { id: unknown }; over: { id: unknown } | null }): void {
@@ -106,7 +141,11 @@ export function DockBar() {
   const [glassFailed, setGlassFailed] = useState(false);
   const onGlassUnavailable = useCallback(() => setGlassFailed(true), []);
   const glass = style === "liquid" && !fullscreen && !locked && !glassFailed;
-  const edgeGap = useSettings((s) => s.edgeGap);
+  const full = useSettings((s) => s.dockWidth) === "full";
+  // Like the taskbar, a full-width dock sits right on the edge.
+  const edgeGap = useSettings((s) => (s.dockWidth === "full" ? 0 : s.edgeGap));
+  const edge = useSettings((s) => s.edge);
+  const edgeDrag = useEdgeDrag();
   const floatOverWindows = useSettings((s) => s.floatOverWindows);
   const bar = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
@@ -116,10 +155,10 @@ export function DockBar() {
   useEffect(() => {
     const el = bar.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => reportSize(el, edgeGap, floatOverWindows));
+    const observer = new ResizeObserver(() => reportSize(el, edgeGap, floatOverWindows, edge));
     observer.observe(el);
     return () => observer.disconnect();
-  }, [edgeGap, floatOverWindows]);
+  }, [edgeGap, floatOverWindows, edge]);
 
   return (
     // Limited by the screen, not the window, which is always only as wide as the bar.
@@ -127,9 +166,11 @@ export function DockBar() {
       className="dock"
       data-testid="bar"
       data-glass={glass}
+      data-width={full ? "full" : "pill"}
       ref={bar}
-      style={{ maxWidth: window.screen.width }}
+      style={{ maxWidth: window.screen.width, width: full ? window.screen.width : undefined }}
       onContextMenu={openMenu}
+      {...edgeDrag}
     >
       <GlassLayer active={glass} onUnavailable={onGlassUnavailable} />
       {!fullscreen && (

@@ -76,3 +76,15 @@ it("load applies what's saved", async () => {
   expect(useSettings.getState().size).toBe(44);
   expect(useSettings.getState().github.user).toBe("octocat");
 });
+
+it("the dock starts as it always has: a pill at the bottom, spaced as before", () => {
+  const d = defaults();
+  expect([d.edge, d.dockWidth, d.spacing]).toEqual(["bottom", "pill", 4]);
+});
+
+it("position settings fall back on their own, and spacing stays within its slider", () => {
+  const s = sanitize({ edge: "left", dockWidth: "huge", spacing: 99 });
+  expect([s.edge, s.dockWidth, s.spacing]).toEqual(["bottom", "pill", 24]);
+  const t = sanitize({ edge: "top", dockWidth: "full", spacing: -1 });
+  expect([t.edge, t.dockWidth, t.spacing]).toEqual(["top", "full", 0]);
+});

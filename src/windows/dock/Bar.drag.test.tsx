@@ -97,3 +97,51 @@ describe("right-click", () => {
     expect(dockMenuItems().find((i) => i.label === "Lock dock")?.checked).toBe(true);
   });
 });
+
+describe("moving the dock to another edge", () => {
+  const box = { width: 400, height: 55, left: 0, top: 0, right: 400, bottom: 55, x: 0, y: 0, toJSON: () => ({}) };
+  const grab = (bar: HTMLElement, from: number, to: number) => {
+    bar.setPointerCapture = vi.fn();
+    bar.getBoundingClientRect = () => box;
+    fireEvent.pointerDown(bar, { button: 0, pointerId: 1, screenY: from });
+    fireEvent.pointerMove(bar, { pointerId: 1, screenY: to });
+    fireEvent.pointerUp(bar, { pointerId: 1, screenY: to });
+  };
+
+  it("follows the pointer from an empty spot, and stays at the edge it's let go near", () => {
+    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+    render(<DockBar />);
+    grab(screen.getByTestId("bar"), 840, 100);
+    expect(invoke).toHaveBeenCalledWith("dock_drag", { offset: -740 });
+    expect(invoke).toHaveBeenCalledWith("dock_drag_end");
+    expect(useSettings.getState().edge).toBe("top");
+  });
+
+  it("a short press doesn't move it", () => {
+    render(<DockBar />);
+    grab(screen.getByTestId("bar"), 840, 838);
+    expect(invoke).not.toHaveBeenCalledWith("dock_drag", expect.anything());
+    expect(useSettings.getState().edge).toBe("bottom");
+  });
+
+  it("a locked dock stays put, until the picker is open", () => {
+    useSettings.setState({ lockDock: true });
+    render(<DockBar />);
+    grab(screen.getByTestId("bar"), 840, 100);
+    expect(invoke).not.toHaveBeenCalledWith("dock_drag", expect.anything());
+    expect(useSettings.getState().edge).toBe("bottom");
+    act(() => usePicker.setState({ open: true }));
+    grab(screen.getByTestId("bar"), 840, 100);
+    expect(useSettings.getState().edge).toBe("top");
+  });
+
+  it("grabbing a widget moves the widget, not the dock", () => {
+    render(<DockBar />);
+    const tile = screen.getByText("clock");
+    tile.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(tile, { button: 0, pointerId: 1, screenY: 840 });
+    fireEvent.pointerMove(tile, { pointerId: 1, screenY: 100 });
+    fireEvent.pointerUp(tile, { pointerId: 1, screenY: 100 });
+    expect(invoke).not.toHaveBeenCalledWith("dock_drag", expect.anything());
+  });
+});

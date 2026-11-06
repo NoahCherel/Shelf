@@ -98,13 +98,36 @@ export const SCHEMA: PageDef[] = [
         }),
       ]),
       section("Position", [
+        choice("edge", {
+          label: "Screen edge",
+          tip: "Which edge the dock sits on. You can also drag it there by an empty spot.",
+          options: [
+            { value: "bottom", label: "Bottom" },
+            { value: "top", label: "Top" },
+          ],
+        }),
+        choice("dockWidth", {
+          label: "Width",
+          tip: "Pill fits its contents. Full width spans the whole edge, like the taskbar.",
+          options: [
+            { value: "pill", label: "Pill" },
+            { value: "full", label: "Full width" },
+          ],
+        }),
         toggle("floatOverWindows", {
           label: "Float over windows",
-          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop above it.",
+          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop short of it.",
         }),
         slider("edgeGap", {
           label: "Distance from edge",
-          tip: "The space between the dock and the bottom of the screen.",
+          tip: "The space between the dock and its edge of the screen. A full-width dock sits right on the edge.",
+          min: 0,
+          max: 24,
+          marks: {},
+        }),
+        slider("spacing", {
+          label: "Spacing",
+          tip: "The space between widgets.",
           min: 0,
           max: 24,
           marks: {},

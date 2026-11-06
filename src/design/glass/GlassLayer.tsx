@@ -85,7 +85,8 @@ export function createPainter(canvas: HTMLCanvasElement): Painter | null {
       gl.uniform1f(uniform("scale"), scale);
       const style = getComputedStyle(document.documentElement);
       const T = parseFloat(style.getPropertyValue("--T")) || 50;
-      gl.uniform1f(uniform("radius"), T * 0.28 * scale);
+      gl.uniform1f(uniform("openEnds"), parent.dataset.width === "full" ? 1 : 0);
+      gl.uniform1f(uniform("radius"), (parseFloat(getComputedStyle(parent).borderTopLeftRadius) || 0) * scale);
       gl.uniform1f(uniform("lensBand"), LOOK.lensBand * scale);
       gl.uniform1f(uniform("lensStrength"), LOOK.lensStrength * scale);
       gl.uniform1f(uniform("softUnderTiles"), LOOK.softUnderTiles * scale);
