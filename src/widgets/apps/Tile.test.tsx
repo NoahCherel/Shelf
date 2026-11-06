@@ -2,6 +2,7 @@ import { afterEach, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
+import { useSettings } from "../../core/settings";
 import apps from "./index";
 import { AppsTile, dragOutcome, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
 
@@ -190,17 +191,39 @@ describe("several windows and previews", () => {
     expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "b" }));
   });
 
-  it("a pinned app that isn't open has no preview and keeps its name", () => {
+  it("a pinned app that isn't open shows its name after the same pause, in Windows' bubble", () => {
+    render(<AppsTile data={[app("a")]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(349));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_name", expect.anything());
+    act(() => vi.advanceTimersByTime(1));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_name", expect.objectContaining({ key: "a" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+  });
+
+  it("apps have no browser tooltip, as the bubble shows their name", () => {
+    render(<AppsTile data={[app("a"), app("b", true)]} status="ready" />);
+    expect(button("a").getAttribute("title")).toBeNull();
+    expect(button("b").getAttribute("title")).toBeNull();
+  });
+
+  it("with previews turned off, an open app shows its name instead", () => {
+    useSettings.setState({ previews: false });
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(400));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_name", expect.objectContaining({ key: "a" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+    useSettings.setState({ previews: true });
+  });
+
+  it("with names turned off, a closed app shows nothing on hover", () => {
+    useSettings.setState({ hoverNames: false });
     render(<AppsTile data={[app("a")]} status="ready" />);
     fireEvent.mouseEnter(button("a"));
     act(() => vi.advanceTimersByTime(1000));
-    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
-    expect(button("a").getAttribute("title")).toBe("a");
-  });
-
-  it("an open app has previews instead of a tooltip", () => {
-    render(<AppsTile data={[app("a", true)]} status="ready" />);
-    expect(button("a").getAttribute("title")).toBeNull();
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_name", expect.anything());
+    useSettings.setState({ hoverNames: true });
   });
 
   it("pressing an app hides the previews and cancels a pending one", () => {

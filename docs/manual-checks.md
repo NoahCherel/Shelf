@@ -164,6 +164,14 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Dropping a program:** a .exe or a shortcut dragged from the desktop or File Explorer onto the dock pins it. Dragging from Start may give nothing to pin.
 - [ ] **Widgets:** a widget added from the picker opens up, and one removed folds away where it was.
 
+## Jump lists and names
+
+- [ ] **Jump lists:** right-clicking Firefox or Edge shows its frequent sites or recent files and its tasks above its own items, and choosing one does what it says.
+- [ ] **File Explorer:** its menu shows quick access, and a folder opens.
+- [ ] **No list:** Discord, Orca and others that publish none keep the usual menu.
+- [ ] **Names:** resting on an app that isn't open shows its name in a bubble, and on an open one with previews turned off.
+- [ ] **Switches:** Names on hover and Window previews, in Settings, turn each off.
+
 ## Auto-hide
 
 - [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.

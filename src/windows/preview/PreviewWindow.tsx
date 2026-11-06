@@ -162,6 +162,8 @@ export function PreviewWindow() {
   }, []);
 
   if (!shown) return null;
+  // No windows: the app's name, in Windows' tooltip bubble.
+  if (shown.windows.length === 0) return <div className="pv-name">{shown.name}</div>;
 
   const closed = (hwnd: number) => {
     const windows = shown.windows.filter((w) => w.hwnd !== hwnd);

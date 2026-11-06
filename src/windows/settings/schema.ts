@@ -159,6 +159,10 @@ export const SCHEMA: PageDef[] = [
           marks: {},
         }),
       ]),
+      section("Apps", [
+        toggle("hoverNames", { label: "Names on hover", tip: "Shows an app's name above its icon when the pointer rests on it." }),
+        toggle("previews", { label: "Window previews", tip: "Shows pictures of an open app's windows when the pointer rests on it. Off, its name shows instead." }),
+      ]),
       section("Clock", [
         toggle("hour24", { label: "24-hour time", tip: "Shows 17:30 rather than 5:30 PM on every clock." }),
         toggle("seconds", { label: "Seconds", tip: "Shows seconds on the Clock widget." }),

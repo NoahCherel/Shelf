@@ -30,6 +30,10 @@ const PADDING: f64 = 8.0;
 const SCREEN_MARGIN: f64 = 8.0;
 /// Padding, the title row and the picture, as in preview.css.
 const HEIGHT: f64 = 170.0;
+/// The name bubble shown over an app with no previews to show.
+const NAME_HEIGHT: f64 = 32.0;
+pub const NAME_MIN_WIDTH: f64 = 48.0;
+pub const NAME_MAX_WIDTH: f64 = 320.0;
 const DOCK_GAP: f64 = 8.0;
 /// Long enough to cross from the icon to the strip, even slowly.
 const LEAVE_GRACE: Duration = Duration::from_millis(400);
@@ -260,6 +264,61 @@ fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
 }
 
 /// Clicks on the strip mustn't take focus from your app, as with the dock.
+/// About as wide as the name in Segoe UI at 12 px, with room either side.
+fn name_width(name: &str) -> f64 {
+    (name.chars().count() as f64 * 7.2 + 28.0).clamp(NAME_MIN_WIDTH, NAME_MAX_WIDTH)
+}
+
+/// The app's name in a bubble above its icon, as Windows shows for an app with no window open, or
+/// for any app when previews are turned off. It uses the previews' window, shown with no windows.
+#[tauri::command(async)]
+pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    let opening = HOVER.keep();
+    if !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
+    let shown_as = format!("name:{key}");
+    if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some(shown_as.as_str()) {
+        return Ok(());
+    }
+    let Some(entry) = current()?.into_iter().find(|e| e.key == key) else {
+        return hide(&app);
+    };
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let window = preview_window(&app)?;
+    let run = || -> tauri::Result<Option<(Rect, Rect)>> {
+        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
+        let scale = m.scale_factor();
+        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
+        let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
+        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
+        let r = card_rect(
+            tile,
+            dock_rect,
+            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
+            ((name_width(&entry.name) * scale).round() as i32, (NAME_HEIGHT * scale).round() as i32),
+            (DOCK_GAP * scale).round() as i32,
+        );
+        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
+        window.set_position(PhysicalPosition::new(r.x, r.y))?;
+        Ok(Some((dock_rect, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
+    };
+    let Some((dock_rect, strip)) = run().map_err(|e| e.to_string())? else { return Ok(()) };
+    if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
+    let _ = set_peek(&app, None);
+    clear_pictures();
+    ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(shown_as);
+    let shown = Shown { key, name: entry.name, slot_width: 0.0, windows: Vec::new() };
+    app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
+    crate::diag::note("name shown");
+    window.show().map_err(|e| e.to_string())?;
+    watch_pointer(app.clone(), dock_rect, strip);
+    Ok(())
+}
+
 /// Previews open right where an app's menu does, so none show while a menu or card is open, as on
 /// Windows. A right-click just as they were being prepared used to put them over the menu.
 fn may_show(card_open: bool) -> bool {
@@ -541,6 +600,13 @@ mod tests {
         assert!(pointer_within((600, 150), dock, strip));
         assert!(pointer_within((600, 40), dock, strip));
         assert!(!pointer_within((600, 600), dock, strip));
+    }
+
+    #[test]
+    fn the_name_bubble_is_as_wide_as_the_name_within_limits() {
+        assert!(name_width("Discord") < name_width("Explorateur de fichiers"));
+        assert_eq!(name_width(""), NAME_MIN_WIDTH);
+        assert_eq!(name_width(&"x".repeat(500)), NAME_MAX_WIDTH);
     }
 
     #[test]

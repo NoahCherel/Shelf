@@ -144,6 +144,7 @@ pub fn run() {
             system::notifications::notifications_clear,
             system::notifications::notification_open,
             apps::previews::preview_show,
+            apps::previews::preview_name,
             apps::previews::preview_slots,
             apps::previews::preview_peek,
             apps::previews::preview_keep,

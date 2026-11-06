@@ -30,6 +30,10 @@ export interface SettingsData {
   autoHide: boolean;
   /** With auto-hide: stays up while the desktop is in front. */
   showOnDesktop: boolean;
+  /** An app's name in a bubble when hovering it. */
+  hoverNames: boolean;
+  /** Pictures of an open app's windows when hovering it. */
+  previews: boolean;
   /** Logical px a pill was narrowed to by its ends, scrolling for the rest; null for its natural width. */
   narrowWidth: number | null;
   weather: { city: string };
@@ -61,6 +65,8 @@ export function defaults(): SettingsData {
     autoHide: false,
     showOnDesktop: false,
     narrowWidth: null,
+    hoverNames: true,
+    previews: true,
     weather: { city: "" },
     github: { user: "" },
   };
@@ -95,6 +101,8 @@ export function sanitize(raw: unknown): SettingsData {
     spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
     autoHide: bool(raw.autoHide, d.autoHide),
     showOnDesktop: bool(raw.showOnDesktop, d.showOnDesktop),
+    hoverNames: bool(raw.hoverNames, d.hoverNames),
+    previews: bool(raw.previews, d.previews),
     narrowWidth: typeof raw.narrowWidth === "number" && Number.isFinite(raw.narrowWidth) ? Math.max(SIZE_MIN, raw.narrowWidth) : null,
     weather: { city: text(weather.city, d.weather.city) },
     github: { user: text(github.user, d.github.user) },

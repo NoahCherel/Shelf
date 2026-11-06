@@ -163,11 +163,15 @@ function useAppPreviews(preview?: boolean) {
     };
   }, [preview]);
   const enter = (e: MouseEvent<HTMLElement>, entry: AppEntry) => {
-    if (preview || entry.windows.length === 0) return;
+    if (preview) return;
+    const { hoverNames, previews: showPreviews } = useSettings.getState();
+    // An open app shows its windows; one that isn't, or with previews off, shows its name.
+    const command = showPreviews && entry.windows.length > 0 ? "preview_show" : hoverNames ? "preview_name" : null;
+    if (!command) return;
     const r = e.currentTarget.getBoundingClientRect();
     const show = () => {
       showing.current = true;
-      invoke("preview_show", { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
+      invoke(command, { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
     };
     clearTimeout(timer.current);
     if (showing.current) show();
@@ -356,7 +360,6 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
           style={{ transform: sortable.transform ? `translate3d(${sortable.transform.x}px, 0, 0)` : undefined, transition: sortable.transition }}
           className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}${pulledOff === entry.key ? " app--off" : ""}`}
           aria-label={entry.name}
-          title={entry.windows.length > 0 ? undefined : entry.name}
           onMouseEnter={(e) => previews.enter(e, entry)}
           onMouseLeave={previews.leave}
           onMouseDown={() => previews.press(entry)}
