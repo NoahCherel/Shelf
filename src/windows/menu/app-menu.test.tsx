@@ -84,3 +84,38 @@ it("an app that has gone shows nothing rather than a broken menu", async () => {
   expect(screen.queryAllByRole("menuitem")).toEqual([]);
   expect(mockInvoke).toHaveBeenCalledWith("close_card");
 });
+
+describe("jump lists", () => {
+  const WITH_LISTS = {
+    sections: [{ title: "Tâches", items: [{ id: "jump:0123456789abcdef", label: "Nouvelle fenêtre privée" }] }],
+    items: MENU.items,
+  };
+
+  beforeEach(() => {
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "apps_menu") return WITH_LISTS;
+      if (cmd === "apps_icon") return "data:image/png;base64,AAAA";
+      return null;
+    });
+  });
+
+  it("show above the app's own items, under Windows' section name", async () => {
+    await openMenu();
+    expect(screen.getByText("Tâches")).toBeTruthy();
+    const labels = screen.getAllByRole("menuitem").map((e) => e.textContent);
+    expect(labels).toEqual(["Nouvelle fenêtre privée", "Discord", "Épingler à la barre des tâches", "Fermer la fenêtre"]);
+  });
+
+  it("a line sends only its fingerprint, and Rust does the rest", async () => {
+    await openMenu();
+    fireEvent.click(row("Nouvelle fenêtre privée"));
+    expect(mockInvoke).toHaveBeenCalledWith("apps_menu_choose", { key: "discord", id: "jump:0123456789abcdef" });
+  });
+
+  it("an app with no jump list shows only its own items", async () => {
+    mockInvoke.mockImplementation(async (cmd) => (cmd === "apps_menu" ? MENU : null));
+    await openMenu();
+    expect(screen.queryByText("Tâches")).toBeNull();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+  });
+});

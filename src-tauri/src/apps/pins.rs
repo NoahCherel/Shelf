@@ -180,6 +180,11 @@ pub fn pin_dropped(path: &str) -> Option<serde_json::Value> {
     Some(changed(|o| o.pin_program(path, opens.as_deref())))
 }
 
+/// What a shortcut opens. Call on a thread with COM initialised.
+pub fn link_target(path: &str) -> Option<String> {
+    read_link(Path::new(path))?.target
+}
+
 /// Only re-read when the folder changes.
 static CACHE: Mutex<Option<(SystemTime, Vec<Pin>)>> = Mutex::new(None);
 

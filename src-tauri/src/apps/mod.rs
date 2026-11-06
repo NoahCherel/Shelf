@@ -1,6 +1,7 @@
 //! The Apps widget's data: pins, open windows, icons, and the Start menu.
 
 mod icons;
+pub mod jumplist;
 pub mod menu;
 pub mod merge;
 mod pins;
@@ -160,18 +161,66 @@ pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
     });
 }
 
-/// What right-clicking this app offers, in Windows' language.
+fn looks_like_path(key: &str) -> bool {
+    key.contains('\\') || key.contains('/') || key.ends_with(".exe")
+}
+
+/// The jump lists Windows keeps for this app: File Explorer's quick access, a program's tasks, and the
+/// recent files of an app with an id of its own. Call on a COM thread.
+/// In Windows' order: the program's own categories, its recent files, then its tasks.
+fn jump_lists(entry: &AppEntry, lang: u16) -> Vec<(String, Vec<jumplist::Link>)> {
+    use jumplist::{section_title, Category, Kind};
+    let title = |kind| section_title(kind, lang).to_string();
+    if entry.key == "microsoft.windows.explorer" {
+        return vec![(title(Kind::QuickAccess), jumplist::quick_access())];
+    }
+    let program = entry.launch.as_deref().and_then(|launch| {
+        if launch.to_lowercase().ends_with(".lnk") {
+            pins::link_target(launch)
+        } else {
+            launch.to_lowercase().ends_with(".exe").then(|| launch.to_string())
+        }
+    });
+    let own = program.map(|exe| jumplist::lists(&exe)).unwrap_or_default();
+    let recent = if looks_like_path(&entry.key) { Vec::new() } else { jumplist::recent(&entry.key) };
+    let mut out: Vec<(String, Vec<jumplist::Link>)> = own
+        .iter()
+        .filter_map(|(c, links)| match c {
+            Category::Named(name) => Some((name.clone(), links.clone())),
+            Category::Tasks => None,
+        })
+        .collect();
+    out.push((title(Kind::Recent), recent));
+    out.extend(own.into_iter().filter(|(c, _)| *c == Category::Tasks).map(|(_, links)| (title(Kind::Tasks), links)));
+    out
+}
+
+/// What right-clicking this app offers, in Windows' language: its jump lists, then its own items.
 #[tauri::command(async)]
 pub fn apps_menu(key: String) -> Result<menu::AppMenu, String> {
     let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
-    Ok(menu::menu_for(&entry, unsafe { GetUserDefaultUILanguage() }))
+    let lang = unsafe { GetUserDefaultUILanguage() };
+    let for_lists = entry.clone();
+    let lists = on_com_thread(move || jump_lists(&for_lists, lang)).unwrap_or_default();
+    Ok(menu::menu_for(&entry, lang, lists))
 }
 
 #[tauri::command(async)]
 pub fn apps_menu_choose(app: AppHandle, key: String, id: String) -> Result<(), String> {
     crate::preview::guard()?;
-    let choice = menu::own_from(&id).ok_or("unknown choice")?;
     let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
+    // A jump list line runs only if it's still there when read again.
+    if let Some(print) = menu::jump_from(&id) {
+        let print = print.to_string();
+        return on_com_thread(move || {
+            let lists = jump_lists(&entry, unsafe { GetUserDefaultUILanguage() });
+            let links: Vec<jumplist::Link> = lists.into_iter().flat_map(|(_, links)| links).collect();
+            let link = jumplist::find(&links, &print).ok_or("that line is no longer in the list")?;
+            jumplist::open(link);
+            Ok::<(), String>(())
+        })?;
+    }
+    let choice = menu::own_from(&id).ok_or("unknown choice")?;
     match choice {
         Own::Open => {
             if let Some(path) = &entry.launch {

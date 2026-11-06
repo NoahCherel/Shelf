@@ -363,6 +363,28 @@ export const scenes: Scene[] = [
       }),
     },
   },
+  {
+    id: "card-app-menu-jumplist",
+    size: TALL,
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    card: "__appmenu:app-0",
+    anchor: '[aria-label="App 0"]',
+    backend: {
+      apps_menu: () => ({
+        sections: [
+          { title: "Fréquents", items: ["Le Monde", "GitHub", "Portail des cours d'une très longue école d'ingénieurs en informatique"].map((label, i) => ({ id: `jump:${String(i).padStart(16, "0")}`, label })) },
+          { title: "Tâches", items: ["Ouvrir un nouvel onglet", "Nouvelle fenêtre privée"].map((label, i) => ({ id: `jump:${String(i + 5).padStart(16, "0")}`, label })) },
+        ],
+        items: [
+          { id: "open", label: "Firefox" },
+          { id: "unpin", label: "Détacher de la barre des tâches" },
+          { id: "close", label: "Fermer la fenêtre" },
+        ],
+      }),
+    },
+  },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];

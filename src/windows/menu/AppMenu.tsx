@@ -2,12 +2,20 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { invoke } from "../../core/tauri";
 import "./app-menu.css";
 
+type Own = "open" | "pin" | "unpin" | "close" | "close-all";
+
 interface Row {
-  id: "open" | "pin" | "unpin" | "close" | "close-all";
+  /** One of the app's own items, or `jump:<fingerprint>` for a line of a jump list. */
+  id: Own | `jump:${string}`;
   label: string;
 }
 
-function Glyph({ id }: { id: Row["id"] }) {
+interface Section {
+  title: string;
+  items: Row[];
+}
+
+function Glyph({ id }: { id: Own }) {
   const lines = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" } as const;
   if (id === "close" || id === "close-all") {
     return (
@@ -43,11 +51,15 @@ function AppIcon({ appKey, name }: { appKey: string; name: string }) {
 /** What a Windows taskbar button offers, looking as it does there. Windows' language comes from Rust. */
 export function AppMenu({ appKey }: { appKey: string }) {
   const [rows, setRows] = useState<Row[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    invoke<{ items: Row[] }>("apps_menu", { key: appKey }).then(
-      (menu) => setRows(menu.items),
+    invoke<{ items: Row[]; sections?: Section[] }>("apps_menu", { key: appKey }).then(
+      (menu) => {
+        setSections(menu.sections ?? []);
+        setRows(menu.items);
+      },
       () => invoke("close_card").catch(() => {}),
     );
   }, [appKey]);
@@ -69,9 +81,22 @@ export function AppMenu({ appKey }: { appKey: string }) {
   if (rows.length === 0) return null;
   return (
     <div className="amenu" role="menu" ref={box} onKeyDown={move}>
+      {sections.map((section) => (
+        <div className="amenu__section" key={section.title} role="group" aria-label={section.title}>
+          <div className="amenu__title" aria-hidden="true">
+            {section.title}
+          </div>
+          {section.items.map((row) => (
+            <button key={row.id} type="button" role="menuitem" className="amenu__row amenu__row--jump" onClick={() => choose(row.id)}>
+              <span className="amenu__label">{row.label}</span>
+            </button>
+          ))}
+        </div>
+      ))}
+      {sections.length > 0 && <hr className="amenu__sep" />}
       {rows.map((row) => (
         <button key={row.id} type="button" role="menuitem" className="amenu__row" onClick={() => choose(row.id)}>
-          <span className="amenu__icon">{row.id === "open" ? <AppIcon appKey={appKey} name={row.label} /> : <Glyph id={row.id} />}</span>
+          <span className="amenu__icon">{row.id === "open" ? <AppIcon appKey={appKey} name={row.label} /> : <Glyph id={row.id as Own} />}</span>
           <span className="amenu__label">{row.label}</span>
         </button>
       ))}
