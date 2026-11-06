@@ -1,6 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { invoke } from "./tauri";
-import { DEFAULT_LAYOUT, useLayout } from "./layout";
+import { addSpace, DEFAULT_LAYOUT, removeSaved, useLayout } from "./layout";
 
 vi.mock("./tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 vi.mock("./registry", () => ({
@@ -96,5 +96,28 @@ describe("load", () => {
     mockInvoke.mockResolvedValue({ version: 2, ids: ["clock", "gone-widget"] });
     await useLayout.getState().load();
     expect(saved()).toEqual([]);
+  });
+});
+
+describe("flexible spaces", () => {
+  it("are kept from the saved layout, several of them, among the widgets", async () => {
+    mockInvoke.mockResolvedValueOnce({ version: 2, ids: ["space:1", "apps", "space:2", "clock", "space:x", "spacebar"] });
+    await useLayout.getState().load();
+    expect(useLayout.getState().ids).toEqual(["space:1", "apps", "space:2", "clock"]);
+  });
+
+  it("a new one goes last, with a number of its own, on top of what's saved", async () => {
+    useLayout.setState({ ids: [] });
+    mockInvoke.mockResolvedValueOnce({ version: 2, ids: ["apps", "space:3", "clock"] });
+    await addSpace();
+    expect(useLayout.getState().ids).toEqual(["apps", "space:3", "clock", "space:4"]);
+    expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["apps", "space:3", "clock", "space:4"] } });
+  });
+
+  it("removing one from another window starts from what's saved too", async () => {
+    useLayout.setState({ ids: [] });
+    mockInvoke.mockResolvedValueOnce({ version: 2, ids: ["apps", "space:1", "clock"] });
+    await removeSaved("space:1");
+    expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["apps", "clock"] } });
   });
 });

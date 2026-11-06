@@ -145,3 +145,39 @@ describe("moving the dock to another edge", () => {
     expect(invoke).not.toHaveBeenCalledWith("dock_drag", expect.anything());
   });
 });
+
+describe("flexible spaces", () => {
+  beforeEach(() => {
+    useLayout.setState({ ids: ["apps", "space:1", "clock"] });
+    useSettings.setState({ dockWidth: "full" });
+  });
+
+  it("sit between widgets, and only show while the picker is open, with a way to remove them", () => {
+    const { container } = render(<DockBar />);
+    const space = container.querySelector<HTMLElement>('[data-widget-id="space:1"]')!;
+    expect(space.classList.contains("slot--space")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Remove space" })).toBeNull();
+    act(() => usePicker.setState({ open: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove space" }));
+    expect(useLayout.getState().ids).toEqual(["apps", "clock"]);
+  });
+
+  it("outside the picker, a space is an empty spot to move the dock by", () => {
+    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+    const { container } = render(<DockBar />);
+    const space = container.querySelector<HTMLElement>('[data-widget-id="space:1"]')!;
+    space.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(space, { button: 0, pointerId: 1, screenY: 840 });
+    fireEvent.pointerMove(space, { pointerId: 1, screenY: 100 });
+    fireEvent.pointerUp(space, { pointerId: 1, screenY: 100 });
+    expect(useSettings.getState().edge).toBe("top");
+  });
+
+  it("the dock's menu offers one at full width, and a space's own menu removes it", () => {
+    expect(dockMenuItems().map((i) => i.label)).toContain("Add flexible space");
+    act(() => useSettings.setState({ dockWidth: "pill" }));
+    expect(dockMenuItems().map((i) => i.label)).not.toContain("Add flexible space");
+    expect(dockMenuItems([], "space:1")[0].label).toBe("Remove space");
+    expect(dockMenuItems([], "clock")[0].label).toBe("Widgets…");
+  });
+});

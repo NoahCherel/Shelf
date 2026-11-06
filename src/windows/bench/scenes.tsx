@@ -63,6 +63,22 @@ export const scenes: Scene[] = [
       },
     ],
   },
+  {
+    id: "dock-full-spaces",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: ["apps", "space:1", "claude-plan-usage", "github-activity", "space:2", "system-status", "clock-and-weather"],
+    settings: { dockWidth: "full" },
+    measure: [
+      { name: "the apps start at the left end", expect: `document.querySelector('[data-widget-id="apps"]').getBoundingClientRect().left < 10` },
+      { name: "the clock ends at the right end", expect: `innerWidth - document.querySelector('[data-widget-id="clock-and-weather"]').getBoundingClientRect().right < 10` },
+      {
+        name: "the two spaces share the room evenly",
+        expect: `(() => { const [a, b] = [...document.querySelectorAll(".slot--space")].map((e) => e.getBoundingClientRect().width); return a > 100 && Math.abs(a - b) < 2; })()`,
+      },
+    ],
+  },
   { id: "dock-full-black", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK, settings: { dockWidth: "full", style: "black" } },
   { id: "dock-spaced", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { spacing: 24 } },
   { id: "dock-light", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK },

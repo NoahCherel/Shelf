@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent, type Pointer
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { byId } from "../../core/registry";
-import { useLayout } from "../../core/layout";
+import { isSpace, useLayout } from "../../core/layout";
 import { useSettings, type SettingsData } from "../../core/settings";
 import { usePicker, useShell } from "../../core/shell";
 import { invoke } from "../../core/tauri";
@@ -38,7 +38,9 @@ function useEdgeDrag() {
   return {
     onPointerDown(e: PointerEvent<HTMLDivElement>) {
       const { lockDock } = useSettings.getState();
-      if (e.button !== 0 || e.target !== e.currentTarget || (lockDock && !usePicker.getState().open)) return;
+      // Outside the picker, a flexible space is empty room like the rest.
+      const space = !usePicker.getState().open && (e.target as HTMLElement).classList?.contains("slot--space");
+      if (e.button !== 0 || (e.target !== e.currentTarget && !space) || (lockDock && !usePicker.getState().open)) return;
       start.current = e.screenY;
       moved.current = false;
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -102,21 +104,45 @@ function Slot({ def }: { def: WidgetDef }) {
       {...listeners}
     >
       <T data={data} status={status} error={error} refresh={refresh} />
-      {pickerOpen && (
-        <button
-          type="button"
-          className="slot__remove"
-          aria-label={`Remove ${def.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            remove(def.id);
-          }}
-        >
-          <svg viewBox="0 0 10 10" aria-hidden="true">
-            <path d="M2 5h6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
-      )}
+      {pickerOpen && <RemoveBadge label={`Remove ${def.name}`} onRemove={() => remove(def.id)} />}
+    </div>
+  );
+}
+
+function RemoveBadge({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      className="slot__remove"
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove();
+      }}
+    >
+      <svg viewBox="0 0 10 10" aria-hidden="true">
+        <path d="M2 5h6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+/** Room that grows to fill a full-width dock. It's only arranged while the picker is open. */
+function SpaceSlot({ id }: { id: string }) {
+  const pickerOpen = usePicker((s) => s.open);
+  const remove = useLayout((s) => s.remove);
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: !pickerOpen });
+  return (
+    <div
+      ref={setNodeRef}
+      className="slot slot--space"
+      data-widget-id={id}
+      data-editing={pickerOpen}
+      data-dragging={isDragging}
+      style={{ transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined, transition }}
+      {...(pickerOpen ? listeners : {})}
+    >
+      {pickerOpen && <RemoveBadge label="Remove space" onRemove={() => remove(id)} />}
     </div>
   );
 }
@@ -183,6 +209,7 @@ export function DockBar() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
             {ids.map((id) => {
+              if (isSpace(id)) return <SpaceSlot key={id} id={id} />;
               const def = byId(id);
               return def ? <Slot key={id} def={def} /> : null;
             })}

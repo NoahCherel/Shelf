@@ -49,11 +49,11 @@ function CardBody({ def }: { def: WidgetDef }) {
   );
 }
 
-function MenuBody({ def }: { def: WidgetDef | undefined }) {
+function MenuBody({ def, slotId }: { def: WidgetDef | undefined; slotId: string }) {
   const own = def?.menu?.({ refresh: () => def.provider && refresh(def.provider) }) ?? [];
   return (
     <Fitted width={MENU_WIDTH}>
-      <Menu items={dockMenuItems(own)} />
+      <Menu items={dockMenuItems(own, slotId)} />
     </Fitted>
   );
 }
@@ -83,7 +83,7 @@ export function CardContent({ id, n }: { id: string; n: number }) {
   if (id.startsWith(MENU_PREFIX)) {
     return (
       <div className="card-window">
-        <MenuBody key={n} def={byId(id.slice(MENU_PREFIX.length))} />
+        <MenuBody key={n} def={byId(id.slice(MENU_PREFIX.length))} slotId={id.slice(MENU_PREFIX.length)} />
       </div>
     );
   }
