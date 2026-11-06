@@ -62,11 +62,13 @@ pub struct DockLayout {
     /// Over other windows, reserving nothing. Otherwise maximized windows stop short of the dock.
     pub float: bool,
     pub edge: Edge,
+    /// Where a pill sits along its edge: 0 at the left end, 1 at the right, 0.5 in the middle.
+    pub along: f64,
 }
 
-/// Centred near an edge of the monitor, in physical pixels. The window is only as
+/// Near an edge of the monitor, `along` it, in physical pixels. The window is only as
 /// tall as the bar: the gap stays outside it, so it can't swallow clicks.
-pub fn dock_rect(monitor: Rect, scale: f64, logical_width: f64, bar: f64, gap: f64, edge: Edge) -> Rect {
+pub fn dock_rect(monitor: Rect, scale: f64, logical_width: f64, bar: f64, gap: f64, edge: Edge, along: f64) -> Rect {
     let w = ((logical_width * scale).ceil() as i32).clamp(1, monitor.w);
     let h = (bar * scale).round() as i32;
     let lift = (gap * scale).round() as i32;
@@ -74,7 +76,8 @@ pub fn dock_rect(monitor: Rect, scale: f64, logical_width: f64, bar: f64, gap: f
         Edge::Bottom => monitor.y + monitor.h - lift - h,
         Edge::Top => monitor.y + lift,
     };
-    Rect { x: monitor.x + (monitor.w - w) / 2, y, w, h }
+    let x = monitor.x + ((monitor.w - w) as f64 * along.clamp(0.0, 1.0)).round() as i32;
+    Rect { x, y, w, h }
 }
 
 /// The strip of the screen to keep clear (left, top, right, bottom).
@@ -86,9 +89,12 @@ pub fn reserved_rect(monitor: Rect, height: i32, edge: Edge) -> (i32, i32, i32, 
     }
 }
 
-/// Where the window goes while it's being dragged, `offset` logical px from where it rests.
-pub fn dragged_y(rest: Rect, monitor: Rect, scale: f64, offset: f64) -> i32 {
-    (rest.y + (offset * scale).round() as i32).clamp(monitor.y, monitor.y + monitor.h - rest.h)
+/// Where the window goes while it's being dragged, `dx` and `dy` logical px from where it rests.
+pub fn dragged(rest: Rect, monitor: Rect, scale: f64, dx: f64, dy: f64) -> (i32, i32) {
+    (
+        (rest.x + (dx * scale).round() as i32).clamp(monitor.x, monitor.x + monitor.w - rest.w),
+        (rest.y + (dy * scale).round() as i32).clamp(monitor.y, monitor.y + monitor.h - rest.h),
+    )
 }
 
 /// How much of the screen edge to keep clear, in physical pixels; None when floating.
@@ -211,7 +217,7 @@ fn saved_behaviour(settings: Option<&serde_json::Value>) -> (bool, bool) {
 }
 
 /// As last reported by the page; `start` fills it from the saved settings.
-static LAYOUT: Mutex<DockLayout> = Mutex::new(DockLayout { width: 400.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom });
+static LAYOUT: Mutex<DockLayout> = Mutex::new(DockLayout { width: 400.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom, along: 0.5 });
 /// Being dragged: the pointer decides where it is, and the glass waits until it lands.
 static MOVING: AtomicBool = AtomicBool::new(false);
 /// Sliding or slid away: auto-hide decides where it is.
@@ -242,7 +248,7 @@ fn place(dock: &WebviewWindow) {
     let Some((monitor, scale)) = monitor_rect(dock) else { return };
     *MONITOR.lock().unwrap_or_else(|e| e.into_inner()) = Some((monitor, scale));
     let l = layout();
-    let r = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge);
+    let r = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along);
     let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
     if MOVING.load(Ordering::Relaxed) || AWAY.load(Ordering::Relaxed) {
         return;
@@ -327,7 +333,7 @@ fn run_slide(app: &AppHandle, slide: Slide) {
     let mine = SLIDES.fetch_add(1, Ordering::SeqCst) + 1;
     AWAY.store(true, Ordering::Relaxed);
     let l = layout();
-    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge);
+    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along);
     let at = |y: i32| dock.set_position(PhysicalPosition::new(rest.x, y));
     if slide == Slide::In {
         let _ = at(autohide::hidden_y(rest, monitor, l.edge));
@@ -362,7 +368,7 @@ fn seen_now(app: &AppHandle) -> Option<Seen> {
     use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
     let (monitor, scale) = (*MONITOR.lock().unwrap_or_else(|e| e.into_inner()))?;
     let l = layout();
-    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge);
+    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along);
     let mut p = POINT::default();
     unsafe { GetCursorPos(&mut p) }.ok()?;
     let busy = super::card::is_open()
@@ -455,6 +461,7 @@ fn saved_layout(settings: Option<&serde_json::Value>) -> DockLayout {
         l.gap = s["edgeGap"].as_f64().unwrap_or(l.gap);
         l.bar = s["size"].as_f64().map_or(l.bar, |t| (t * 1.09).ceil());
         l.edge = Edge::from_name(s["edge"].as_str());
+        l.along = s["pillAt"].as_f64().map_or(l.along, |at| at.clamp(0.0, 1.0));
         if s["dockWidth"].as_str() == Some("full") {
             l.gap = 0.0;
         }
@@ -521,13 +528,13 @@ pub fn stop() {
 
 /// Fits the window to the bar. Anything but a new width also changes what's reserved.
 #[tauri::command]
-pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: bool, edge: String) -> Result<(), String> {
+pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: bool, edge: String, along: f64) -> Result<(), String> {
     let edge = Edge::from_name(Some(&edge));
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let edge_changed = {
         let mut current = LAYOUT.lock().unwrap_or_else(|e| e.into_inner());
         let changed = current.bar != bar || current.gap != gap || current.float != float || current.edge != edge;
-        *current = DockLayout { width, bar, gap, float, edge };
+        *current = DockLayout { width, bar, gap, float, edge, along };
         changed
     };
     if edge_changed {
@@ -537,15 +544,16 @@ pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: boo
     Ok(())
 }
 
-/// The dock follows the pointer, `offset` logical px from where it rests.
+/// The dock follows the pointer, `dx` and `dy` logical px from where it rests.
 #[tauri::command]
-pub fn dock_drag(app: AppHandle, offset: f64) -> Result<(), String> {
+pub fn dock_drag(app: AppHandle, dx: f64, dy: f64) -> Result<(), String> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let (monitor, scale) = monitor_rect(&dock).ok_or("no monitor")?;
     let l = layout();
-    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge);
+    let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along);
     MOVING.store(true, Ordering::Relaxed);
-    dock.set_position(PhysicalPosition::new(rest.x, dragged_y(rest, monitor, scale, offset))).map_err(|e| e.to_string())
+    let (x, y) = dragged(rest, monitor, scale, dx, dy);
+    dock.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())
 }
 
 /// Let go: it goes back to where its layout says.
@@ -567,47 +575,64 @@ mod tests {
 
     #[test]
     fn dock_is_centred_on_monitor() {
-        let r = dock_rect(FHD, 1.0, 1000.0, 72.0, 0.0, Edge::Bottom);
+        let r = dock_rect(FHD, 1.0, 1000.0, 72.0, 0.0, Edge::Bottom, 0.5);
         assert_eq!(r, Rect { x: 460, y: 1008, w: 1000, h: 72 });
     }
 
     #[test]
     fn dock_never_exceeds_monitor_width() {
-        let r = dock_rect(FHD, 1.0, 5000.0, 72.0, 0.0, Edge::Bottom);
+        let r = dock_rect(FHD, 1.0, 5000.0, 72.0, 0.0, Edge::Bottom, 0.5);
         assert_eq!((r.x, r.w), (0, 1920));
     }
 
     #[test]
     fn dock_rect_is_correct_at_100_125_150_percent() {
-        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Bottom), Rect { x: 560, y: 1008, w: 800, h: 72 });
-        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 0.0, Edge::Bottom), Rect { x: 460, y: 990, w: 1000, h: 90 });
-        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 0.0, Edge::Bottom), Rect { x: 360, y: 972, w: 1200, h: 108 });
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Bottom, 0.5), Rect { x: 560, y: 1008, w: 800, h: 72 });
+        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 0.0, Edge::Bottom, 0.5), Rect { x: 460, y: 990, w: 1000, h: 90 });
+        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 0.0, Edge::Bottom, 0.5), Rect { x: 360, y: 972, w: 1200, h: 108 });
     }
 
     #[test]
     fn monitor_with_offset_origin_is_respected() {
         let left = Rect { x: -1920, y: 200, w: 1920, h: 1080 };
-        assert_eq!(dock_rect(left, 1.0, 1000.0, 72.0, 0.0, Edge::Bottom), Rect { x: -1460, y: 1208, w: 1000, h: 72 });
+        assert_eq!(dock_rect(left, 1.0, 1000.0, 72.0, 0.0, Edge::Bottom, 0.5), Rect { x: -1460, y: 1208, w: 1000, h: 72 });
+    }
+
+    #[test]
+    fn a_pill_sits_wherever_it_was_put_along_its_edge() {
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Bottom, 0.0).x, 0);
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Bottom, 1.0).x, 1120);
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Top, 0.25).x, 280);
+        let left = Rect { x: -1920, y: 0, w: 1920, h: 1080 };
+        assert_eq!(dock_rect(left, 1.0, 800.0, 72.0, 0.0, Edge::Bottom, 1.0).x, -800);
+        assert_eq!(dock_rect(FHD, 1.0, 1920.0, 72.0, 0.0, Edge::Bottom, 0.9).x, 0, "full width has nowhere to go");
+    }
+
+    #[test]
+    fn the_saved_spot_along_the_edge_is_used_from_the_start_and_kept_on_screen() {
+        assert_eq!(saved_layout(Some(&serde_json::json!({ "pillAt": 0.2 }))).along, 0.2);
+        assert_eq!(saved_layout(Some(&serde_json::json!({ "pillAt": 7.0 }))).along, 1.0);
+        assert_eq!(saved_layout(None).along, 0.5);
     }
 
     #[test]
     fn the_gap_lifts_the_window_instead_of_adding_a_dead_strip_to_it() {
-        let r = dock_rect(FHD, 1.25, 800.0, 55.0, 6.0, Edge::Bottom);
+        let r = dock_rect(FHD, 1.25, 800.0, 55.0, 6.0, Edge::Bottom, 0.5);
         assert_eq!(r.h, 69, "only the bar");
         assert_eq!(r.y + r.h, 1080 - 8, "6 logical px above the edge at 125%");
     }
 
     #[test]
     fn floating_reserves_nothing_and_docked_reserves_bar_and_gap() {
-        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom }, 1.25), None);
-        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: false, edge: Edge::Bottom }, 1.25), Some(77));
+        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom, along: 0.5 }, 1.25), None);
+        assert_eq!(reserved_height(DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: false, edge: Edge::Bottom, along: 0.5 }, 1.25), Some(77));
     }
 
     #[test]
     fn at_the_top_the_gap_is_above_the_window() {
-        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Top), Rect { x: 560, y: 0, w: 800, h: 72 });
-        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 6.0, Edge::Top), Rect { x: 460, y: 8, w: 1000, h: 90 });
-        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 6.0, Edge::Top), Rect { x: 360, y: 9, w: 1200, h: 108 });
+        assert_eq!(dock_rect(FHD, 1.0, 800.0, 72.0, 0.0, Edge::Top, 0.5), Rect { x: 560, y: 0, w: 800, h: 72 });
+        assert_eq!(dock_rect(FHD, 1.25, 800.0, 72.0, 6.0, Edge::Top, 0.5), Rect { x: 460, y: 8, w: 1000, h: 90 });
+        assert_eq!(dock_rect(FHD, 1.5, 800.0, 72.0, 6.0, Edge::Top, 0.5), Rect { x: 360, y: 9, w: 1200, h: 108 });
     }
 
     #[test]
@@ -620,10 +645,14 @@ mod tests {
     #[test]
     fn dragging_stays_on_the_monitor() {
         let r = Rect { x: 460, y: 1008, w: 1000, h: 72 };
-        assert_eq!(dragged_y(r, FHD, 1.0, -300.0), 708);
-        assert_eq!(dragged_y(r, FHD, 1.25, -100.0), 883);
-        assert_eq!(dragged_y(r, FHD, 1.0, -5000.0), 0);
-        assert_eq!(dragged_y(r, FHD, 1.0, 5000.0), 1008);
+        assert_eq!(dragged(r, FHD, 1.0, 0.0, -300.0).1, 708);
+        assert_eq!(dragged(r, FHD, 1.25, 0.0, -100.0).1, 883);
+        assert_eq!(dragged(r, FHD, 1.0, 0.0, -5000.0).1, 0);
+        assert_eq!(dragged(r, FHD, 1.0, 0.0, 5000.0).1, 1008);
+        assert_eq!(dragged(r, FHD, 1.0, -200.0, 0.0), (260, 1008));
+        assert_eq!(dragged(r, FHD, 1.25, 100.0, 0.0).0, 585);
+        assert_eq!(dragged(r, FHD, 1.0, -5000.0, 0.0).0, 0);
+        assert_eq!(dragged(r, FHD, 1.0, 5000.0, 0.0).0, 920);
     }
 
     #[test]
@@ -735,7 +764,7 @@ mod tests {
 
     #[test]
     fn auto_hide_reserves_nothing() {
-        let docked = DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: false, edge: Edge::Bottom };
+        let docked = DockLayout { width: 800.0, bar: 55.0, gap: 6.0, float: false, edge: Edge::Bottom, along: 0.5 };
         assert_eq!(reserved_with(docked, 1.25, true), None);
         assert_eq!(reserved_with(docked, 1.25, false), Some(77));
     }

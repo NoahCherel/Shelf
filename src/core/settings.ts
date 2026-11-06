@@ -20,6 +20,8 @@ export interface SettingsData {
   /** Logical px between the dock and its edge of the screen. */
   edgeGap: number;
   edge: "bottom" | "top";
+  /** Where a pill sits along its edge: 0 at the left end, 1 at the right. */
+  pillAt: number;
   /** A pill as wide as its contents, or the whole edge like the taskbar. */
   dockWidth: "pill" | "full";
   /** The space between widgets, in hundredths of a tile's height. */
@@ -53,6 +55,7 @@ export function defaults(): SettingsData {
     floatOverWindows: true,
     edgeGap: 6,
     edge: "bottom",
+    pillAt: 0.5,
     dockWidth: "pill",
     spacing: 4,
     autoHide: false,
@@ -87,6 +90,7 @@ export function sanitize(raw: unknown): SettingsData {
     floatOverWindows: bool(raw.floatOverWindows, d.floatOverWindows),
     edgeGap: typeof raw.edgeGap === "number" && Number.isFinite(raw.edgeGap) ? Math.min(GAP_MAX, Math.max(0, raw.edgeGap)) : d.edgeGap,
     edge: oneOf(raw.edge, ["bottom", "top"] as const, d.edge),
+    pillAt: typeof raw.pillAt === "number" && Number.isFinite(raw.pillAt) ? Math.min(1, Math.max(0, raw.pillAt)) : d.pillAt,
     dockWidth: oneOf(raw.dockWidth, ["pill", "full"] as const, d.dockWidth),
     spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
     autoHide: bool(raw.autoHide, d.autoHide),

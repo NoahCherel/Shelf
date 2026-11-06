@@ -1,7 +1,7 @@
 import { beforeEach, vi } from "vitest";
 import { act, render, waitFor } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
-import { GlassLayer, lookFor } from "./GlassLayer";
+import { GlassLayer, lookFor, watchTiles } from "./GlassLayer";
 import { usesGlass } from "../theme";
 import { lensOffset } from "./lens";
 
@@ -117,5 +117,25 @@ describe("glass for each style", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(calls("glass_start")).toBe(1);
     expect(calls("glass_stop")).toBe(0);
+  });
+});
+
+describe("tiles that move", () => {
+  it("are followed by the glass, so nothing is left where a tile was", async () => {
+    const bar = document.createElement("div");
+    const tile = document.createElement("div");
+    bar.appendChild(tile);
+    document.body.appendChild(bar);
+    const moved = vi.fn();
+    const stop = watchTiles(bar, moved);
+    tile.style.left = "120px";
+    await new Promise((r) => setTimeout(r, 40));
+    expect(moved).toHaveBeenCalled();
+    stop();
+    moved.mockClear();
+    tile.style.left = "300px";
+    await new Promise((r) => setTimeout(r, 40));
+    expect(moved).not.toHaveBeenCalled();
+    bar.remove();
   });
 });

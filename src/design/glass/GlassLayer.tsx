@@ -133,6 +133,23 @@ export function createPainter(canvas: HTMLCanvasElement): Painter | null {
   };
 }
 
+/** Calls back, once a frame at most, whenever a tile inside `bar` moves, as a widget dragged along the dock does. */
+export function watchTiles(bar: HTMLElement, moved: () => void): () => void {
+  let queued = 0;
+  const observer = new MutationObserver(() => {
+    if (queued) return;
+    queued = requestAnimationFrame(() => {
+      queued = 0;
+      moved();
+    });
+  });
+  observer.observe(bar, { subtree: true, attributes: true, attributeFilter: ["style"] });
+  return () => {
+    observer.disconnect();
+    cancelAnimationFrame(queued);
+  };
+}
+
 export interface GlassLayerProps {
   active: boolean;
   /** Called when capture or WebGL can't run here, so the bar can fall back to a solid look. */
@@ -183,6 +200,8 @@ export function GlassLayer({ active, onUnavailable }: GlassLayerProps) {
     const scroller = canvas.current?.parentElement?.querySelector(".dock__scroll");
     const relayout = () => painter?.layout();
     scroller?.addEventListener("scroll", relayout, { passive: true });
+    // Tiles placed or dragged along a full-width dock move without the bar changing size.
+    const unwatch = canvas.current?.parentElement ? watchTiles(canvas.current.parentElement, relayout) : () => {};
     // Dark and light, and each glass style, tint differently.
     const themeWatch = new MutationObserver(() => painter?.layout());
     themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-style", "data-clear"] });
@@ -195,6 +214,7 @@ export function GlassLayer({ active, onUnavailable }: GlassLayerProps) {
       live = false;
       observer.disconnect();
       scroller?.removeEventListener("scroll", relayout);
+      unwatch();
       themeWatch.disconnect();
       off.then((stop) => stop());
       invoke("glass_stop").catch(() => {});

@@ -98,6 +98,37 @@ describe("right-click", () => {
   });
 });
 
+describe("moving the pill along its edge", () => {
+  it("follows the pointer sideways too, and stays where it's let go", () => {
+    Object.defineProperty(window.screen, "width", { value: 1536, configurable: true });
+    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+    Object.defineProperty(window, "screenX", { value: 368, configurable: true });
+    render(<DockBar />);
+    const bar = screen.getByTestId("bar");
+    bar.setPointerCapture = vi.fn();
+    bar.getBoundingClientRect = () => ({ width: 800, height: 55, left: 0, top: 0, right: 800, bottom: 55, x: 0, y: 0, toJSON: () => ({}) });
+    fireEvent.pointerDown(bar, { button: 0, pointerId: 1, screenX: 700, screenY: 840 });
+    fireEvent.pointerMove(bar, { pointerId: 1, screenX: 400, screenY: 840 });
+    fireEvent.pointerUp(bar, { pointerId: 1, screenX: 400, screenY: 840 });
+    expect(invoke).toHaveBeenCalledWith("dock_drag", { dx: -300, dy: 0 });
+    expect(useSettings.getState().pillAt).toBeCloseTo(68 / 736);
+    expect(useSettings.getState().edge).toBe("bottom");
+  });
+
+  it("a full-width dock only changes edge", () => {
+    useSettings.setState({ dockWidth: "full", pillAt: 0.5 });
+    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+    render(<DockBar />);
+    const bar = screen.getByTestId("bar");
+    bar.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(bar, { button: 0, pointerId: 1, screenX: 700, screenY: 840 });
+    fireEvent.pointerMove(bar, { pointerId: 1, screenX: 300, screenY: 100 });
+    fireEvent.pointerUp(bar, { pointerId: 1, screenX: 300, screenY: 100 });
+    expect(useSettings.getState().pillAt).toBe(0.5);
+    expect(useSettings.getState().edge).toBe("top");
+  });
+});
+
 describe("moving the dock to another edge", () => {
   const box = { width: 400, height: 55, left: 0, top: 0, right: 400, bottom: 55, x: 0, y: 0, toJSON: () => ({}) };
   const grab = (bar: HTMLElement, from: number, to: number) => {
@@ -112,7 +143,7 @@ describe("moving the dock to another edge", () => {
     Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
     render(<DockBar />);
     grab(screen.getByTestId("bar"), 840, 100);
-    expect(invoke).toHaveBeenCalledWith("dock_drag", { offset: -740 });
+    expect(invoke).toHaveBeenCalledWith("dock_drag", { dx: 0, dy: -740 });
     expect(invoke).toHaveBeenCalledWith("dock_drag_end");
     expect(useSettings.getState().edge).toBe("top");
   });

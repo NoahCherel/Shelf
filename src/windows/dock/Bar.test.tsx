@@ -51,8 +51,8 @@ it("reports its size with the gap and whether it floats", async () => {
   const { invoke } = await import("../../core/tauri");
   const el = document.createElement("div");
   el.getBoundingClientRect = () => ({ width: 700.4, height: 54.5 }) as DOMRect;
-  reportSize(el, 6, true, "top");
-  expect(invoke).toHaveBeenCalledWith("set_dock_width", { width: 700.4, bar: 55, gap: 6, float: true, edge: "top" });
+  reportSize(el, 6, true, "top", 0.25);
+  expect(invoke).toHaveBeenCalledWith("set_dock_width", { width: 700.4, bar: 55, gap: 6, float: true, edge: "top", along: 0.25 });
 });
 
 it("skips an id with no widget instead of breaking", () => {

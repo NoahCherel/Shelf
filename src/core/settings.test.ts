@@ -108,3 +108,10 @@ it("all six styles are kept, and Clear's material falls back on its own", () => 
   expect(sanitize({ clearMaterial: "white" }).clearMaterial).toBe("white");
   expect(sanitize({ clearMaterial: "gold" }).clearMaterial).toBe("frosted");
 });
+
+it("a pill starts in the middle of its edge, and stays on it", () => {
+  expect(defaults().pillAt).toBe(0.5);
+  expect(sanitize({ pillAt: 0.1 }).pillAt).toBe(0.1);
+  expect(sanitize({ pillAt: 3 }).pillAt).toBe(1);
+  expect(sanitize({ pillAt: "left" }).pillAt).toBe(0.5);
+});
