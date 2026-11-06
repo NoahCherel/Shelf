@@ -235,3 +235,28 @@ it("doesn't redraw when a new value equals the last one", async () => {
   await advance(1_000);
   expect(result.current.data).toBe(first);
 });
+
+it("a tile out of view stops asking, and keeps showing what it had", async () => {
+  const { useProvider } = await fresh();
+  const p = counter({ intervalMs: 1000 });
+  const { result, rerender } = renderHook(({ active }) => useProvider(p, undefined, active), { initialProps: { active: true } });
+  await flush();
+  expect(result.current.data).toBe(1);
+  rerender({ active: false });
+  await advance(10_000);
+  expect(p.fetch).toHaveBeenCalledTimes(1);
+  expect(result.current.data).toBe(1);
+  rerender({ active: true });
+  await flush();
+  expect(p.fetch).toHaveBeenCalledTimes(2);
+});
+
+it("a source shared with a tile still in view keeps going", async () => {
+  const { useProvider } = await fresh();
+  const p = counter({ intervalMs: 1000 });
+  renderHook(() => useProvider(p, undefined, false));
+  renderHook(() => useProvider(p));
+  await flush();
+  await advance(3000);
+  expect(p.fetch.mock.calls.length).toBeGreaterThan(2);
+});

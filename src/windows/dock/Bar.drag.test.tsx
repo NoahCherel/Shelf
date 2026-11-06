@@ -181,3 +181,67 @@ describe("flexible spaces", () => {
     expect(dockMenuItems([], "clock")[0].label).toBe("Widgets…");
   });
 });
+
+describe("narrowing the dock", () => {
+  const sized = (el: HTMLElement, width: number) => {
+    el.getBoundingClientRect = () => ({ width, height: 55, left: 0, top: 0, right: width, bottom: 55, x: 0, y: 0, toJSON: () => ({}) });
+    el.setPointerCapture = vi.fn();
+  };
+  const pull = (end: HTMLElement, by: number) => {
+    fireEvent.pointerDown(end, { button: 0, pointerId: 1, screenX: 500 });
+    fireEvent.pointerMove(end, { pointerId: 1, screenX: 500 + by });
+    fireEvent.pointerUp(end, { pointerId: 1, screenX: 500 + by });
+  };
+
+  it("pulling an end in narrows it from both sides, as it stays centred", () => {
+    render(<DockBar />);
+    sized(screen.getByTestId("bar"), 800);
+    pull(screen.getByRole("separator", { name: "Right end" }), -100);
+    expect(useSettings.getState().narrowWidth).toBe(600);
+    pull(screen.getByRole("separator", { name: "Left end" }), 50);
+    expect(useSettings.getState().narrowWidth).toBe(500);
+  });
+
+  it("never narrower than one tile", () => {
+    render(<DockBar />);
+    sized(screen.getByTestId("bar"), 300);
+    pull(screen.getByRole("separator", { name: "Right end" }), -1000);
+    expect(useSettings.getState().narrowWidth).toBe(useSettings.getState().size);
+  });
+
+  it("a narrowed dock is that wide and scrolls, and a double-click on an end undoes it", () => {
+    useSettings.setState({ narrowWidth: 300 });
+    Object.defineProperty(window.screen, "width", { value: 1920, configurable: true });
+    render(<DockBar />);
+    const bar = screen.getByTestId("bar");
+    expect(bar.dataset.narrow).toBe("true");
+    expect(bar.style.maxWidth).toBe("300px");
+    fireEvent.doubleClick(screen.getByRole("separator", { name: "Left end" }));
+    expect(useSettings.getState().narrowWidth).toBeNull();
+  });
+
+  it("a locked dock and a full-width one have no ends to pull", () => {
+    useSettings.setState({ lockDock: true });
+    const { unmount } = render(<DockBar />);
+    expect(screen.queryByRole("separator", { name: "Right end" })).toBeNull();
+    unmount();
+    useSettings.setState({ lockDock: false, dockWidth: "full" });
+    render(<DockBar />);
+    expect(screen.queryByRole("separator", { name: "Right end" })).toBeNull();
+  });
+
+  it("the wheel slides it sideways, except over something with a wheel of its own", () => {
+    useSettings.setState({ narrowWidth: 300 });
+    const { container } = render(<DockBar />);
+    const scroller = container.querySelector<HTMLElement>(".dock__scroll")!;
+    scroller.scrollBy = vi.fn();
+    fireEvent.wheel(screen.getByText("clock"), { deltaY: 120 });
+    expect(scroller.scrollBy).toHaveBeenCalledWith({ left: 120, behavior: "smooth" });
+    vi.mocked(scroller.scrollBy).mockClear();
+    const own = document.createElement("span");
+    own.dataset.ownWheel = "";
+    screen.getByText("clock").appendChild(own);
+    fireEvent.wheel(own, { deltaY: 120 });
+    expect(scroller.scrollBy).not.toHaveBeenCalled();
+  });
+});

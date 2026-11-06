@@ -105,6 +105,7 @@ function Part({ label, title, panel, preview, onScroll, children }: { label: str
       title={title ?? label}
       onClick={open}
       onWheel={(e) => !preview && onScroll?.(e.deltaY < 0)}
+      data-own-wheel={onScroll ? "" : undefined}
     >
       {children}
     </button>

@@ -94,3 +94,10 @@ it("auto-hide and its desktop option start off, and only take true or false", ()
   const s = sanitize({ autoHide: "yes", showOnDesktop: true });
   expect([s.autoHide, s.showOnDesktop]).toEqual([false, true]);
 });
+
+it("a narrowed dock keeps a sensible width, or none", () => {
+  expect(defaults().narrowWidth).toBeNull();
+  expect(sanitize({ narrowWidth: 300 }).narrowWidth).toBe(300);
+  expect(sanitize({ narrowWidth: 10 }).narrowWidth).toBe(40);
+  expect(sanitize({ narrowWidth: "wide" }).narrowWidth).toBeNull();
+});

@@ -25,6 +25,8 @@ export interface SettingsData {
   autoHide: boolean;
   /** With auto-hide: stays up while the desktop is in front. */
   showOnDesktop: boolean;
+  /** Logical px a pill was narrowed to by its ends, scrolling for the rest; null for its natural width. */
+  narrowWidth: number | null;
   weather: { city: string };
   github: { user: string };
 }
@@ -51,6 +53,7 @@ export function defaults(): SettingsData {
     spacing: 4,
     autoHide: false,
     showOnDesktop: false,
+    narrowWidth: null,
     weather: { city: "" },
     github: { user: "" },
   };
@@ -83,6 +86,7 @@ export function sanitize(raw: unknown): SettingsData {
     spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
     autoHide: bool(raw.autoHide, d.autoHide),
     showOnDesktop: bool(raw.showOnDesktop, d.showOnDesktop),
+    narrowWidth: typeof raw.narrowWidth === "number" && Number.isFinite(raw.narrowWidth) ? Math.max(SIZE_MIN, raw.narrowWidth) : null,
     weather: { city: text(weather.city, d.weather.city) },
     github: { user: text(github.user, d.github.user) },
   };

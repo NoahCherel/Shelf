@@ -99,7 +99,10 @@ export function createPainter(canvas: HTMLCanvasElement): Painter | null {
       gl.uniform1f(uniform("rimStrength"), LOOK.rimStrength);
 
       // Softening only happens under tiles; bare app icons sit on the clear glass.
-      const rects = [...parent.querySelectorAll(".tile")].slice(0, MAX_TILES).map((tile) => tile.getBoundingClientRect());
+      const rects = [...parent.querySelectorAll(".tile")]
+        .map((tile) => tile.getBoundingClientRect())
+        .filter((r) => r.right > bar.left && r.left < bar.right)
+        .slice(0, MAX_TILES);
       gl.uniform1i(uniform("tileCount"), rects.length);
       rects.forEach((r, i) => {
         gl.uniform4f(uniform(`tiles[${i}]`), (r.left - bar.left) * scale, (r.top - bar.top) * scale, r.width * scale, r.height * scale);
@@ -155,6 +158,10 @@ export function GlassLayer({ active, onUnavailable }: GlassLayerProps) {
     const off = listen("glass-frame", collect);
     const observer = new ResizeObserver(() => painter?.layout());
     if (canvas.current?.parentElement) observer.observe(canvas.current.parentElement);
+    // A narrowed dock scrolls its tiles under the glass.
+    const scroller = canvas.current?.parentElement?.querySelector(".dock__scroll");
+    const relayout = () => painter?.layout();
+    scroller?.addEventListener("scroll", relayout, { passive: true });
     // Dark and light tint the tiles differently.
     const themeWatch = new MutationObserver(() => painter?.layout());
     themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -166,6 +173,7 @@ export function GlassLayer({ active, onUnavailable }: GlassLayerProps) {
     return () => {
       live = false;
       observer.disconnect();
+      scroller?.removeEventListener("scroll", relayout);
       themeWatch.disconnect();
       off.then((stop) => stop());
       invoke("glass_stop").catch(() => {});

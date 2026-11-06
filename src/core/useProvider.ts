@@ -4,9 +4,10 @@ import type { Provider } from "./widget";
 
 const noSubscribe = () => () => {};
 
-export function useProvider<D>(p: Provider<D> | undefined, sample?: D): Snapshot<D> & { refresh(): void } {
+/** `active` false, as for a tile scrolled out of view, stops asking for this tile but keeps what it last had. */
+export function useProvider<D>(p: Provider<D> | undefined, sample?: D, active = true): Snapshot<D> & { refresh(): void } {
   const state = useSyncExternalStore(
-    useCallback((listener: () => void) => (p ? subscribe(p, sample, listener) : noSubscribe()), [p, sample]),
+    useCallback((listener: () => void) => (p && active ? subscribe(p, sample, listener) : noSubscribe()), [p, sample, active]),
     () => (p ? snapshot(p, sample) : sampleState<D>(sample)),
   );
   const refresh = useCallback(() => {
