@@ -161,8 +161,8 @@ pub fn watch_parent(pid: u32) {
 pub fn set_taskbar_mode(mode: String) -> Result<(), String> {
     crate::preview::guard()?;
     match mode.as_str() {
-        "hidden" => TASKBAR.apply(Mode::Hidden),
-        "autohide" => TASKBAR.apply(Mode::Autohide),
+        "hidden" => super::dock::choose_taskbar_mode(Mode::Hidden),
+        "autohide" => super::dock::choose_taskbar_mode(Mode::Autohide),
         _ => return Err(format!("unknown taskbar mode: {mode}")),
     }
     Ok(())

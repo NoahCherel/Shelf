@@ -146,6 +146,12 @@ export function DockBar() {
   const edgeGap = useSettings((s) => (s.dockWidth === "full" ? 0 : s.edgeGap));
   const edge = useSettings((s) => s.edge);
   const edgeDrag = useEdgeDrag();
+  const autoHide = useSettings((s) => s.autoHide);
+  const showOnDesktop = useSettings((s) => s.showOnDesktop);
+
+  useEffect(() => {
+    invoke("set_dock_behaviour", { autoHide, showOnDesktop }).catch(() => {});
+  }, [autoHide, showOnDesktop]);
   const floatOverWindows = useSettings((s) => s.floatOverWindows);
   const bar = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));

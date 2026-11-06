@@ -88,3 +88,9 @@ it("position settings fall back on their own, and spacing stays within its slide
   const t = sanitize({ edge: "top", dockWidth: "full", spacing: -1 });
   expect([t.edge, t.dockWidth, t.spacing]).toEqual(["top", "full", 0]);
 });
+
+it("auto-hide and its desktop option start off, and only take true or false", () => {
+  expect([defaults().autoHide, defaults().showOnDesktop]).toEqual([false, false]);
+  const s = sanitize({ autoHide: "yes", showOnDesktop: true });
+  expect([s.autoHide, s.showOnDesktop]).toEqual([false, true]);
+});

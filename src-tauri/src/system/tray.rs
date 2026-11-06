@@ -121,6 +121,11 @@ fn watch_until_closed(bar: isize, previous: isize) {
 }
 
 /// Escape closes the grid only once it has the focus, which it may have lost.
+/// Windows' grid of hidden icons is showing.
+pub fn grid_open() -> bool {
+    grid().is_some()
+}
+
 pub fn close_grid() {
     let Some(flyout) = grid() else { return };
     let flyout = raw(flyout);

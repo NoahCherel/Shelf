@@ -19,12 +19,15 @@ use super::taskbar::{Mode, TASKBAR};
 
 pub static FULLSCREEN: AtomicBool = AtomicBool::new(false);
 pub static LOCKED: AtomicBool = AtomicBool::new(false);
+pub static AUTOHIDDEN: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize, Clone)]
 pub struct ShellStatus {
     pub fullscreen: bool,
     pub locked: bool,
     pub hidden_taskbar: bool,
+    /// Slid away by auto-hide.
+    pub autohidden: bool,
 }
 
 pub fn status() -> ShellStatus {
@@ -32,6 +35,7 @@ pub fn status() -> ShellStatus {
         fullscreen: FULLSCREEN.load(Ordering::Relaxed),
         locked: LOCKED.load(Ordering::Relaxed),
         hidden_taskbar: TASKBAR.mode() == Mode::Hidden,
+        autohidden: AUTOHIDDEN.load(Ordering::Relaxed),
     }
 }
 
@@ -51,6 +55,12 @@ fn is_desktop(h: HWND) -> bool {
     let n = unsafe { GetClassNameW(h, &mut buf) };
     let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
     matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
+}
+
+/// The desktop, or the taskbar, has the focus: no app is in front.
+pub fn desktop_in_front() -> bool {
+    let fg = unsafe { GetForegroundWindow() };
+    !fg.is_invalid() && is_desktop(fg)
 }
 
 /// True when `h` is showing and fills `monitor` entirely.

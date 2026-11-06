@@ -258,6 +258,11 @@ fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
 }
 
 /// Clicks on the strip mustn't take focus from your app, as with the dock.
+/// The strip of previews is showing.
+pub fn is_showing() -> bool {
+    SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+}
+
 pub fn prepare(app: &AppHandle) -> Result<(), String> {
     let window = preview_window(app)?;
     let raw = window.hwnd().map_err(|e| e.to_string())?;

@@ -165,3 +165,14 @@
 .version {
   color: var(--muted);
 }
+
+.setting__control {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.setting__control:disabled {
+  opacity: 0.4;
+}

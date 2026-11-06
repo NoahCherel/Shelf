@@ -21,6 +21,10 @@ export interface SettingsData {
   dockWidth: "pill" | "full";
   /** The space between widgets, in hundredths of a tile's height. */
   spacing: number;
+  /** Slides away when not in use, and back when the pointer touches its edge. */
+  autoHide: boolean;
+  /** With auto-hide: stays up while the desktop is in front. */
+  showOnDesktop: boolean;
   weather: { city: string };
   github: { user: string };
 }
@@ -45,6 +49,8 @@ export function defaults(): SettingsData {
     edge: "bottom",
     dockWidth: "pill",
     spacing: 4,
+    autoHide: false,
+    showOnDesktop: false,
     weather: { city: "" },
     github: { user: "" },
   };
@@ -75,6 +81,8 @@ export function sanitize(raw: unknown): SettingsData {
     edge: oneOf(raw.edge, ["bottom", "top"] as const, d.edge),
     dockWidth: oneOf(raw.dockWidth, ["pill", "full"] as const, d.dockWidth),
     spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
+    autoHide: bool(raw.autoHide, d.autoHide),
+    showOnDesktop: bool(raw.showOnDesktop, d.showOnDesktop),
     weather: { city: text(weather.city, d.weather.city) },
     github: { user: text(github.user, d.github.user) },
   };

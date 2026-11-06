@@ -22,7 +22,7 @@ use tauri::AppHandle;
 
 use crate::system::tap_keys;
 
-pub use windows::{exe_of_pid, store_string, take_foreground_raw, watch_foreground};
+pub use windows::{exe_of_pid, start_is_open, store_string, take_foreground_raw, watch_foreground};
 
 /// Sent once per icon, so the icons aren't copied to the page on every refresh.
 static ICONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);

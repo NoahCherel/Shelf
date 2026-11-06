@@ -22,16 +22,18 @@ pub struct Glass<B> {
     wanted: bool,
     fullscreen: bool,
     locked: bool,
+    /// Slid away: the page keeps its last frame for when it comes back.
+    hidden: bool,
     running: bool,
 }
 
 impl<B: Backend> Glass<B> {
     pub fn new(backend: B) -> Self {
-        Self { backend, wanted: false, fullscreen: false, locked: false, running: false }
+        Self { backend, wanted: false, fullscreen: false, locked: false, hidden: false, running: false }
     }
 
     fn settle(&mut self) -> Result<(), String> {
-        let run = self.wanted && !self.fullscreen && !self.locked;
+        let run = self.wanted && !self.fullscreen && !self.locked && !self.hidden;
         if run && !self.running {
             self.backend.begin()?;
             self.running = true;
@@ -50,6 +52,11 @@ impl<B: Backend> Glass<B> {
     pub fn shell(&mut self, fullscreen: bool, locked: bool) {
         self.fullscreen = fullscreen;
         self.locked = locked;
+        let _ = self.settle();
+    }
+
+    pub fn hidden(&mut self, hidden: bool) {
+        self.hidden = hidden;
         let _ = self.settle();
     }
 
@@ -122,6 +129,10 @@ pub fn shell_changed(app: &AppHandle, fullscreen: bool, locked: bool) {
     glass(app).lock().unwrap_or_else(|e| e.into_inner()).shell(fullscreen, locked);
 }
 
+pub fn dock_hidden(app: &AppHandle, hidden: bool) {
+    glass(app).lock().unwrap_or_else(|e| e.into_inner()).hidden(hidden);
+}
+
 /// Monitors changed or the PC woke: the old session may be stale.
 pub fn restart(app: &AppHandle) {
     glass(app).lock().unwrap_or_else(|e| e.into_inner()).restart();
@@ -181,6 +192,17 @@ mod tests {
         assert!(!g.backend.running);
         g.shell(false, false);
         assert!(g.backend.running, "comes back afterwards");
+    }
+
+    #[test]
+    fn capture_stops_while_the_dock_is_hidden_and_resumes_after() {
+        let mut g = glass();
+        g.want(true).unwrap();
+        g.hidden(true);
+        assert!(!g.backend.running);
+        g.hidden(false);
+        assert!(g.backend.running);
+        assert_eq!(g.backend.starts, 2);
     }
 
     #[test]

@@ -214,6 +214,11 @@ pub fn fit_card(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
     place(&app, (width, height))
 }
 
+/// A card or menu is showing.
+pub fn is_open() -> bool {
+    with_state(|s| s.open.is_some())
+}
+
 /// Catches up a page that loaded after `card-open` fired.
 #[tauri::command]
 pub fn card_current() -> Option<String> {

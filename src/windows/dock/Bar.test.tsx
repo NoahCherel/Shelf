@@ -1,5 +1,5 @@
 import { beforeEach, vi } from "vitest";
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { DockBar, edgeAt, reportSize } from "./Bar";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
@@ -90,4 +90,15 @@ it("the dock goes to whichever half of the screen it's let go in", () => {
   expect(edgeAt(431, 864)).toBe("top");
   expect(edgeAt(432, 864)).toBe("bottom");
   expect(edgeAt(860, 864)).toBe("bottom");
+});
+
+it("tells Rust about auto-hide when it starts and whenever it changes", async () => {
+  const { invoke } = await import("../../core/tauri");
+  const { useSettings } = await import("../../core/settings");
+  vi.mocked(invoke).mockClear();
+  render(<DockBar />);
+  expect(invoke).toHaveBeenCalledWith("set_dock_behaviour", { autoHide: false, showOnDesktop: false });
+  act(() => useSettings.setState({ autoHide: true }));
+  expect(invoke).toHaveBeenCalledWith("set_dock_behaviour", { autoHide: true, showOnDesktop: false });
+  act(() => useSettings.setState({ autoHide: false }));
 });

@@ -1,5 +1,5 @@
 import { invoke } from "../../core/tauri";
-import { useSettings } from "../../core/settings";
+import { useSettings, type SettingsData } from "../../core/settings";
 
 /** A value kept outside the settings file, like Windows' own startup list. */
 export interface External<V> {
@@ -14,6 +14,8 @@ interface Common {
   tip: string;
   /** Runs after the setting changes. */
   onChange?: (value: never) => void;
+  /** Shown but out of use while this holds, as when another setting overrides it. */
+  disabledWhen?: (s: SettingsData) => boolean;
 }
 
 export type RowDef =
@@ -116,7 +118,17 @@ export const SCHEMA: PageDef[] = [
         }),
         toggle("floatOverWindows", {
           label: "Float over windows",
-          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop short of it.",
+          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop short of it. Auto-hide always floats.",
+          disabledWhen: (s) => s.autoHide,
+        }),
+        toggle("autoHide", {
+          label: "Auto-hide",
+          tip: "The dock slides away when you're not using it, and comes back when the pointer touches its edge or Start opens.",
+        }),
+        toggle("showOnDesktop", {
+          label: "Stay up on the desktop",
+          tip: "With auto-hide, the dock stays up whenever no app is in front.",
+          disabledWhen: (s) => !s.autoHide,
         }),
         slider("edgeGap", {
           label: "Distance from edge",

@@ -138,3 +138,14 @@ it("closes through Rust", () => {
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(mockInvoke).toHaveBeenCalledWith("close_window", { kind: "settings" });
 });
+
+it("with auto-hide on, floating over windows can't be changed, as nothing is reserved anyway", () => {
+  render(<SettingsWindow />);
+  open("Dock");
+  const float = () => screen.getByRole("switch", { name: "Float over windows" }) as HTMLButtonElement;
+  expect(float().matches(":disabled")).toBe(false);
+  fireEvent.click(screen.getByRole("switch", { name: "Auto-hide" }));
+  expect(useSettings.getState().autoHide).toBe(true);
+  expect(float().matches(":disabled")).toBe(true);
+  expect(screen.getByRole("switch", { name: "Stay up on the desktop" })).toBeTruthy();
+});
