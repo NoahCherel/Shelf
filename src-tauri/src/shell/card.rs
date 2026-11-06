@@ -58,6 +58,11 @@ pub fn card_rect(tile: Span, dock: Rect, monitor: Rect, size: (i32, i32), margin
     Rect { x, y: top, w, h: bottom - top }
 }
 
+/// The menus a right-click opens, as opposed to cards a click toggles.
+fn is_menu(id: &str) -> bool {
+    id.starts_with("__menu:") || id.starts_with("__appmenu:")
+}
+
 #[derive(PartialEq, Debug)]
 pub enum CardMove {
     Open,
@@ -77,7 +82,10 @@ impl CardState {
     /// `focused` is whether the card window has the focus. One that doesn't was covered by another app
     /// the moment it opened, so a click on its tile brings it back rather than closing what can't be seen.
     pub fn request(&mut self, id: &str, now: u64, focused: bool) -> CardMove {
-        if self.open.as_deref() == Some(id) && !focused {
+        // A right-click always opens its menu, as on Windows. Its press already closed any menu
+        // that was open, as a click elsewhere, so toggling or the reopen guard would swallow it.
+        if is_menu(id) || (self.open.as_deref() == Some(id) && !focused) {
+            self.open = Some(id.to_string());
             self.opened_at = now;
             return CardMove::Open;
         }
@@ -445,11 +453,11 @@ mod tests {
     #[test]
     fn a_card_another_app_came_in_front_of_is_brought_back_rather_than_closed() {
         let mut s = CardState::default();
-        assert_eq!(s.request("__appmenu:orca", 0, true), CardMove::Open);
-        // Orca covered it at once, so it never had the focus: the next right-click shows it again.
-        assert_eq!(s.request("__appmenu:orca", 1000, false), CardMove::Open);
-        assert_eq!(s.open.as_deref(), Some("__appmenu:orca"));
-        assert_eq!(s.request("__appmenu:orca", 2000, true), CardMove::Close, "in front and focused, the same click closes it");
+        assert_eq!(s.request("clock", 0, true), CardMove::Open);
+        // Another app covered it at once, so it never had the focus: the next click shows it again.
+        assert_eq!(s.request("clock", 1000, false), CardMove::Open);
+        assert_eq!(s.open.as_deref(), Some("clock"));
+        assert_eq!(s.request("clock", 2000, true), CardMove::Close, "in front and focused, the same click closes it");
     }
 
     #[test]
@@ -464,6 +472,18 @@ mod tests {
         assert!(press_closes(true, (100, 100), card));
         assert!(!press_closes(true, (900, 700), card), "a press on the card itself");
         assert!(!press_closes(false, (100, 100), card), "no press, nothing to close for");
+    }
+
+    #[test]
+    fn every_right_click_opens_its_menu_even_right_after_one_closed() {
+        let mut s = CardState::default();
+        assert_eq!(s.request("__appmenu:discord", 0, true), CardMove::Open);
+        // The press of the next right-click closes the open menu as a click elsewhere...
+        s.closed(400);
+        // ...and its release, 100 ms later, still opens the menu.
+        assert_eq!(s.request("__appmenu:discord", 500, false), CardMove::Open);
+        assert_eq!(s.request("__menu:clock", 600, true), CardMove::Open);
+        assert_eq!(s.request("__menu:clock", 700, true), CardMove::Open, "not closed by its own right-click");
     }
 
     #[test]
