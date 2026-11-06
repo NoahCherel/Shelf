@@ -95,6 +95,18 @@ export const scenes: Scene[] = [
   ]),
   { id: "dock-clear-black", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { style: "clear", clearMaterial: "black" } },
   { id: "dock-clear-white", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { style: "clear", clearMaterial: "white" } },
+  {
+    id: "dock-pill-with-spaces",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: ["claude-usage", "github-activity", "space:1", "apps", "space:2", "system-status", "space:3", "clock", "battery"],
+    settings: { style: "ios", edge: "top", spacing: 24, edgeGap: 0 },
+    measure: [
+      { name: "the pill is narrower than the screen", expect: `document.querySelector(".dock").getBoundingClientRect().width < innerWidth - 100` },
+      { name: "the bar shows", expect: `document.querySelectorAll(".slot:not(.slot--space)").length === 6 && document.querySelector(".dock").getBoundingClientRect().height > 40` },
+    ],
+  },
   { id: "dock-full-black", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK, settings: { dockWidth: "full", style: "black" } },
   { id: "dock-spaced", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { spacing: 24 } },
   { id: "dock-light", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK },

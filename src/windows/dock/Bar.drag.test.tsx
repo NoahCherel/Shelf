@@ -245,3 +245,13 @@ describe("narrowing the dock", () => {
     expect(scroller.scrollBy).not.toHaveBeenCalled();
   });
 });
+
+describe("changing the dock's width while it runs", () => {
+  it("keeps every widget, from pill to full width and back", () => {
+    const { container } = render(<DockBar />);
+    for (const dockWidth of ["full", "pill", "full", "pill"] as const) {
+      act(() => useSettings.setState({ dockWidth }));
+      expect(container.querySelectorAll("[data-widget-id]").length).toBe(3);
+    }
+  });
+});

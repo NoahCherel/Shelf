@@ -248,7 +248,8 @@ export function DockBar() {
   const narrowWidth = useSettings((s) => s.narrowWidth);
   const narrow = !full && narrowWidth !== null;
   const pickerOpen = usePicker((s) => s.open);
-  const canResize = !full && !(useSettings((s) => s.lockDock) && !pickerOpen);
+  const lockDock = useSettings((s) => s.lockDock);
+  const canResize = !full && !(lockDock && !pickerOpen);
 
   useEffect(() => {
     invoke("set_dock_behaviour", { autoHide, showOnDesktop }).catch(() => {});
