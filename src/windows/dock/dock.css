@@ -123,3 +123,21 @@
   width: 62%;
   height: 62%;
 }
+
+/* The top and bottom borders are handles to move the dock by. They leave the ends to narrow it. */
+.dock__grip {
+  position: absolute;
+  left: calc(var(--bar-pad) + 4px);
+  right: calc(var(--bar-pad) + 4px);
+  z-index: 3;
+  height: max(var(--bar-pad), 5px);
+  cursor: grab;
+}
+
+.dock__grip--top {
+  top: 0;
+}
+
+.dock__grip--bottom {
+  bottom: 0;
+}

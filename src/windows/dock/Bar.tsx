@@ -40,8 +40,9 @@ function useEdgeDrag() {
   return {
     onPointerDown(e: PointerEvent<HTMLDivElement>) {
       const { lockDock } = useSettings.getState();
-      // The row the tiles sit in is empty room too, between and around them.
-      const empty = e.target === e.currentTarget || (e.target as HTMLElement).classList?.contains("dock__scroll");
+      // The row the tiles sit in is empty room too, between and around them, and the borders are handles.
+      const target = (e.target as HTMLElement).classList;
+      const empty = e.target === e.currentTarget || target?.contains("dock__scroll") || target?.contains("dock__grip");
       if (e.button !== 0 || !empty || (lockDock && !usePicker.getState().open)) return;
       start.current = { x: e.screenX, y: e.screenY, left: window.screenX, width: e.currentTarget.getBoundingClientRect().width };
       moved.current = false;
@@ -274,14 +275,15 @@ function useFreePlacement(full: boolean, ids: string[], locked: boolean) {
     const width = size.items[id] ?? 0;
     const leftAt = (x: number) => Math.min(Math.max(0, size.width - width), Math.max(0, base + x - startX));
     let moved = false;
-    el.setPointerCapture?.(e.pointerId);
     const move = (ev: globalThis.PointerEvent) => {
       if (!moved && Math.abs(ev.clientX - startX) < DRAG_DISTANCE) return;
+      // Only now: taking the pointer at the press would send the click to the slot, not the button inside it.
+      if (!moved) el.setPointerCapture?.(ev.pointerId);
       moved = true;
       setMoving({ id, left: leftAt(ev.clientX) });
     };
     const up = (ev: globalThis.PointerEvent) => {
-      el.removeEventListener("pointermove", move);
+      window.removeEventListener("pointermove", move);
       setMoving(null);
       if (!moved) return;
       const left = leftAt(ev.clientX);
@@ -295,8 +297,9 @@ function useFreePlacement(full: boolean, ids: string[], locked: boolean) {
       el.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => el.removeEventListener("click", swallow, { capture: true }), 0);
     };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up, { once: true });
+    // On the window, as the pointer can leave the slot before it counts as a drag.
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
   };
 
   return {
@@ -373,6 +376,12 @@ export function DockBar() {
         </DndContext>
       )}
       </div>
+      {!(lockDock && !pickerOpen) && (
+        <>
+          <div role="separator" aria-orientation="horizontal" aria-label="Top border" className="dock__grip dock__grip--top" />
+          <div role="separator" aria-orientation="horizontal" aria-label="Bottom border" className="dock__grip dock__grip--bottom" />
+        </>
+      )}
       {canResize && <End side="left" bar={bar} />}
       {canResize && <End side="right" bar={bar} />}
     </div>

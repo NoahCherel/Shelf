@@ -318,3 +318,46 @@ describe("placing widgets anywhere on a full-width dock", () => {
     expect(slot(container, "clock").style.left).toBe("");
   });
 });
+
+describe("pressing a widget on a full-width dock", () => {
+  beforeEach(() => {
+    useSettings.setState({ dockWidth: "full" });
+  });
+
+  it("only takes the pointer once it really moves, so buttons inside still get their click", () => {
+    const { container } = render(<DockBar />);
+    const clock = container.querySelector<HTMLElement>('[data-widget-id="clock"]')!;
+    clock.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(clock, { button: 0, pointerId: 1, clientX: 400 });
+    fireEvent.pointerMove(clock, { pointerId: 1, clientX: 402 });
+    fireEvent.pointerUp(clock, { pointerId: 1, clientX: 402 });
+    expect(clock.setPointerCapture).not.toHaveBeenCalled();
+    fireEvent.pointerDown(clock, { button: 0, pointerId: 2, clientX: 400 });
+    fireEvent.pointerMove(clock, { pointerId: 2, clientX: 460 });
+    expect(clock.setPointerCapture).toHaveBeenCalledWith(2);
+    fireEvent.pointerUp(clock, { pointerId: 2, clientX: 460 });
+  });
+});
+
+describe("moving a pill by its top and bottom borders", () => {
+  it("both borders grab the dock, and its ends still narrow it", () => {
+    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+    render(<DockBar />);
+    for (const name of ["Top border", "Bottom border"]) {
+      const grip = screen.getByRole("separator", { name });
+      grip.setPointerCapture = vi.fn();
+      useSettings.setState({ edge: "bottom" });
+      fireEvent.pointerDown(grip, { button: 0, pointerId: 1, screenX: 500, screenY: 840 });
+      fireEvent.pointerMove(grip, { pointerId: 1, screenX: 500, screenY: 100 });
+      fireEvent.pointerUp(grip, { pointerId: 1, screenX: 500, screenY: 100 });
+      expect(useSettings.getState().edge).toBe("top");
+    }
+    expect(screen.getByRole("separator", { name: "Right end" })).toBeTruthy();
+  });
+
+  it("a locked dock's borders don't move it", () => {
+    useSettings.setState({ lockDock: true });
+    render(<DockBar />);
+    expect(screen.queryByRole("separator", { name: "Top border" })).toBeNull();
+  });
+});
