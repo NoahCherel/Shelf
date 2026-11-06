@@ -28,7 +28,7 @@ export function prepareBench(): void {
   if (id === "__list") (window as { __benchScenes?: unknown }).__benchScenes = scenes.map(({ backend: _backend, ...rest }) => rest);
   freezeClock(BENCH_NOW);
   const settings = { ...baseSettings, theme: scene?.theme ?? "dark", ...scene?.settings };
-  installFakeBackend({ ...baseBackend(settings, scene?.dock ?? []), ...scene?.backend });
+  installFakeBackend({ ...baseBackend(settings, scene?.dock ?? [], scene?.positions), ...scene?.backend });
   window.addEventListener("error", (e) => {
     (window as { __benchError?: string }).__benchError = e.message;
   });

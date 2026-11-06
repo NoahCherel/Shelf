@@ -140,7 +140,9 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Spacing:** the slider changes the space between widgets, and the default looks as before.
 
 - [ ] **Previews at the top:** below a top dock, moving onto an app's previews keeps them open.
-- [ ] **Spaces:** at full width, the dock's menu adds a flexible space. With the picker open, it shows dashed and can be dragged or removed, so widgets can sit at either end.
+- [ ] **Anywhere:** at full width, dragging a widget puts it exactly where it's let go, it stays there after a restart, and neighbours only step aside when they'd overlap.
+- [ ] **Switching width:** going from full width to pill and back keeps the dock showing.
+- [ ] **Clear all:** in the notifications card, it removes every notification.
 - [ ] **Narrow:** pulling an end of the pill narrows it, the rest scrolls with the wheel or a swipe, and a double-click on an end brings it back.
 - [ ] **Volume:** over a narrowed dock, the wheel on the sound icon still sets the volume.
 

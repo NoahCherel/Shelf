@@ -48,6 +48,7 @@ These replace the study's values, on the owner's word, 2026-11-04:
 - No keyboard shortcuts, as catching them means watching the whole keyboard. Win+T isn't built. The Windows key still brings an auto-hidden dock back, by noticing Start open.
 - The dock can be put at the top from Settings too, not only by dragging.
 - Full width sits right on the edge, as in the reference's pictures, whatever the distance from the edge is set to.
+- At full width, each widget can be dragged anywhere along the dock, to the pixel, as the owner asked on 2026-11-06. Flexible spaces were tried first and dropped as not precise enough.
 - Auto-hide wakes along the whole edge, like the taskbar, and keeps the taskbar hidden even in its Auto-hide mode.
 
 ## Limits of this study

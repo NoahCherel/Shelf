@@ -1,17 +1,14 @@
-import { addSpace, isSpace, removeSaved } from "../../core/layout";
 import { useSettings } from "../../core/settings";
 import { invoke } from "../../core/tauri";
 import type { MenuItem } from "../../core/widget";
 import "./menu.css";
 
 /** A widget's own items, then the dock's. Read when the menu opens, so the tick is current. */
-export function dockMenuItems(widgetItems: MenuItem[] = [], slotId?: string): MenuItem[] {
-  const { lockDock, dockWidth, update } = useSettings.getState();
-  const own = slotId && isSpace(slotId) ? [{ label: "Remove space", onClick: () => void removeSaved(slotId) }] : widgetItems;
+export function dockMenuItems(widgetItems: MenuItem[] = []): MenuItem[] {
+  const { lockDock, update } = useSettings.getState();
   return [
-    ...own,
+    ...widgetItems,
     { label: "Widgets…", onClick: () => invoke("open_window", { kind: "picker" }).catch(() => {}) },
-    ...(dockWidth === "full" ? [{ label: "Add flexible space", onClick: () => void addSpace() }] : []),
     { label: "Settings", onClick: () => invoke("open_window", { kind: "settings" }).catch(() => {}) },
     { label: "Lock dock", checked: lockDock, onClick: () => update({ lockDock: !lockDock }) },
     { label: "Quit", onClick: () => invoke("quit").catch(() => {}) },

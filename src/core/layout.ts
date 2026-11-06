@@ -11,32 +11,42 @@ const STATUS_TILE = "system-status";
 
 interface Layout {
   ids: string[];
+  /** Where each widget was put on a full-width dock: 0 against the left end, 1 against the right. */
+  positions: Record<string, number>;
   add(id: string): void;
   remove(id: string): void;
   move(from: number, to: number): void;
+  /** A widget let go somewhere on a full-width dock, and the order that leaves them in. */
+  place(id: string, at: number, order: string[]): void;
   load(): Promise<void>;
 }
 
-/** A flexible space: no widget, just room that grows to fill a full-width dock. */
-export const isSpace = (id: string): boolean => /^space:\d+$/.test(id);
-
 function known(ids: unknown[]): string[] {
   const registered = new Set(widgets.map((w) => w.id));
-  const clean = ids.filter((id): id is string => typeof id === "string" && (registered.has(id) || isSpace(id)));
+  const clean = ids.filter((id): id is string => typeof id === "string" && registered.has(id));
   return [...new Set(clean)];
 }
 
-function save(ids: string[]) {
-  invoke("store_save", { name: "layout", value: { version: VERSION, ids } }).catch(() => {});
+function knownPositions(raw: unknown, ids: string[]): Record<string, number> {
+  if (typeof raw !== "object" || raw === null) return {};
+  const kept = Object.entries(raw).filter((e): e is [string, number] => ids.includes(e[0]) && typeof e[1] === "number" && Number.isFinite(e[1]));
+  return Object.fromEntries(kept.map(([id, at]) => [id, Math.min(1, Math.max(0, at))]));
+}
+
+function save(ids: string[], positions: Record<string, number>) {
+  invoke("store_save", { name: "layout", value: { version: VERSION, ids, positions } }).catch(() => {});
 }
 
 export const useLayout = create<Layout>((set, get) => {
-  const change = (ids: string[]) => {
-    set({ ids });
-    save(ids);
+  // Every change saves the positions too, so a window that adds a widget can't drop them.
+  const change = (ids: string[], positions = get().positions) => {
+    const kept = Object.fromEntries(Object.entries(positions).filter(([id]) => ids.includes(id)));
+    set({ ids, positions: kept });
+    save(ids, kept);
   };
   return {
     ids: [],
+    positions: {},
     add(id) {
       if (!get().ids.includes(id)) change([...get().ids, id]);
     },
@@ -50,36 +60,24 @@ export const useLayout = create<Layout>((set, get) => {
       ids.splice(to, 0, item);
       change(ids);
     },
+    place(id, at, order) {
+      change(known(order), { ...get().positions, [id]: Math.min(1, Math.max(0, at)) });
+    },
     async load() {
-      const saved = (await invoke("store_load", { name: "layout" }).catch(() => null)) as { ids?: unknown; version?: number } | null;
+      const saved = (await invoke("store_load", { name: "layout" }).catch(() => null)) as { ids?: unknown; version?: number; positions?: unknown } | null;
       // A missing or broken file gets the default; ids that no longer exist just drop out.
       if (!Array.isArray(saved?.ids)) {
-        set({ ids: known(DEFAULT_LAYOUT) });
+        set({ ids: known(DEFAULT_LAYOUT), positions: {} });
         return;
       }
       const outdated = (saved.version ?? 1) < VERSION;
-      set({ ids: known(outdated ? [...saved.ids, STATUS_TILE] : saved.ids) });
+      const ids = known(outdated ? [...saved.ids, STATUS_TILE] : saved.ids);
+      set({ ids, positions: knownPositions(saved.positions, ids) });
     },
   };
 });
 
 useLayout.subscribe((layout) => setDockIds(layout.ids));
-
-/** For windows that don't follow the layout, such as the menu: changes what's saved, not a stale copy. */
-async function changeSaved(change: (ids: string[]) => string[]): Promise<void> {
-  await useLayout.getState().load();
-  const ids = change(useLayout.getState().ids);
-  useLayout.setState({ ids });
-  save(ids);
-}
-
-export function addSpace(): Promise<void> {
-  return changeSaved((ids) => [...ids, `space:${Math.max(0, ...ids.filter(isSpace).map((id) => Number(id.slice(6)))) + 1}`]);
-}
-
-export function removeSaved(id: string): Promise<void> {
-  return changeSaved((ids) => ids.filter((x) => x !== id));
-}
 
 /** Loads the layout and follows changes made in other windows. */
 export function syncLayout(): void {

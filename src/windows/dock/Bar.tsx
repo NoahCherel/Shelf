@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { byId } from "../../core/registry";
-import { isSpace, useLayout } from "../../core/layout";
+import { useLayout } from "../../core/layout";
+import { arrange, fractionAt } from "./arrange";
 import { useSettings, type SettingsData } from "../../core/settings";
 import { usePicker, useShell } from "../../core/shell";
 import { invoke } from "../../core/tauri";
@@ -39,10 +40,9 @@ function useEdgeDrag() {
   return {
     onPointerDown(e: PointerEvent<HTMLDivElement>) {
       const { lockDock } = useSettings.getState();
-      // Outside the picker, a flexible space is empty room like the rest.
-      const target = (e.target as HTMLElement).classList;
-      const space = target?.contains("dock__scroll") || (!usePicker.getState().open && target?.contains("slot--space"));
-      if (e.button !== 0 || (e.target !== e.currentTarget && !space) || (lockDock && !usePicker.getState().open)) return;
+      // The row the tiles sit in is empty room too, between and around them.
+      const empty = e.target === e.currentTarget || (e.target as HTMLElement).classList?.contains("dock__scroll");
+      if (e.button !== 0 || !empty || (lockDock && !usePicker.getState().open)) return;
       start.current = e.screenY;
       moved.current = false;
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -83,7 +83,14 @@ function useInView(el: HTMLElement | null): boolean {
   return shown;
 }
 
-function Slot({ def }: { def: WidgetDef }) {
+/** On a full-width dock: where the slot sits, and how to start moving it. */
+interface Free {
+  left: number;
+  moving: boolean;
+  grab: (e: PointerEvent<HTMLDivElement>) => void;
+}
+
+function Slot({ def, free }: { def: WidgetDef; free?: Free }) {
   const T = def.Tile;
   const [node, setNode] = useState<HTMLDivElement | null>(null);
   const { data, status, error, refresh } = useProvider(def.provider, def.sample, useInView(node));
@@ -91,7 +98,7 @@ function Slot({ def }: { def: WidgetDef }) {
   const lockDock = useSettings((s) => s.lockDock);
   const remove = useLayout((s) => s.remove);
   const locked = lockDock && !pickerOpen;
-  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: def.id, disabled: locked });
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: def.id, disabled: locked || !!free });
   const ref = useCallback(
     (el: HTMLDivElement | null) => {
       setNodeRef(el);
@@ -122,9 +129,10 @@ function Slot({ def }: { def: WidgetDef }) {
       data-status={status}
       data-locked={locked}
       data-dragging={isDragging}
-      style={{ transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined, transition }}
+      data-moving={free?.moving}
+      style={free ? { left: free.left } : { transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined, transition }}
       onClick={openCard}
-      {...listeners}
+      {...(free ? { onPointerDown: free.grab } : listeners)}
     >
       <T data={data} status={status} error={error} refresh={refresh} />
       {pickerOpen && <RemoveBadge label={`Remove ${def.name}`} onRemove={() => remove(def.id)} />}
@@ -147,26 +155,6 @@ function RemoveBadge({ label, onRemove }: { label: string; onRemove: () => void 
         <path d="M2 5h6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     </button>
-  );
-}
-
-/** Room that grows to fill a full-width dock. It's only arranged while the picker is open. */
-function SpaceSlot({ id }: { id: string }) {
-  const pickerOpen = usePicker((s) => s.open);
-  const remove = useLayout((s) => s.remove);
-  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: !pickerOpen });
-  return (
-    <div
-      ref={setNodeRef}
-      className="slot slot--space"
-      data-widget-id={id}
-      data-editing={pickerOpen}
-      data-dragging={isDragging}
-      style={{ transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined, transition }}
-      {...(pickerOpen ? listeners : {})}
-    >
-      {pickerOpen && <RemoveBadge label="Remove space" onRemove={() => remove(id)} />}
-    </div>
   );
 }
 
@@ -229,6 +217,86 @@ function openMenu(e: MouseEvent<HTMLDivElement>) {
   }).catch(() => {});
 }
 
+const same = (a: Record<string, number>, b: Record<string, number>) =>
+  Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
+
+/**
+ * On a full-width dock, each widget sits where it was put and can be dragged anywhere along it.
+ * Widths are measured, so neighbours only move as much as they must not to overlap.
+ */
+function useFreePlacement(full: boolean, ids: string[], locked: boolean) {
+  const row = useRef<HTMLDivElement>(null);
+  const positions = useLayout((s) => s.positions);
+  const [size, setSize] = useState<{ width: number; gap: number; items: Record<string, number> }>({ width: 0, gap: 0, items: {} });
+  const [moving, setMoving] = useState<{ id: string; left: number } | null>(null);
+
+  const measure = useCallback(() => {
+    const el = row.current;
+    if (!el) return;
+    const items = Object.fromEntries(
+      [...el.querySelectorAll<HTMLElement>(":scope > [data-widget-id]")].map((slot) => [slot.dataset.widgetId!, slot.getBoundingClientRect().width]),
+    );
+    const width = el.getBoundingClientRect().width;
+    const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+    setSize((now) => (now.width === width && now.gap === gap && same(now.items, items) ? now : { width, gap, items }));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (full) measure();
+  });
+
+  // Tiles change size on their own, as when an app opens.
+  useEffect(() => {
+    const el = row.current;
+    if (!full || !el) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    el.querySelectorAll(":scope > [data-widget-id]").forEach((slot) => observer.observe(slot));
+    return () => observer.disconnect();
+  }, [full, ids, measure]);
+
+  const lefts = full ? arrange(ids.filter((id) => size.items[id] !== undefined).map((id) => ({ id, width: size.items[id], at: positions[id] })), size.width, size.gap) : {};
+
+  const grab = (id: string) => (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || locked) return;
+    const el = e.currentTarget;
+    const startX = e.clientX;
+    const base = lefts[id] ?? 0;
+    const width = size.items[id] ?? 0;
+    const leftAt = (x: number) => Math.min(Math.max(0, size.width - width), Math.max(0, base + x - startX));
+    let moved = false;
+    el.setPointerCapture?.(e.pointerId);
+    const move = (ev: globalThis.PointerEvent) => {
+      if (!moved && Math.abs(ev.clientX - startX) < DRAG_DISTANCE) return;
+      moved = true;
+      setMoving({ id, left: leftAt(ev.clientX) });
+    };
+    const up = (ev: globalThis.PointerEvent) => {
+      el.removeEventListener("pointermove", move);
+      setMoving(null);
+      if (!moved) return;
+      const left = leftAt(ev.clientX);
+      const order = [...ids].sort((a, b) => (a === id ? left : (lefts[a] ?? 0)) - (b === id ? left : (lefts[b] ?? 0)));
+      useLayout.getState().place(id, fractionAt(left, width, size.width), order);
+      // The click that follows letting go isn't a click on the widget.
+      const swallow = (click: Event) => {
+        click.stopPropagation();
+        click.preventDefault();
+      };
+      el.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => el.removeEventListener("click", swallow, { capture: true }), 0);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up, { once: true });
+  };
+
+  return {
+    row,
+    free: (id: string): Free | undefined =>
+      full ? { left: moving?.id === id ? moving.left : (lefts[id] ?? 0), moving: moving?.id === id, grab: grab(id) } : undefined,
+  };
+}
+
 export function DockBar() {
   const ids = useLayout((s) => s.ids);
   const fullscreen = useShell((s) => s.fullscreen);
@@ -256,6 +324,7 @@ export function DockBar() {
   }, [autoHide, showOnDesktop]);
   const floatOverWindows = useSettings((s) => s.floatOverWindows);
   const bar = useRef<HTMLDivElement>(null);
+  const placed = useFreePlacement(full, ids, lockDock && !pickerOpen);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
 
   // Keeps the window exactly as wide as the bar. The bar sizes itself to its content,
@@ -282,14 +351,13 @@ export function DockBar() {
       {...edgeDrag}
     >
       <GlassLayer active={glass} onUnavailable={onGlassUnavailable} />
-      <div className="dock__scroll" onWheel={glide}>
+      <div className="dock__scroll" ref={placed.row} onWheel={glide}>
       {!fullscreen && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
             {ids.map((id) => {
-              if (isSpace(id)) return <SpaceSlot key={id} id={id} />;
               const def = byId(id);
-              return def ? <Slot key={id} def={def} /> : null;
+              return def ? <Slot key={id} def={def} free={placed.free(id)} /> : null;
             })}
           </SortableContext>
         </DndContext>

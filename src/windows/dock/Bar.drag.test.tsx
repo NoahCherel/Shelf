@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { DockBar, handleDragEnd } from "./Bar";
 import { dockMenuItems, Menu } from "../menu/Menu";
 import { invoke } from "../../core/tauri";
@@ -146,42 +146,6 @@ describe("moving the dock to another edge", () => {
   });
 });
 
-describe("flexible spaces", () => {
-  beforeEach(() => {
-    useLayout.setState({ ids: ["apps", "space:1", "clock"] });
-    useSettings.setState({ dockWidth: "full" });
-  });
-
-  it("sit between widgets, and only show while the picker is open, with a way to remove them", () => {
-    const { container } = render(<DockBar />);
-    const space = container.querySelector<HTMLElement>('[data-widget-id="space:1"]')!;
-    expect(space.classList.contains("slot--space")).toBe(true);
-    expect(screen.queryByRole("button", { name: "Remove space" })).toBeNull();
-    act(() => usePicker.setState({ open: true }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove space" }));
-    expect(useLayout.getState().ids).toEqual(["apps", "clock"]);
-  });
-
-  it("outside the picker, a space is an empty spot to move the dock by", () => {
-    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
-    const { container } = render(<DockBar />);
-    const space = container.querySelector<HTMLElement>('[data-widget-id="space:1"]')!;
-    space.setPointerCapture = vi.fn();
-    fireEvent.pointerDown(space, { button: 0, pointerId: 1, screenY: 840 });
-    fireEvent.pointerMove(space, { pointerId: 1, screenY: 100 });
-    fireEvent.pointerUp(space, { pointerId: 1, screenY: 100 });
-    expect(useSettings.getState().edge).toBe("top");
-  });
-
-  it("the dock's menu offers one at full width, and a space's own menu removes it", () => {
-    expect(dockMenuItems().map((i) => i.label)).toContain("Add flexible space");
-    act(() => useSettings.setState({ dockWidth: "pill" }));
-    expect(dockMenuItems().map((i) => i.label)).not.toContain("Add flexible space");
-    expect(dockMenuItems([], "space:1")[0].label).toBe("Remove space");
-    expect(dockMenuItems([], "clock")[0].label).toBe("Widgets…");
-  });
-});
-
 describe("narrowing the dock", () => {
   const sized = (el: HTMLElement, width: number) => {
     el.getBoundingClientRect = () => ({ width, height: 55, left: 0, top: 0, right: width, bottom: 55, x: 0, y: 0, toJSON: () => ({}) });
@@ -253,5 +217,73 @@ describe("changing the dock's width while it runs", () => {
       act(() => useSettings.setState({ dockWidth }));
       expect(container.querySelectorAll("[data-widget-id]").length).toBe(3);
     }
+  });
+});
+
+describe("placing widgets anywhere on a full-width dock", () => {
+  const rects = (widths: Record<string, number>, scroller: number) =>
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const id = (this as HTMLElement).dataset?.widgetId;
+      const width = this.classList.contains("dock__scroll") ? scroller : id ? (widths[id] ?? 0) : 0;
+      return { width, height: 50, left: 0, top: 0, right: width, bottom: 50, x: 0, y: 0, toJSON: () => ({}) };
+    });
+  const slot = (container: HTMLElement, id: string) => container.querySelector<HTMLElement>(`[data-widget-id="${id}"]`)!;
+  const slide = (el: HTMLElement, by: number) => {
+    el.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 400 });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: 400 + by });
+    fireEvent.pointerUp(el, { pointerId: 1, clientX: 400 + by });
+  };
+
+  beforeEach(() => {
+    useSettings.setState({ dockWidth: "full" });
+    useLayout.setState({ ids: ["apps", "clock", "battery"], positions: {} });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("each widget sits at its saved spot", () => {
+    rects({ apps: 100, clock: 100, battery: 100 }, 1000);
+    useLayout.setState({ positions: { apps: 0, clock: 0.5, battery: 1 } });
+    const { container } = render(<DockBar />);
+    expect(["apps", "clock", "battery"].map((id) => slot(container, id).style.left)).toEqual(["0px", "450px", "900px"]);
+  });
+
+  it("dragging one puts it exactly where it's let go, and saves that", () => {
+    rects({ apps: 100, clock: 100, battery: 100 }, 1000);
+    const { container } = render(<DockBar />);
+    expect(slot(container, "clock").style.left).toBe("450px");
+    slide(slot(container, "clock"), 300);
+    expect(useLayout.getState().positions.clock).toBeCloseTo(750 / 900);
+    expect(useLayout.getState().ids).toEqual(["apps", "battery", "clock"]);
+    expect(slot(container, "clock").style.left).toBe("750px");
+  });
+
+  it("letting go doesn't also click the widget", () => {
+    rects({ apps: 100, clock: 100, battery: 100 }, 1000);
+    const { container } = render(<DockBar />);
+    const clock = slot(container, "clock");
+    slide(clock, 300);
+    vi.mocked(invoke).mockClear();
+    fireEvent.click(clock);
+    expect(invoke).not.toHaveBeenCalledWith("open_card", expect.anything());
+  });
+
+  it("a locked dock keeps its widgets where they are", () => {
+    rects({ apps: 100, clock: 100, battery: 100 }, 1000);
+    useSettings.setState({ lockDock: true });
+    const { container } = render(<DockBar />);
+    slide(slot(container, "clock"), 300);
+    expect(useLayout.getState().positions.clock).toBeUndefined();
+  });
+
+  it("a pill keeps its widgets in a row, whatever was saved", () => {
+    rects({ apps: 100, clock: 100, battery: 100 }, 1000);
+    useSettings.setState({ dockWidth: "pill" });
+    useLayout.setState({ positions: { clock: 1 } });
+    const { container } = render(<DockBar />);
+    expect(slot(container, "clock").style.left).toBe("");
   });
 });

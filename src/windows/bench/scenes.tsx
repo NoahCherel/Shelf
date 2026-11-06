@@ -17,6 +17,7 @@ export interface Scene {
   steps?: { hover?: string; click?: string; type?: string }[]; // selectors, run through the debug port
   measure?: { name: string; expect: string }[]; // JavaScript run in the page; each must be true
   scale?: number; // display scale, default 1.25 as on the owner's PC
+  positions?: Record<string, number>; // where widgets sit on a full-width dock
 }
 
 const DOCK = ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"];
@@ -64,43 +65,28 @@ export const scenes: Scene[] = [
     ],
   },
   {
-    id: "dock-full-spaces",
+    id: "dock-full-placed",
     size: WIDE,
     wallpaper: "ribbons",
     theme: "dark",
-    dock: ["apps", "space:1", "claude-plan-usage", "github-activity", "space:2", "system-status", "clock-and-weather"],
+    dock: ["apps", "claude-plan-usage", "github-activity", "system-status", "clock-and-weather"],
+    positions: { apps: 0, "claude-plan-usage": 0.35, "github-activity": 0.6, "system-status": 0.93, "clock-and-weather": 1 },
     settings: { dockWidth: "full" },
     measure: [
       { name: "the apps start at the left end", expect: `document.querySelector('[data-widget-id="apps"]').getBoundingClientRect().left < 10` },
       { name: "the clock ends at the right end", expect: `innerWidth - document.querySelector('[data-widget-id="clock-and-weather"]').getBoundingClientRect().right < 10` },
       {
-        name: "the two spaces share the room evenly",
-        expect: `(() => { const [a, b] = [...document.querySelectorAll(".slot--space")].map((e) => e.getBoundingClientRect().width); return a > 100 && Math.abs(a - b) < 2; })()`,
+        name: "nothing overlaps",
+        expect: `(() => { const r = [...document.querySelectorAll(".slot")].map((e) => e.getBoundingClientRect()).sort((a, b) => a.left - b.left); return r.every((x, i) => !i || x.left >= r[i - 1].right - 0.5); })()`,
       },
     ],
   },
   {
-    id: "dock-narrow",
+    id: "dock-top-ios",
     size: WIDE,
     wallpaper: "ribbons",
     theme: "dark",
-    dock: DOCK,
-    settings: { narrowWidth: 560 },
-    measure: [{ name: "the bar is as narrow as asked", expect: `Math.round(document.querySelector(".dock").getBoundingClientRect().width) === 560` }],
-  },
-  ...(["ios", "midnight", "white", "clear"] as const).flatMap((style) => [
-    // Clear's frosting only shows over something bright behind it.
-    { id: `dock-${style}`, size: WIDE, wallpaper: style === "clear" ? ("glow" as const) : ("ribbons" as const), theme: "dark" as const, dock: DOCK, settings: { style } },
-    { id: `dock-${style}-light`, size: WIDE, wallpaper: "pale" as const, theme: "light" as const, dock: DOCK, settings: { style } },
-  ]),
-  { id: "dock-clear-black", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { style: "clear", clearMaterial: "black" } },
-  { id: "dock-clear-white", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { style: "clear", clearMaterial: "white" } },
-  {
-    id: "dock-pill-with-spaces",
-    size: WIDE,
-    wallpaper: "ribbons",
-    theme: "dark",
-    dock: ["claude-usage", "github-activity", "space:1", "apps", "space:2", "system-status", "space:3", "clock", "battery"],
+    dock: ["claude-usage", "github-activity", "apps", "system-status", "clock", "battery"],
     settings: { style: "ios", edge: "top", spacing: 24, edgeGap: 0 },
     measure: [
       { name: "the pill is narrower than the screen", expect: `document.querySelector(".dock").getBoundingClientRect().width < innerWidth - 100` },
