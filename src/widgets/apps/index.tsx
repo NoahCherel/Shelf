@@ -1,6 +1,6 @@
 import { invoke } from "../../core/tauri";
 import { defineWidget } from "../../core/widget";
-import { AppsTile, stableOrder, type AppEntry } from "./Tile";
+import { AppsTile, stableOrder, takeReordered, type AppEntry } from "./Tile";
 
 const sampleEntry = (name: string, open: boolean): AppEntry => ({
   key: `sample-${name}`,
@@ -22,6 +22,9 @@ export default defineWidget<AppEntry[]>({
     id: "apps",
     intervalMs: 1500,
     cache: false,
-    fetch: async (previous) => stableOrder(previous ?? [], await invoke<AppEntry[]>("apps_list")),
+    fetch: async (previous) => {
+      const next = await invoke<AppEntry[]>("apps_list");
+      return takeReordered() ? next : stableOrder(previous ?? [], next);
+    },
   },
 });
