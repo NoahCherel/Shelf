@@ -138,6 +138,10 @@ unsafe fn from_file_at(file: &str, index: i32) -> Option<String> {
 /// A jump list line's icon, from where its shortcut says, or from the file or folder it opens.
 /// Call on a thread with COM initialised.
 pub fn jump_icon(spec: &str) -> Option<String> {
+    // A browser's own picture of a site, already ready to show.
+    if spec.starts_with("data:image/") {
+        return Some(spec.to_string());
+    }
     match super::jumplist::icon_spec(spec) {
         Some((file, index)) => unsafe { from_file_at(file, index) }.or_else(|| icon(file)),
         None => icon(spec),

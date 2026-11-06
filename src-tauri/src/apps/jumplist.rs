@@ -52,6 +52,7 @@ pub enum Kind {
     Tasks,
     Recent,
     QuickAccess,
+    History,
 }
 
 const MOST_RECENT: usize = 8;
@@ -84,6 +85,8 @@ pub fn section_title(kind: Kind, lang: u16) -> &'static str {
         (Kind::Recent, false) => "Recent",
         (Kind::QuickAccess, true) => "Accès rapide",
         (Kind::QuickAccess, false) => "Quick access",
+        (Kind::History, true) => "Historique",
+        (Kind::History, false) => "History",
     }
 }
 
@@ -185,20 +188,105 @@ pub fn newest<T>(candidates: impl IntoIterator<Item = (T, SystemTime)>) -> Optio
     candidates.into_iter().max_by_key(|(_, when)| *when).map(|(it, _)| it)
 }
 
+/// The name Windows gives an app's jump list files: a CRC-64 of its id in capitals, as UTF-16. The
+/// variant was found by matching the owner's own files, where it names Firefox's, Edge's and File
+/// Explorer's.
+pub fn file_stem_for(app_id: &str) -> String {
+    const POLY: u64 = 0x92C6_4265_D321_39A4;
+    let mut crc = u64::MAX;
+    for byte in app_id.to_uppercase().encode_utf16().flat_map(|u| u.to_le_bytes()) {
+        crc ^= byte as u64;
+        for _ in 0..8 {
+            crc = if crc & 1 == 1 { (crc >> 1) ^ POLY } else { crc >> 1 };
+        }
+    }
+    format!("{crc:016x}")
+}
+
+/// One item of the recent list Windows keeps for an app.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Recent {
+    pub path: String,
+    /// When it was last used, as a FILETIME.
+    pub when: u64,
+    pub pinned: bool,
+}
+
+/// Where an entry's fields sit: its last use, its pin, and its path's length, which the path follows.
+/// Version 6, as Windows 11 writes it, was measured on the owner's own files; version 3 is as
+/// documented for Windows 10.
+fn dest_layout(version: u32) -> Option<(usize, usize, usize)> {
+    match version {
+        3 => Some((96, 104, 124)),
+        4.. => Some((100, 108, 128)),
+        _ => None,
+    }
+}
+
+/// The DestList of an automatic jump list file, newest first: fixed fields, then the path's length
+/// and the path, then four bytes. Whatever doesn't follow it ends the reading, keeping what was read.
+pub fn dest_list(bytes: &[u8]) -> Vec<Recent> {
+    const HEADER: usize = 32;
+    let (Some(version), Some(count)) = (u32_at(bytes, 0), u32_at(bytes, 4)) else { return Vec::new() };
+    let Some((when_at, pin_at, len_at)) = dest_layout(version) else { return Vec::new() };
+    let mut out = Vec::new();
+    let mut at = HEADER;
+    for _ in 0..count {
+        let Some(when) = bytes.get(at + when_at..at + when_at + 8).map(|b| u64::from_le_bytes(b.try_into().unwrap())) else { break };
+        let Some(pin) = bytes.get(at + pin_at..at + pin_at + 4).map(|b| i32::from_le_bytes(b.try_into().unwrap())) else { break };
+        let Some(len) = bytes.get(at + len_at..at + len_at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize) else { break };
+        let Some(raw) = bytes.get(at + len_at + 2..at + len_at + 2 + len * 2) else { break };
+        let path = String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
+        out.push(Recent { path, when, pinned: pin >= 0 });
+        at += len_at + 2 + len * 2 + 4;
+    }
+    out.sort_by(|a, b| b.when.cmp(&a.when));
+    out
+}
+
+/// What a recent item is called in the menu: its file's name, or its address.
+pub fn name_of(path: &str) -> &str {
+    if path.starts_with("http://") || path.starts_with("https://") {
+        return path;
+    }
+    path.rsplit(['\\', '/']).next().unwrap_or(path)
+}
+
+fn recent_folder() -> PathBuf {
+    Path::new(&std::env::var("APPDATA").unwrap_or_default()).join(r"Microsoft\Windows\Recent\AutomaticDestinations")
+}
+
+/// The recent items Windows keeps for an app, from its own file, still there. Call on a COM thread.
+pub fn recent_items(app_id: &str) -> Vec<Link> {
+    let file = recent_folder().join(format!("{}.automaticDestinations-ms", file_stem_for(app_id)));
+    let Some(list) = native::dest_list_of(&file) else { return Vec::new() };
+    dest_list(&list)
+        .into_iter()
+        .filter(|r| r.path.starts_with("http") || Path::new(&r.path).exists())
+        .take(MOST_RECENT)
+        .map(|r| Link { title: name_of(&r.path).to_string(), detail: detail_of(&r.path).to_string(), icon: r.path.clone(), path: r.path, args: String::new() })
+        .collect()
+}
+
 fn custom_folder() -> PathBuf {
     Path::new(&std::env::var("APPDATA").unwrap_or_default()).join(r"Microsoft\Windows\Recent\CustomDestinations")
 }
 
-/// The program's own lists, such as Firefox's "Most visited" and its tasks. Call on a COM thread.
-pub fn lists(exe: &str) -> Vec<(Category, Vec<Link>)> {
-    let Ok(files) = std::fs::read_dir(custom_folder()) else { return Vec::new() };
-    let candidates = files.flatten().filter_map(|f| {
-        let path = f.path();
-        let when = f.metadata().and_then(|m| m.modified()).ok()?;
-        let bytes = std::fs::read(&path).ok()?;
-        mentions(&bytes, exe).then_some((bytes, when))
-    });
-    let Some(bytes) = newest(candidates) else { return Vec::new() };
+/// The program's own lists, such as Firefox's "Most visited" and its tasks: from the file Windows
+/// names after the app's id, or else the newest that mentions its program. Call on a COM thread.
+pub fn lists(app_id: Option<&str>, exe: Option<&str>) -> Vec<(Category, Vec<Link>)> {
+    let by_id = app_id.and_then(|id| std::fs::read(custom_folder().join(format!("{}.customDestinations-ms", file_stem_for(id)))).ok());
+    let by_program = || {
+        let exe = exe?;
+        let files = std::fs::read_dir(custom_folder()).ok()?;
+        let candidates = files.flatten().filter_map(|f| {
+            let when = f.metadata().and_then(|m| m.modified()).ok()?;
+            let bytes = std::fs::read(f.path()).ok()?;
+            mentions(&bytes, exe).then_some((bytes, when))
+        });
+        newest(candidates)
+    };
+    let Some(bytes) = by_id.or_else(by_program) else { return Vec::new() };
     categories(&bytes, native::read_link)
         .into_iter()
         .map(|(category, links)| match category {
@@ -210,7 +298,13 @@ pub fn lists(exe: &str) -> Vec<(Category, Vec<Link>)> {
 
 /// The app's recent files, for an app that gave Windows an id of its own. Call on a COM thread.
 pub fn recent(app_id: &str) -> Vec<Link> {
-    native::recent(app_id, MOST_RECENT)
+    // Windows' own file first: its document lists filter out much of what the taskbar shows.
+    let items = recent_items(app_id);
+    if items.is_empty() {
+        native::recent(app_id, MOST_RECENT)
+    } else {
+        items
+    }
 }
 
 /// File Explorer's pinned and frequent folders. Call on a COM thread.
@@ -234,7 +328,8 @@ mod native {
 
     use windows::core::{Interface, GUID, HSTRING, PWSTR};
     use windows::Win32::Foundation::PROPERTYKEY;
-    use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, IPersistStream, CLSCTX_INPROC_SERVER, STREAM_SEEK_CUR};
+    use windows::Win32::System::Com::StructuredStorage::{IStorage, StgOpenStorage};
+    use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, IPersistStream, CLSCTX_INPROC_SERVER, STGM_READ, STGM_SHARE_EXCLUSIVE, STREAM_SEEK_CUR, STREAM_SEEK_END, STREAM_SEEK_SET};
     use windows::Win32::UI::Shell::Common::IObjectArray;
     use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
     use windows::Win32::UI::Shell::{
@@ -314,6 +409,27 @@ mod native {
         Some(Link { title: text_of(item, SIGDN_NORMALDISPLAY)?, detail: super::detail_of(&path).to_string(), icon: path.clone(), path, args: String::new() })
     }
 
+    /// The DestList stream of an automatic jump list file. Explorer keeps the file open, so a copy is read.
+    pub fn dest_list_of(file: &std::path::Path) -> Option<Vec<u8>> {
+        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", std::process::id()));
+        std::fs::copy(file, &copy).ok()?;
+        let read = || unsafe {
+            let storage: IStorage = StgOpenStorage(&HSTRING::from(copy.as_os_str()), None, STGM_READ | STGM_SHARE_EXCLUSIVE, None, 0).ok()?;
+            let stream = storage.OpenStream(&HSTRING::from("DestList"), None, STGM_READ | STGM_SHARE_EXCLUSIVE, 0).ok()?;
+            let mut size = 0u64;
+            stream.Seek(0, STREAM_SEEK_END, Some(&mut size)).ok()?;
+            stream.Seek(0, STREAM_SEEK_SET, None).ok()?;
+            let mut bytes = vec![0u8; size as usize];
+            let mut got = 0u32;
+            stream.Read(bytes.as_mut_ptr() as *mut c_void, size as u32, Some(&mut got)).ok().ok()?;
+            bytes.truncate(got as usize);
+            Some(bytes)
+        };
+        let bytes = read();
+        let _ = std::fs::remove_file(&copy);
+        bytes
+    }
+
     pub fn recent(app_id: &str, most: usize) -> Vec<Link> {
         unsafe {
             let Ok(lists) = CoCreateInstance::<_, IApplicationDocumentLists>(&ApplicationDocumentLists, None, CLSCTX_INPROC_SERVER) else { return Vec::new() };
@@ -373,6 +489,12 @@ mod tests {
         let list = vec![link("a.exe", "")];
         assert_eq!(find(&list, "0123456789abcdef"), None);
         assert_eq!(find(&list, "calc.exe"), None);
+    }
+
+    #[test]
+    fn a_browser_s_history_is_named_too() {
+        assert_eq!(section_title(Kind::History, 0x040C), "Historique");
+        assert_eq!(section_title(Kind::History, 0x0409), "History");
     }
 
     #[test]
@@ -487,6 +609,75 @@ mod tests {
     fn a_file_is_detailed_by_the_folder_it_is_in() {
         assert_eq!(folder_of(r"C:\Users\me\Documents\notes.txt"), r"C:\Users\me\Documents");
         assert_eq!(folder_of("::{GUID}"), "");
+    }
+
+    #[test]
+    fn an_apps_files_are_named_as_windows_names_them() {
+        // Checked against the owner's own files.
+        assert_eq!(file_stem_for("308046B0AF4A39CB"), "6824f4a902c78fbd");
+        assert_eq!(file_stem_for("308046b0af4a39cb"), "6824f4a902c78fbd", "whatever the case");
+        assert_eq!(file_stem_for("MSEdge"), "ccba5a5986c77e43");
+        assert_eq!(file_stem_for("Microsoft.Windows.Explorer"), "f01b4d95cf55d32a");
+    }
+
+    fn dest_entry_in(version: u32, when: u64, pinned: bool, path: &str) -> Vec<u8> {
+        let (when_at, pin_at, len_at) = dest_layout(version).unwrap();
+        let wide: Vec<u16> = path.encode_utf16().collect();
+        let mut e = vec![0u8; len_at + 2 + wide.len() * 2 + 4];
+        e[when_at..when_at + 8].copy_from_slice(&when.to_le_bytes());
+        e[pin_at..pin_at + 4].copy_from_slice(&(if pinned { 0i32 } else { -1i32 }).to_le_bytes());
+        e[len_at..len_at + 2].copy_from_slice(&(wide.len() as u16).to_le_bytes());
+        for (i, u) in wide.iter().enumerate() {
+            e[len_at + 2 + i * 2..len_at + 4 + i * 2].copy_from_slice(&u.to_le_bytes());
+        }
+        e
+    }
+
+    fn dest_entry(_number: u32, when: u64, pinned: bool, path: &str) -> Vec<u8> {
+        dest_entry_in(6, when, pinned, path)
+    }
+
+    #[test]
+    fn the_windows_10_layout_is_read_too() {
+        let mut list = vec![0u8; 32];
+        list[0..4].copy_from_slice(&3u32.to_le_bytes());
+        list[4..8].copy_from_slice(&1u32.to_le_bytes());
+        list.extend(dest_entry_in(3, 5, false, r"C:\a.txt"));
+        assert_eq!(dest_list(&list)[0].path, r"C:\a.txt");
+    }
+
+    #[test]
+    fn windows_own_recent_list_is_read_newest_first() {
+        let mut list = vec![0u8; 32];
+        list[0..4].copy_from_slice(&6u32.to_le_bytes());
+        list[4..8].copy_from_slice(&3u32.to_le_bytes());
+        list.extend(dest_entry(1, 100, false, r"C:\Users\me\old.pdf"));
+        list.extend(dest_entry(2, 300, false, r"C:\Users\me\new.pdf"));
+        list.extend(dest_entry(3, 200, true, "https://example.com/"));
+        let items = dest_list(&list);
+        assert_eq!(items.iter().map(|i| i.path.as_str()).collect::<Vec<_>>(), [r"C:\Users\me\new.pdf", "https://example.com/", r"C:\Users\me\old.pdf"]);
+        assert!(items[1].pinned);
+    }
+
+    #[test]
+    fn a_recent_list_that_doesnt_follow_the_format_gives_what_was_read() {
+        let mut list = vec![0u8; 32];
+        list[0..4].copy_from_slice(&6u32.to_le_bytes());
+        list[4..8].copy_from_slice(&5u32.to_le_bytes());
+        list.extend(dest_entry(1, 100, false, r"C:\a.txt"));
+        list.extend([1, 2, 3]);
+        assert_eq!(dest_list(&list).len(), 1);
+        assert!(dest_list(&[0u8; 10]).is_empty());
+        let mut old = vec![0u8; 32];
+        old[0..4].copy_from_slice(&1u32.to_le_bytes());
+        old[4..8].copy_from_slice(&1u32.to_le_bytes());
+        assert!(dest_list(&old).is_empty(), "the Windows 7 layout isn't read");
+    }
+
+    #[test]
+    fn a_recent_item_is_named_by_its_file_or_its_address() {
+        assert_eq!(name_of(r"C:\Users\me\Report.pdf"), "Report.pdf");
+        assert_eq!(name_of("https://example.com/a"), "https://example.com/a");
     }
 
     #[test]

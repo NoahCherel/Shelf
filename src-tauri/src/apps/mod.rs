@@ -1,6 +1,7 @@
 //! The Apps widget's data: pins, open windows, icons, and the Start menu.
 
 mod icons;
+pub mod history;
 pub mod jumplist;
 pub mod menu;
 pub mod merge;
@@ -165,13 +166,36 @@ pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
     });
 }
 
+fn is_browser(exe: &str) -> bool {
+    let name = exe.rsplit(['\\', '/']).next().unwrap_or(exe).to_lowercase();
+    ["firefox.exe", "chrome.exe", "msedge.exe", "brave.exe", "opera.exe", "vivaldi.exe"].contains(&name.as_str())
+}
+
 fn looks_like_path(key: &str) -> bool {
     key.contains('\\') || key.contains('/') || key.ends_with(".exe")
 }
 
 /// The jump lists Windows keeps for this app: File Explorer's quick access, a program's tasks, and the
 /// recent files of an app with an id of its own. Call on a COM thread.
-/// In Windows' order: the program's own categories, its recent files, then its tasks.
+/// The pages a browser visited last, each opening in that browser.
+fn history_of(exe: &str) -> Vec<jumplist::Link> {
+    let Some(browser) = history::browser_for(exe) else { return Vec::new() };
+    history::recent(&browser, HISTORY_LINES)
+        .into_iter()
+        .map(|visit| jumplist::Link {
+            title: visit.title,
+            path: exe.to_string(),
+            args: format!("\"{}\"", visit.url),
+            icon: visit.icon.unwrap_or_else(|| exe.to_string()),
+            detail: visit.url,
+        })
+        .collect()
+}
+
+const HISTORY_LINES: usize = 8;
+
+/// In Windows' order: the program's own categories, its recent files, then its tasks. A browser
+/// shows the pages it visited last first, instead of the sites it reckons most visited.
 fn jump_lists(entry: &AppEntry, lang: u16) -> Vec<(String, Vec<jumplist::Link>)> {
     use jumplist::{section_title, Category, Kind};
     let title = |kind| section_title(kind, lang).to_string();
@@ -185,15 +209,22 @@ fn jump_lists(entry: &AppEntry, lang: u16) -> Vec<(String, Vec<jumplist::Link>)>
             launch.to_lowercase().ends_with(".exe").then(|| launch.to_string())
         }
     });
-    let own = program.map(|exe| jumplist::lists(&exe)).unwrap_or_default();
-    let recent = if looks_like_path(&entry.key) { Vec::new() } else { jumplist::recent(&entry.key) };
+    let app_id = (!looks_like_path(&entry.key)).then_some(entry.key.as_str());
+    let own = jumplist::lists(app_id, program.as_deref());
+    let recent = app_id.map(jumplist::recent).unwrap_or_default();
+    // A browser's own categories are its most visited sites, by its own reckoning: the owner wants
+    // what's recent instead.
+    let browser = program.as_deref().is_some_and(is_browser);
     let mut out: Vec<(String, Vec<jumplist::Link>)> = own
         .iter()
         .filter_map(|(c, links)| match c {
-            Category::Named(name) => Some((name.clone(), links.clone())),
-            Category::Tasks => None,
+            Category::Named(name) if !browser => Some((name.clone(), links.clone())),
+            _ => None,
         })
         .collect();
+    if browser {
+        out.push((title(Kind::History), program.as_deref().map(history_of).unwrap_or_default()));
+    }
     out.push((title(Kind::Recent), recent));
     out.extend(own.into_iter().filter(|(c, _)| *c == Category::Tasks).map(|(_, links)| (title(Kind::Tasks), links)));
     out
