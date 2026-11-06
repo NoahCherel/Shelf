@@ -79,10 +79,21 @@ pub fn notification_dismiss(id: u32) -> Result<(), String> {
     UserNotificationListener::Current().and_then(|l| l.RemoveNotification(id)).map_err(|e| e.to_string())
 }
 
+/// Tries every one, so one that can't be removed doesn't keep the rest. Returns how many failed.
+fn remove_each(ids: &[u32], mut remove: impl FnMut(u32) -> bool) -> usize {
+    ids.iter().filter(|&&id| !remove(id)).count()
+}
+
+/// Windows' own clear-all left everything in place, so each is removed as a single one is.
 #[tauri::command(async)]
 pub fn notifications_clear() -> Result<(), String> {
     crate::preview::guard()?;
-    UserNotificationListener::Current().and_then(|l| l.ClearNotifications()).map_err(|e| e.to_string())
+    let listener = UserNotificationListener::Current().map_err(|e| e.to_string())?;
+    let ids: Vec<u32> = all().map_err(|e| e.to_string())?.iter().filter_map(|n| n.Id().ok()).collect();
+    match remove_each(&ids, |id| listener.RemoveNotification(id).is_ok()) {
+        0 => Ok(()),
+        failed => Err(format!("{failed} of {} notifications couldn't be removed", ids.len())),
+    }
 }
 
 struct AppMatch {
@@ -135,6 +146,18 @@ pub fn notification_open(id: u32) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clearing_removes_each_one_and_carries_on_past_one_that_fails() {
+        let mut removed = Vec::new();
+        let failed = remove_each(&[1, 2, 3], |id| {
+            removed.push(id);
+            id != 2
+        });
+        assert_eq!(removed, vec![1, 2, 3]);
+        assert_eq!(failed, 1);
+        assert_eq!(remove_each(&[], |_| false), 0);
+    }
 
     #[test]
     fn the_first_line_is_the_title_and_the_rest_the_body() {
