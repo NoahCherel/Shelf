@@ -71,10 +71,11 @@ fn fitted(source: (i32, i32), slot: Box4) -> Box4 {
     Box4 { left, top, right: left + w, bottom: top + h }
 }
 
-/// On the strip, or in the gap between it and the dock.
+/// On the strip, or in the gap between it and the dock, whichever side of the dock it opened on.
 fn heading_for_strip(pointer: (i32, i32), dock: Rect, strip: Rect) -> bool {
     let (x, y) = pointer;
-    x >= strip.x && x < strip.x + strip.w && y >= strip.y && y < dock.y
+    let (top, bottom) = if strip.y >= dock.y + dock.h { (dock.y + dock.h, strip.y + strip.h) } else { (strip.y, dock.y) };
+    x >= strip.x && x < strip.x + strip.w && y >= top && y < bottom
 }
 
 fn pointer_within(pointer: (i32, i32), dock: Rect, strip: Rect) -> bool {
@@ -516,6 +517,19 @@ mod tests {
         assert!(is_newest(&last, 2));
         assert!(!is_newest(&last, 1), "a leave overtaken by the next hover must not end the peek");
         assert!(is_newest(&last, 3));
+    }
+
+    #[test]
+    fn under_a_dock_at_the_top_the_strip_and_the_gap_keep_it_open() {
+        let dock = Rect { x: 300, y: 8, w: 1000, h: 70 };
+        let strip = Rect { x: 500, y: 88, w: 400, h: 170 };
+        assert!(heading_for_strip((600, 150), dock, strip), "on the strip");
+        assert!(heading_for_strip((600, 82), dock, strip), "in the gap");
+        assert!(!heading_for_strip((600, 40), dock, strip), "back on the dock");
+        assert!(!heading_for_strip((600, 300), dock, strip), "past it");
+        assert!(pointer_within((600, 150), dock, strip));
+        assert!(pointer_within((600, 40), dock, strip));
+        assert!(!pointer_within((600, 600), dock, strip));
     }
 
     #[test]
