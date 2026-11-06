@@ -124,6 +124,12 @@ export function CardWindow() {
       setShown(null);
     });
     window.addEventListener("focus", catchUp);
+    // Another app can cover the card the moment it opens. Rust would still think it open, and the
+    // next click on its tile would close it instead of showing it, so it's closed for real.
+    const onHidden = () => {
+      if (document.hidden && current) invoke("close_card").catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onHidden);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") invoke("close_card").catch(() => {});
     };
@@ -132,6 +138,7 @@ export function CardWindow() {
       off.then((stop) => stop());
       offClosed.then((stop) => stop());
       window.removeEventListener("focus", catchUp);
+      document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("keydown", onKey);
     };
   }, []);
