@@ -108,6 +108,8 @@ These need a real pointer, and closing or switching real windows.
 
 ## Right-clicking an app
 
+- [x] **Every time:** each right-click shows the right app's menu, including when switching from one app to another (confirmed by the owner, 2026-11-06).
+- [ ] **Focus taken:** when another app takes the focus as the menu opens, the menu stays, and the next click outside it closes it.
 - [ ] **Menu:** the app's icon and name, pin or unpin, and close, in Windows' language, looking like Windows' own.
 - [ ] **Pin:** pinning an open app keeps its icon after closing it, and after restarting Shelf.
 - [ ] **Unpin:** unpinning takes it off the dock. It's still pinned on Windows' own taskbar, which Shelf leaves alone.

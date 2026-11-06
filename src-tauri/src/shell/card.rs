@@ -272,6 +272,11 @@ fn button_down() -> bool {
     [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].iter().any(|vk| unsafe { GetAsyncKeyState(vk.0 as i32) } < 0)
 }
 
+/// Down now, or pressed since the last check: a quick click can start and end between two checks.
+fn button_pressed() -> bool {
+    [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].iter().any(|vk| unsafe { GetAsyncKeyState(vk.0 as i32) } as u16 & 0x8001 != 0)
+}
+
 const PRESS_CHECK: Duration = Duration::from_millis(40);
 static WATCHING: AtomicBool = AtomicBool::new(false);
 
@@ -282,6 +287,8 @@ fn close_at_next_press_outside(app: AppHandle) {
         return;
     }
     std::thread::spawn(move || {
+        // Clears the "pressed since" flag left by whatever came before.
+        button_pressed();
         loop {
             std::thread::sleep(PRESS_CHECK);
             let Ok(card) = card_window(&app) else { break };
@@ -293,7 +300,7 @@ fn close_at_next_press_outside(app: AppHandle) {
             if unsafe { GetCursorPos(&mut p) }.is_err() {
                 continue;
             }
-            if press_closes(button_down(), (p.x, p.y), Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }) {
+            if press_closes(button_pressed(), (p.x, p.y), Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }) {
                 with_state(|s| s.closed(now()));
                 let _ = hide_card(&app);
                 break;

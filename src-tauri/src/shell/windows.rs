@@ -4,9 +4,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Must match every window in tauri.conf.json: windows with different options can't share WebView2.
 /// One renderer between them keeps memory down, as they only ever show Shelf's own pages.
-/// Occlusion tracking is off: an app's previews strip, closing where its menu opens, made WebView2
-/// think the menu covered, so it stopped drawing it and showed nothing or the last menu.
-const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess,CalculateNativeWinOcclusion --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1";
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1";
 
 fn size_of(kind: &str) -> Option<(f64, f64, &'static str)> {
     match kind {

@@ -71,6 +71,13 @@ function useEdgeDrag() {
       }
       invoke("dock_drag_end").catch(() => {});
     },
+    // Windows can take the pointer away mid-drag, with no pointerup: the dock goes back where it was,
+    // and Rust stops treating it as moving.
+    onLostPointerCapture() {
+      if (start.current === null) return;
+      start.current = null;
+      if (moved.current) invoke("dock_drag_end").catch(() => {});
+    },
   };
 }
 
@@ -354,8 +361,14 @@ function useFreePlacement(full: boolean, ids: string[], locked: boolean) {
       moved = true;
       setMoving({ id, left: leftAt(ev.clientX) });
     };
+    const cancel = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setMoving(null);
+    };
     const up = (ev: globalThis.PointerEvent) => {
       window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointercancel", cancel);
       setMoving(null);
       if (!moved) return;
       const left = leftAt(ev.clientX);
@@ -372,6 +385,8 @@ function useFreePlacement(full: boolean, ids: string[], locked: boolean) {
     // On the window, as the pointer can leave the slot before it counts as a drag.
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up, { once: true });
+    // A drag Windows cuts short leaves the widget where it was.
+    window.addEventListener("pointercancel", cancel, { once: true });
   };
 
   return {

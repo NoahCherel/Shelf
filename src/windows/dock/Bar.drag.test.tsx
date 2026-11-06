@@ -416,3 +416,19 @@ it("at full width, a widget folding away stays where it was rather than jumping"
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
+
+it("a dock drag Windows cuts short still tells Rust it's over, without moving the dock", () => {
+  Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+  render(<DockBar />);
+  const bar = screen.getByTestId("bar");
+  bar.setPointerCapture = vi.fn();
+  fireEvent.pointerDown(bar, { button: 0, pointerId: 1, screenX: 500, screenY: 840 });
+  fireEvent.pointerMove(bar, { pointerId: 1, screenX: 500, screenY: 100 });
+  vi.mocked(invoke).mockClear();
+  fireEvent.lostPointerCapture(bar, { pointerId: 1 });
+  expect(invoke).toHaveBeenCalledWith("dock_drag_end");
+  expect(useSettings.getState().edge).toBe("bottom");
+  vi.mocked(invoke).mockClear();
+  fireEvent.pointerUp(bar, { pointerId: 1, screenX: 500, screenY: 100 });
+  expect(invoke).not.toHaveBeenCalledWith("dock_drag_end");
+});

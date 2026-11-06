@@ -27,7 +27,7 @@
         "shadow": false,
         "visible": false,
         "focus": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess,CalculateNativeWinOcclusion --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
       },
       {
         "label": "card",
@@ -45,7 +45,7 @@
         "shadow": false,
         "visible": false,
         "focus": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess,CalculateNativeWinOcclusion --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
       },
       {
         "label": "preview",
@@ -63,7 +63,7 @@
         "shadow": false,
         "visible": false,
         "focus": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess,CalculateNativeWinOcclusion --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
       }
     ],
     "security": {
