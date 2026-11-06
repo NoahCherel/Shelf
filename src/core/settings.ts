@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import { invoke, listen } from "./tauri";
+import { STYLES, type ClearMaterial, type StyleName } from "../design/theme";
 
 const VERSION = 1;
 
 export interface SettingsData {
-  style: "liquid" | "black";
+  style: StyleName;
+  /** What Clear's widgets are made of, with no bar behind them. */
+  clearMaterial: ClearMaterial;
   theme: "auto" | "dark" | "light";
   accent: string | null;
   size: number;
@@ -39,6 +42,7 @@ export const SPACING_MAX = 24;
 export function defaults(): SettingsData {
   return {
     style: "liquid",
+    clearMaterial: "frosted",
     theme: "auto",
     accent: null,
     size: 50,
@@ -71,7 +75,8 @@ export function sanitize(raw: unknown): SettingsData {
   const weather = isObject(raw.weather) ? raw.weather : {};
   const github = isObject(raw.github) ? raw.github : {};
   return {
-    style: oneOf(raw.style, ["liquid", "black"] as const, d.style),
+    style: oneOf(raw.style, STYLES, d.style),
+    clearMaterial: oneOf(raw.clearMaterial, ["black", "white", "frosted"] as const, d.clearMaterial),
     theme: oneOf(raw.theme, ["auto", "dark", "light"] as const, d.theme),
     accent: typeof raw.accent === "string" && /^#[0-9a-f]{6}$/i.test(raw.accent) ? raw.accent : null,
     size: typeof raw.size === "number" && Number.isFinite(raw.size) ? Math.min(SIZE_MAX, Math.max(SIZE_MIN, raw.size)) : d.size,

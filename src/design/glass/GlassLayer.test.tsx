@@ -1,7 +1,8 @@
 import { beforeEach, vi } from "vitest";
 import { act, render, waitFor } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
-import { GlassLayer } from "./GlassLayer";
+import { GlassLayer, lookFor } from "./GlassLayer";
+import { usesGlass } from "../theme";
 import { lensOffset } from "./lens";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
@@ -82,5 +83,39 @@ describe("GlassLayer", () => {
     const fire = mockListen.mock.calls.find((c) => c[0] === "glass-frame")![1] as () => void;
     await act(async () => fire());
     expect(calls("glass_frame")).toBe(1);
+  });
+});
+
+describe("glass for each style", () => {
+  it("only the glass styles capture the screen, and Clear only when frosted", () => {
+    expect(["liquid", "ios", "midnight", "black", "white"].map((s) => usesGlass(s as never, "frosted"))).toEqual([true, true, false, false, false]);
+    expect(usesGlass("clear", "frosted")).toBe(true);
+    expect(usesGlass("clear", "black")).toBe(false);
+  });
+
+  it("iOS Glass is tinted more deeply than Liquid Glass", () => {
+    expect(lookFor("ios", "dark").tintAmount).toBeGreaterThan(lookFor("liquid", "dark").tintAmount + 0.2);
+    expect(lookFor("ios", "light").tint).toEqual([1, 1, 1]);
+  });
+
+  it("Clear draws only under its tiles", () => {
+    expect(lookFor("clear", "dark").clearOutside).toBe(1);
+    expect(lookFor("liquid", "dark").clearOutside).toBe(0);
+  });
+
+  it("switching between glass styles keeps the same capture running", async () => {
+    document.documentElement.dataset.style = "liquid";
+    render(
+      <div className="dock">
+        <GlassLayer active />
+      </div>,
+    );
+    await waitFor(() => expect(calls("glass_start")).toBe(1));
+    act(() => {
+      document.documentElement.dataset.style = "ios";
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls("glass_start")).toBe(1);
+    expect(calls("glass_stop")).toBe(0);
   });
 });

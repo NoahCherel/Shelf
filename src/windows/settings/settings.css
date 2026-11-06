@@ -176,3 +176,17 @@
 .setting__control:disabled {
   opacity: 0.4;
 }
+
+/* A colour of your own: the rainbow until one is picked, then that colour. */
+.accent--own {
+  position: relative;
+  overflow: hidden;
+  background: conic-gradient(#ff453a, #ff9f0a, #ffd60a, #30d158, #64d2ff, #0a84ff, #bf5af2, #ff375f, #ff453a);
+}
+
+.accent--own input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}

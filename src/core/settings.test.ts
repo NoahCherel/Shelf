@@ -101,3 +101,10 @@ it("a narrowed dock keeps a sensible width, or none", () => {
   expect(sanitize({ narrowWidth: 10 }).narrowWidth).toBe(40);
   expect(sanitize({ narrowWidth: "wide" }).narrowWidth).toBeNull();
 });
+
+it("all six styles are kept, and Clear's material falls back on its own", () => {
+  for (const style of ["liquid", "ios", "midnight", "black", "white", "clear"]) expect(sanitize({ style }).style).toBe(style);
+  expect(defaults().clearMaterial).toBe("frosted");
+  expect(sanitize({ clearMaterial: "white" }).clearMaterial).toBe("white");
+  expect(sanitize({ clearMaterial: "gold" }).clearMaterial).toBe("frosted");
+});

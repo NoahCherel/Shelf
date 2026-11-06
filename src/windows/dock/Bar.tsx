@@ -9,6 +9,7 @@ import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { GlassLayer } from "../../design/glass/GlassLayer";
+import { usesGlass } from "../../design/theme";
 import { openPanel } from "../../panels";
 import "./dock.css";
 
@@ -235,7 +236,8 @@ export function DockBar() {
   const style = useSettings((s) => s.style);
   const [glassFailed, setGlassFailed] = useState(false);
   const onGlassUnavailable = useCallback(() => setGlassFailed(true), []);
-  const glass = style === "liquid" && !fullscreen && !locked && !glassFailed;
+  const clearMaterial = useSettings((s) => s.clearMaterial);
+  const glass = usesGlass(style, clearMaterial) && !fullscreen && !locked && !glassFailed;
   const full = useSettings((s) => s.dockWidth) === "full";
   // Like the taskbar, a full-width dock sits right on the edge.
   const edgeGap = useSettings((s) => (s.dockWidth === "full" ? 0 : s.edgeGap));

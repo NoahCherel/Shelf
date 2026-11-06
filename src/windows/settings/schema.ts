@@ -67,11 +67,25 @@ export const SCHEMA: PageDef[] = [
       section("Dock style", [
         choice("style", {
           label: "Style",
-          tip: "Liquid Glass bends what's behind the dock. Black is solid and uses the least power.",
+          tip: "Liquid Glass bends what's behind the dock, and iOS Glass tints it more deeply. Midnight, Black and White are solid and use the least power. Clear has no bar, only widgets.",
           options: [
             { value: "liquid", label: "Liquid Glass" },
+            { value: "ios", label: "iOS Glass" },
+            { value: "midnight", label: "Midnight" },
             { value: "black", label: "Black" },
+            { value: "white", label: "White" },
+            { value: "clear", label: "Clear" },
           ],
+        }),
+        choice("clearMaterial", {
+          label: "Clear widgets",
+          tip: "With Clear, what the widgets are made of: frosted glass, or solid black or white.",
+          options: [
+            { value: "frosted", label: "Frosted" },
+            { value: "black", label: "Black" },
+            { value: "white", label: "White" },
+          ],
+          disabledWhen: (s) => s.style !== "clear",
         }),
         choice("theme", {
           label: "Theme",

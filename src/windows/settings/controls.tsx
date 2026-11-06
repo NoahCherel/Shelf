@@ -104,6 +104,9 @@ function AccentRow({ row }: { row: RowDef }) {
           onClick={() => save(accent.color)}
         />
       ))}
+      <label className="accent accent--own" title="Your own colour" style={{ background: ACCENTS.some((a) => a.color === current) ? undefined : current }}>
+        <input type="color" aria-label="Your own colour" value={current} onChange={(e) => save(e.target.value)} />
+      </label>
     </div>
   );
 }

@@ -18,6 +18,8 @@ uniform vec4 tiles[16];
 uniform int tileCount;
 // 1 for a full-width bar: its ends run into the screen's edges, so they neither bend nor shine.
 uniform float openEnds;
+// 1 for Clear: no bar, only glass under each tile.
+uniform float clearOutside;
 
 float box(vec2 q, vec2 b, float r) {
   vec2 d = abs(q) - b + r;
@@ -71,6 +73,11 @@ void main() {
 
   // Tiles soften what's behind them and darken it, which is what makes their text readable.
   float tile = underTile(px);
+  if (clearOutside > 0.5) {
+    vec3 frosted = mix(mix(blurred(px, softUnderTiles * 2.0) * tileBrightness, vec3(1.0), tileLift), tint, tintAmount);
+    gl_FragColor = vec4(frosted * tile, tile);
+    return;
+  }
   vec3 behind = mix(blurred(bent, softUnderTiles) * tileBrightness, vec3(1.0), tileLift);
   vec3 color = mix(sampleAt(bent), behind, tile);
   color = mix(color, tint, tintAmount);

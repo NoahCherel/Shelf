@@ -16,9 +16,26 @@ const LOOK = {
   tileBrightness: 0.46,
   /** On light, they wash it toward white instead, so dark text stays readable. */
   tileLift: 0.62,
+  tint: [1, 1, 1] as [number, number, number],
   tintAmount: 0.02,
   rimStrength: 0.58,
+  /** 1 draws nothing outside the tiles, for Clear. */
+  clearOutside: 0,
 };
+
+type Look = typeof LOOK;
+
+/** Each glass style's values, on dark or light. */
+export function lookFor(style: string, theme: string): Look {
+  if (style === "ios") {
+    // A deeper tint over the same bending: dark smoke on dark, milky on light.
+    return theme === "light"
+      ? { ...LOOK, tint: [1, 1, 1], tintAmount: 0.38, lensStrength: 16, tileLift: 0.5 }
+      : { ...LOOK, tint: [0.06, 0.06, 0.08], tintAmount: 0.46, lensStrength: 16, tileBrightness: 0.62, rimStrength: 0.42 };
+  }
+  if (style === "clear") return { ...LOOK, clearOutside: 1, tintAmount: theme === "light" ? 0.2 : 0.12, tint: theme === "light" ? [1, 1, 1] : [0.08, 0.08, 0.1] };
+  return LOOK;
+}
 
 export interface Painter {
   draw(buffer: ArrayBuffer): void;
@@ -87,19 +104,23 @@ export function createPainter(canvas: HTMLCanvasElement): Painter | null {
       const T = parseFloat(style.getPropertyValue("--T")) || 50;
       gl.uniform1f(uniform("openEnds"), parent.dataset.width === "full" ? 1 : 0);
       gl.uniform1f(uniform("radius"), (parseFloat(getComputedStyle(parent).borderTopLeftRadius) || 0) * scale);
-      gl.uniform1f(uniform("lensBand"), LOOK.lensBand * scale);
-      gl.uniform1f(uniform("lensStrength"), LOOK.lensStrength * scale);
-      gl.uniform1f(uniform("softUnderTiles"), LOOK.softUnderTiles * scale);
-      const light = document.documentElement.dataset.theme === "light";
-      gl.uniform1f(uniform("tileBrightness"), light ? 1 : LOOK.tileBrightness);
-      gl.uniform1f(uniform("tileLift"), light ? LOOK.tileLift : 0);
+      const theme = document.documentElement.dataset.theme ?? "dark";
+      const look = lookFor(document.documentElement.dataset.style ?? "liquid", theme);
+      gl.uniform1f(uniform("lensBand"), look.lensBand * scale);
+      gl.uniform1f(uniform("lensStrength"), look.lensStrength * scale);
+      gl.uniform1f(uniform("softUnderTiles"), look.softUnderTiles * scale);
+      const light = theme === "light";
+      gl.uniform1f(uniform("tileBrightness"), light ? 1 : look.tileBrightness);
+      gl.uniform1f(uniform("tileLift"), light ? look.tileLift : 0);
       gl.uniform1f(uniform("tileRadius"), T * 0.24 * scale);
-      gl.uniform3f(uniform("tint"), 1, 1, 1);
-      gl.uniform1f(uniform("tintAmount"), LOOK.tintAmount);
-      gl.uniform1f(uniform("rimStrength"), LOOK.rimStrength);
+      gl.uniform3f(uniform("tint"), ...look.tint);
+      gl.uniform1f(uniform("tintAmount"), look.tintAmount);
+      gl.uniform1f(uniform("rimStrength"), look.rimStrength);
+      gl.uniform1f(uniform("clearOutside"), look.clearOutside);
 
-      // Softening only happens under tiles; bare app icons sit on the clear glass.
-      const rects = [...parent.querySelectorAll(".tile")]
+      // Softening only happens under tiles; bare app icons sit on the clear glass. With no bar,
+      // the apps have a plate of their own.
+      const rects = [...parent.querySelectorAll(look.clearOutside ? ".tile, .apps" : ".tile")]
         .map((tile) => tile.getBoundingClientRect())
         .filter((r) => r.right > bar.left && r.left < bar.right)
         .slice(0, MAX_TILES);
@@ -162,9 +183,9 @@ export function GlassLayer({ active, onUnavailable }: GlassLayerProps) {
     const scroller = canvas.current?.parentElement?.querySelector(".dock__scroll");
     const relayout = () => painter?.layout();
     scroller?.addEventListener("scroll", relayout, { passive: true });
-    // Dark and light tint the tiles differently.
+    // Dark and light, and each glass style, tint differently.
     const themeWatch = new MutationObserver(() => painter?.layout());
-    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-style", "data-clear"] });
     painter?.layout();
     invoke("glass_start").catch(() => {
       if (live) onUnavailable?.();

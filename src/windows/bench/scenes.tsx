@@ -88,6 +88,13 @@ export const scenes: Scene[] = [
     settings: { narrowWidth: 560 },
     measure: [{ name: "the bar is as narrow as asked", expect: `Math.round(document.querySelector(".dock").getBoundingClientRect().width) === 560` }],
   },
+  ...(["ios", "midnight", "white", "clear"] as const).flatMap((style) => [
+    // Clear's frosting only shows over something bright behind it.
+    { id: `dock-${style}`, size: WIDE, wallpaper: style === "clear" ? ("glow" as const) : ("ribbons" as const), theme: "dark" as const, dock: DOCK, settings: { style } },
+    { id: `dock-${style}-light`, size: WIDE, wallpaper: "pale" as const, theme: "light" as const, dock: DOCK, settings: { style } },
+  ]),
+  { id: "dock-clear-black", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { style: "clear", clearMaterial: "black" } },
+  { id: "dock-clear-white", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { style: "clear", clearMaterial: "white" } },
   { id: "dock-full-black", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK, settings: { dockWidth: "full", style: "black" } },
   { id: "dock-spaced", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { spacing: 24 } },
   { id: "dock-light", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK },
