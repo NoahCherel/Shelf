@@ -210,6 +210,7 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
+            diag::remember(app.handle());
             search::refresh_apps();
             apps::previews::prepare(app.handle())?;
             shell::dock::start(app.handle())?;

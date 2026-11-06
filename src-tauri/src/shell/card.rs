@@ -231,7 +231,8 @@ pub fn swap_card(app: AppHandle, widget_id: String, width: f64) -> Result<(), St
 /// The page reports how tall its content is, once rendered.
 #[tauri::command]
 pub fn fit_card(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
-    if with_state(|s| s.open.is_none()) {
+    // A card sized to nothing puts its page to sleep, and it then never grows back.
+    if with_state(|s| s.open.is_none()) || width < 1.0 || height < 1.0 {
         return Ok(());
     }
     place(&app, (width, height))
@@ -305,7 +306,11 @@ fn close_at_next_press_outside(app: AppHandle) {
 /// Clicking away closes the card.
 pub fn on_blur(window: &tauri::Window) {
     let down = button_down();
-    crate::diag::note(&format!("card lost the focus, button down {down}"));
+    crate::diag::note(&format!("card lost the focus, button down {down}; {}", crate::diag::card_window_state()));
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_millis(50));
+        crate::diag::note(&format!("50 ms later: {}", crate::diag::card_window_state()));
+    });
     if !blur_is_click_away(down) {
         close_at_next_press_outside(window.app_handle().clone());
         return;
