@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
 import apps from "./index";
-import { AppsTile, dragOutcome, isPulledOff, markReordered, stableOrder, type AppEntry } from "./Tile";
+import { AppsTile, dragOutcome, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
 
@@ -437,5 +437,20 @@ describe("dragging apps along the dock", () => {
     expect(outer).not.toHaveBeenCalled();
     fireEvent.pointerDown(container.querySelector('[aria-label="Start"]')!, { button: 0, pointerId: 1 });
     expect(outer).toHaveBeenCalled();
+  });
+});
+
+describe("an app dragged past either end of the apps", () => {
+  const box = { left: 100, right: 400 };
+  const icon = { left: 150, width: 48 };
+
+  it("stops at the edge instead of sliding out of sight", () => {
+    expect(keptInside(-500, icon, box)).toBe(-50);
+    expect(keptInside(500, icon, box)).toBe(202);
+  });
+
+  it("moves freely in between", () => {
+    expect(keptInside(30, icon, box)).toBe(30);
+    expect(keptInside(-50, icon, box)).toBe(-50);
   });
 });

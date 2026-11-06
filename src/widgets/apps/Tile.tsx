@@ -61,6 +61,11 @@ export function dragOutcome(drag: { active: string; over: string | null; dy: num
   return { kind: "reorder", keys: arrayMove(keys, keys.indexOf(drag.active), keys.indexOf(drag.over)) };
 }
 
+/** How far along an app may be dragged: its tile clips what's past its ends, so it stops at them. */
+export function keptInside(dx: number, icon: { left: number; width: number }, box: { left: number; right: number }): number {
+  return Math.min(box.right - icon.left - icon.width, Math.max(box.left - icon.left, dx));
+}
+
 function Sortable({ id, disabled, children }: { id: string; disabled: boolean; children: (s: ReturnType<typeof useSortable>) => ReactNode }) {
   return <>{children(useSortable({ id, disabled }))}</>;
 }
@@ -272,6 +277,11 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   const canDrag = !preview && !pickerOpen && !lockDock;
   const [pulledOff, setPulledOff] = useState<string | null>(null);
   const dragged = useRef(false);
+  const box = useRef<HTMLDivElement>(null);
+  const keepInside = ({ transform, activeNodeRect }: { transform: { x: number; y: number; scaleX: number; scaleY: number }; activeNodeRect: { left: number; width: number } | null }) => {
+    const bounds = box.current?.getBoundingClientRect();
+    return activeNodeRect && bounds ? { ...transform, x: keptInside(transform.x, activeNodeRect, bounds) } : transform;
+  };
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
   const onDragMove = (e: DragMoveEvent) => setPulledOff(isPulledOff(e.delta.y, tileSize()) ? String(e.active.id) : null);
   const onDragEnd = (e: DragEndEvent) => {
@@ -308,7 +318,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
     invoke(command, args).catch(() => {});
   };
   return (
-    <div className="apps">
+    <div className="apps" ref={box}>
       <button
         type="button"
         className={startOpen ? "app app--active" : "app"}
@@ -328,7 +338,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
       >
         <SearchGlyph />
       </button>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => invoke("preview_hide").catch(() => {})} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => setPulledOff(null)}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[keepInside]} onDragStart={() => invoke("preview_hide").catch(() => {})} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => setPulledOff(null)}>
       <SortableContext items={rows.filter((e) => present.has(e.key)).map((e) => e.key)} strategy={horizontalListSortingStrategy}>
       {rows.map((entry) =>
         !present.has(entry.key) && !preview ? (
