@@ -84,8 +84,10 @@
   font-weight: 600;
 }
 
-.amenu__row--jump {
-  padding-left: 12px;
+/* Where a line's picture goes until it comes. */
+.amenu__placeholder {
+  width: 16px;
+  height: 16px;
 }
 
 .amenu__sep {

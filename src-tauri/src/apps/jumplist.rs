@@ -5,12 +5,46 @@
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// One line of a jump list: what it says, and what opening it runs.
-#[derive(Clone, Debug, PartialEq)]
+/// One line of a jump list: what it says, what opening it runs, its picture and its details.
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Link {
     pub title: String,
     pub path: String,
     pub args: String,
+    /// Where its icon comes from: a file and an index ("C:\\x.ico,0"), or a path the shell knows.
+    pub icon: String,
+    /// What Windows shows on hover: a link's description, or the folder a file is in.
+    pub detail: String,
+}
+
+/// An icon given as a file and an index, as a shortcut stores it; None for a plain path.
+pub fn icon_spec(spec: &str) -> Option<(&str, i32)> {
+    let (file, index) = spec.rsplit_once(',')?;
+    Some((file, index.trim().parse().ok()?))
+}
+
+/// A link with no description of its own is detailed by the address it opens, as a browser's
+/// frequent sites are, when there's one in its arguments.
+pub fn address_in(args: &str) -> &str {
+    args.split_whitespace().map(|word| word.trim_matches('"')).find(|word| word.starts_with("https://") || word.starts_with("http://")).unwrap_or("")
+}
+
+/// What a recent item shows on hover: the folder of a file, or the address of a web page.
+pub fn detail_of(path: &str) -> &str {
+    let folder = folder_of(path);
+    if folder.is_empty() && (path.starts_with("https://") || path.starts_with("http://")) {
+        path
+    } else {
+        folder
+    }
+}
+
+/// The folder a file is in, or nothing for what isn't a file path.
+pub fn folder_of(path: &str) -> &str {
+    if path.get(1..3) != Some(":\\") {
+        return "";
+    }
+    path.rsplit_once('\\').map_or("", |(folder, _)| folder)
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -253,13 +287,18 @@ mod native {
             }
             let mut args = [0u16; 2048];
             let _ = link.GetArguments(&mut args);
+            let mut description = [0u16; 512];
+            let description = link.GetDescription(&mut description).ok().map(|_| resolved(until_nul(&description))).unwrap_or_default();
             let title = link.cast::<IPropertyStore>().ok().and_then(|s| store_string(&s, &TITLE)).map(resolved).filter(|t| !t.is_empty());
-            let title = title.or_else(|| {
-                let mut description = [0u16; 512];
-                link.GetDescription(&mut description).ok()?;
-                Some(resolved(until_nul(&description))).filter(|t| !t.is_empty())
-            })?;
-            Some(Link { title, path, args: until_nul(&args) })
+            let title = title.or_else(|| Some(description.clone()).filter(|t| !t.is_empty()))?;
+            let mut location = [0u16; 1024];
+            let mut index = 0i32;
+            let _ = link.GetIconLocation(&mut location, &mut index);
+            let location = until_nul(&location);
+            let icon = if location.is_empty() { path.clone() } else { format!("{location},{index}") };
+            let args = until_nul(&args);
+            let detail = if description.is_empty() || description == title { super::address_in(&args).to_string() } else { description };
+            Some(Link { title, path, args, icon, detail })
         }
     }
 
@@ -271,7 +310,8 @@ mod native {
     }
 
     unsafe fn as_link(item: &IShellItem) -> Option<Link> {
-        Some(Link { title: text_of(item, SIGDN_NORMALDISPLAY)?, path: text_of(item, SIGDN_DESKTOPABSOLUTEPARSING)?, args: String::new() })
+        let path = text_of(item, SIGDN_DESKTOPABSOLUTEPARSING)?;
+        Some(Link { title: text_of(item, SIGDN_NORMALDISPLAY)?, detail: super::detail_of(&path).to_string(), icon: path.clone(), path, args: String::new() })
     }
 
     pub fn recent(app_id: &str, most: usize) -> Vec<Link> {
@@ -311,7 +351,7 @@ mod tests {
     use std::time::Duration;
 
     fn link(path: &str, args: &str) -> Link {
-        Link { title: "x".into(), path: path.into(), args: args.into() }
+        Link { title: "x".into(), path: path.into(), args: args.into(), ..Default::default() }
     }
 
     fn utf16(text: &str) -> Vec<u8> {
@@ -367,7 +407,7 @@ mod tests {
     /// A fake link reader: each "link" is one byte naming its title, and takes 4 bytes.
     fn fake_reader(bytes: &[u8]) -> Option<(Option<Link>, usize)> {
         let title = *bytes.first()? as char;
-        Some(((title != '-').then(|| Link { title: title.to_string(), path: "p".into(), args: title.to_string() }), 4))
+        Some(((title != '-').then(|| Link { title: title.to_string(), path: "p".into(), args: title.to_string(), ..Default::default() }), 4))
     }
 
     fn u32le(n: u32) -> Vec<u8> {
@@ -418,8 +458,35 @@ mod tests {
         file.extend(entry(b't'));
         // Cut short: four links promised, none there.
         let lists = categories(&file, fake_reader);
-        assert_eq!(lists, vec![(Category::Tasks, vec![Link { title: "t".into(), path: "p".into(), args: "t".into() }])]);
+        assert_eq!(lists, vec![(Category::Tasks, vec![Link { title: "t".into(), path: "p".into(), args: "t".into(), ..Default::default() }])]);
         assert!(categories(&[1, 2, 3], fake_reader).is_empty());
+    }
+
+    #[test]
+    fn an_icon_given_by_file_and_index_is_told_apart_from_a_plain_path() {
+        assert_eq!(icon_spec(r"C:\Profile\jumpListCache\abc.ico,0"), Some((r"C:\Profile\jumpListCache\abc.ico", 0)));
+        assert_eq!(icon_spec(r"C:\Windows\system32\shell32.dll,-21"), Some((r"C:\Windows\system32\shell32.dll", -21)));
+        assert_eq!(icon_spec(r"C:\Users\me\a,b\notes.txt"), None);
+        assert_eq!(icon_spec(r"C:\Users\me\notes.txt"), None);
+    }
+
+    #[test]
+    fn a_recent_web_page_is_detailed_by_its_address_and_a_file_by_its_folder() {
+        assert_eq!(detail_of("https://example.com/page"), "https://example.com/page");
+        assert_eq!(detail_of(r"C:\Users\me\notes.txt"), r"C:\Users\me");
+        assert_eq!(detail_of("::{GUID}"), "");
+    }
+
+    #[test]
+    fn a_frequent_site_is_detailed_by_its_address() {
+        assert_eq!(address_in(r#"-osint -url "https://github.com/""#), "https://github.com/");
+        assert_eq!(address_in("-new-tab"), "");
+    }
+
+    #[test]
+    fn a_file_is_detailed_by_the_folder_it_is_in() {
+        assert_eq!(folder_of(r"C:\Users\me\Documents\notes.txt"), r"C:\Users\me\Documents");
+        assert_eq!(folder_of("::{GUID}"), "");
     }
 
     #[test]

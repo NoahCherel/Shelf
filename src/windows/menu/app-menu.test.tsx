@@ -119,3 +119,27 @@ describe("jump lists", () => {
     expect(screen.getAllByRole("menuitem")).toHaveLength(3);
   });
 });
+
+describe("a jump list's pictures and details", () => {
+  beforeEach(() => {
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "apps_menu")
+        return {
+          sections: [{ title: "Fréquents", items: [{ id: "jump:0123456789abcdef", label: "GitHub", detail: "https://github.com/" }] }],
+          items: MENU.items,
+        };
+      if (cmd === "apps_menu_icons") return [["jump:0123456789abcdef", "data:image/png;base64,BBBB"]];
+      if (cmd === "apps_icon") return "data:image/png;base64,AAAA";
+      return null;
+    });
+  });
+
+  it("each line gets its own picture once they come, and its details on hover", async () => {
+    await openMenu();
+    await act(async () => {});
+    const line = row("GitHub");
+    expect(line.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,BBBB");
+    expect(line.getAttribute("title")).toBe("https://github.com/");
+    expect(mockInvoke).toHaveBeenCalledWith("apps_menu_icons", { key: "discord" });
+  });
+});

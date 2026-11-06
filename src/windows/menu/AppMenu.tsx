@@ -8,6 +8,8 @@ interface Row {
   /** One of the app's own items, or `jump:<fingerprint>` for a line of a jump list. */
   id: Own | `jump:${string}`;
   label: string;
+  /** Shown on hover: a link's description, or the folder a file is in. */
+  detail?: string;
 }
 
 interface Section {
@@ -52,6 +54,7 @@ function AppIcon({ appKey, name }: { appKey: string; name: string }) {
 export function AppMenu({ appKey }: { appKey: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [icons, setIcons] = useState<Map<string, string>>(new Map());
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +62,13 @@ export function AppMenu({ appKey }: { appKey: string }) {
       (menu) => {
         setSections(menu.sections ?? []);
         setRows(menu.items);
+        // The lines' pictures come after, so the menu shows straight away.
+        if (menu.sections?.length) {
+          Promise.resolve(invoke<[string, string][]>("apps_menu_icons", { key: appKey })).then(
+            (found) => setIcons(new Map(found ?? [])),
+            () => {},
+          );
+        }
       },
       () => invoke("close_card").catch(() => {}),
     );
@@ -87,7 +97,8 @@ export function AppMenu({ appKey }: { appKey: string }) {
             {section.title}
           </div>
           {section.items.map((row) => (
-            <button key={row.id} type="button" role="menuitem" className="amenu__row amenu__row--jump" onClick={() => choose(row.id)}>
+            <button key={row.id} type="button" role="menuitem" className="amenu__row" title={row.detail} onClick={() => choose(row.id)}>
+              <span className="amenu__icon">{icons.get(row.id) ? <img src={icons.get(row.id)} alt="" draggable={false} /> : <span className="amenu__placeholder" aria-hidden="true" />}</span>
               <span className="amenu__label">{row.label}</span>
             </button>
           ))}

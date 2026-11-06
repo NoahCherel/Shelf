@@ -185,6 +185,7 @@ pub fn run() {
             apps::start_quick_menu,
             apps::apps_menu,
             apps::apps_menu_choose,
+            apps::apps_menu_icons,
             apps::apps_reorder,
             apps::apps_unpin,
             claude_usage,

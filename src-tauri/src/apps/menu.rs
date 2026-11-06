@@ -22,6 +22,9 @@ pub enum Own {
 pub struct Row {
     id: String,
     label: String,
+    /// Shown on hover, as Windows does for a jump list's lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
 }
 
 /// A titled part of a jump list, as Windows shows above a taskbar button's own items.
@@ -99,12 +102,15 @@ pub fn menu_for(entry: &AppEntry, lang: u16, lists: Vec<(String, Vec<Link>)>) ->
             .filter(|(_, links)| !links.is_empty())
             .map(|(title, links)| Section {
                 title,
-                items: links.iter().map(|l| Row { id: format!("{JUMP}{}", fingerprint(l)), label: l.title.clone() }).collect(),
+                items: links
+                    .iter()
+                    .map(|l| Row { id: format!("{JUMP}{}", fingerprint(l)), label: l.title.clone(), detail: Some(l.detail.clone()).filter(|d| !d.is_empty()) })
+                    .collect(),
             })
             .collect(),
         items: items(entry.pinned, entry.windows.len())
             .into_iter()
-            .map(|item| Row { id: own_id(item).to_string(), label: if item == Own::Open { entry.name.clone() } else { label(item, lang).to_string() } })
+            .map(|item| Row { id: own_id(item).to_string(), label: if item == Own::Open { entry.name.clone() } else { label(item, lang).to_string() }, detail: None })
             .collect(),
     }
 }
@@ -170,12 +176,14 @@ mod tests {
 
     #[test]
     fn jump_lists_come_first_under_their_titles_and_empty_ones_are_left_out() {
-        let tasks = vec![Link { title: "New private window".into(), path: "firefox.exe".into(), args: "-private-window".into() }];
+        let tasks = vec![Link { title: "New private window".into(), path: "firefox.exe".into(), args: "-private-window".into(), detail: "Opens a private window".into(), ..Default::default() }];
         let menu = menu_for(&app(true), FRENCH, vec![("Tâches".into(), tasks.clone()), ("Récent".into(), Vec::new())]);
         assert_eq!(menu.sections.len(), 1);
         assert_eq!(menu.sections[0].title, "Tâches");
         assert_eq!(menu.sections[0].items[0].label, "New private window");
         assert_eq!(menu.sections[0].items[0].id, format!("jump:{}", fingerprint(&tasks[0])));
+        assert_eq!(menu.sections[0].items[0].detail.as_deref(), Some("Opens a private window"));
+        assert_eq!(menu.items[0].detail, None);
         assert_eq!(menu.items[0].label, "Firefox", "the app's own items stay below");
     }
 

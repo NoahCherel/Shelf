@@ -30,6 +30,10 @@ static ICONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 /// The shell's icon lookups aren't dependable when several run at once.
 static ONE_LOOKUP: Mutex<()> = Mutex::new(());
 static SOURCES: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+/// The jump list lines last shown, for their icons to follow without reading the lists again.
+static LAST_JUMP: Mutex<Option<(String, Vec<jumplist::Link>)>> = Mutex::new(None);
+/// Icons of jump list lines by where they come from, found or not.
+static JUMP_ICONS: Mutex<Option<HashMap<String, Option<String>>>> = Mutex::new(None);
 
 /// Shell objects need their own COM apartment, so they get their own short-lived thread.
 pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, String> {
@@ -202,7 +206,33 @@ pub fn apps_menu(key: String) -> Result<menu::AppMenu, String> {
     let lang = unsafe { GetUserDefaultUILanguage() };
     let for_lists = entry.clone();
     let lists = on_com_thread(move || jump_lists(&for_lists, lang)).unwrap_or_default();
+    let shown = lists.iter().flat_map(|(_, links)| links.clone()).collect();
+    *LAST_JUMP.lock().unwrap_or_else(|e| e.into_inner()) = Some((entry.key.clone(), shown));
     Ok(menu::menu_for(&entry, lang, lists))
+}
+
+/// The pictures of the jump list lines just shown for this app, each by the id of its line. They
+/// come after the menu, so it isn't held up, and are kept once found.
+#[tauri::command(async)]
+pub fn apps_menu_icons(key: String) -> Result<Vec<(String, String)>, String> {
+    let links = match &*LAST_JUMP.lock().unwrap_or_else(|e| e.into_inner()) {
+        Some((shown_for, links)) if *shown_for == key => links.clone(),
+        _ => return Ok(Vec::new()),
+    };
+    on_com_thread(move || {
+        links
+            .iter()
+            .filter_map(|link| {
+                let known = JUMP_ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&link.icon).cloned());
+                let icon = known.unwrap_or_else(|| {
+                    let found = icons::jump_icon(&link.icon);
+                    JUMP_ICONS.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).insert(link.icon.clone(), found.clone());
+                    found
+                })?;
+                Some((format!("jump:{}", jumplist::fingerprint(link)), icon))
+            })
+            .collect()
+    })
 }
 
 #[tauri::command(async)]
