@@ -1,9 +1,14 @@
 //! The one shared card window: placed over its tile, closed by clicking away.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+
+use windows::Win32::Foundation::POINT;
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
+use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 use super::dock::Rect;
 
@@ -238,8 +243,60 @@ pub fn close_card(app: AppHandle) -> Result<(), String> {
     hide_card(&app)
 }
 
+/// Losing the focus while a button is held is a click somewhere else. Without one, another app took
+/// the focus on its own, as Orca was recorded doing just after a menu opened, and the card stays.
+pub fn blur_is_click_away(button_down: bool) -> bool {
+    button_down
+}
+
+/// While the card is up without the focus, a press outside it is clicking away.
+pub fn press_closes(button_down: bool, pointer: (i32, i32), card: Rect) -> bool {
+    let (x, y) = pointer;
+    let inside = x >= card.x && x < card.x + card.w && y >= card.y && y < card.y + card.h;
+    button_down && !inside
+}
+
+fn button_down() -> bool {
+    [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].iter().any(|vk| unsafe { GetAsyncKeyState(vk.0 as i32) } < 0)
+}
+
+const PRESS_CHECK: Duration = Duration::from_millis(40);
+static WATCHING: AtomicBool = AtomicBool::new(false);
+
+/// The card lost the focus without a click: closes it at the next press outside it, as it gets no
+/// more blur to say so. Stops once it's closed or has the focus back.
+fn close_at_next_press_outside(app: AppHandle) {
+    if WATCHING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(PRESS_CHECK);
+            let Ok(card) = card_window(&app) else { break };
+            if with_state(|s| s.open.is_none()) || card.is_focused().unwrap_or(false) {
+                break;
+            }
+            let (Ok(pos), Ok(size)) = (card.outer_position(), card.outer_size()) else { break };
+            let mut p = POINT::default();
+            if unsafe { GetCursorPos(&mut p) }.is_err() {
+                continue;
+            }
+            if press_closes(button_down(), (p.x, p.y), Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }) {
+                with_state(|s| s.closed(now()));
+                let _ = hide_card(&app);
+                break;
+            }
+        }
+        WATCHING.store(false, Ordering::SeqCst);
+    });
+}
+
 /// Clicking away closes the card.
 pub fn on_blur(window: &tauri::Window) {
+    if !blur_is_click_away(button_down()) {
+        close_at_next_press_outside(window.app_handle().clone());
+        return;
+    }
     if with_state(|s| s.blur_closes(now())) {
         let _ = hide_card(window.app_handle());
     }
@@ -388,6 +445,20 @@ mod tests {
         assert_eq!(s.request("__appmenu:orca", 1000, false), CardMove::Open);
         assert_eq!(s.open.as_deref(), Some("__appmenu:orca"));
         assert_eq!(s.request("__appmenu:orca", 2000, true), CardMove::Close, "in front and focused, the same click closes it");
+    }
+
+    #[test]
+    fn losing_the_focus_to_a_click_elsewhere_closes_it_but_not_to_an_app_taking_it() {
+        assert!(blur_is_click_away(true));
+        assert!(!blur_is_click_away(false), "Orca took the focus on its own: the card stays");
+    }
+
+    #[test]
+    fn once_another_app_has_the_focus_a_press_outside_the_card_closes_it() {
+        let card = Rect { x: 800, y: 600, w: 300, h: 400 };
+        assert!(press_closes(true, (100, 100), card));
+        assert!(!press_closes(true, (900, 700), card), "a press on the card itself");
+        assert!(!press_closes(false, (100, 100), card), "no press, nothing to close for");
     }
 
     #[test]
