@@ -1,4 +1,11 @@
-export type StyleName = "liquid" | "black";
+export type StyleName = "liquid" | "ios" | "midnight" | "black" | "white" | "clear";
+export const STYLES: readonly StyleName[] = ["liquid", "ios", "midnight", "black", "white", "clear"];
+export type ClearMaterial = "black" | "white" | "frosted";
+
+/** The styles drawn from a capture of the screen behind the dock. */
+export function usesGlass(style: StyleName, clearMaterial: ClearMaterial): boolean {
+  return style === "liquid" || style === "ios" || (style === "clear" && clearMaterial === "frosted");
+}
 export type ThemeName = "dark" | "light";
 
 const root = () => document.documentElement;
@@ -18,4 +25,16 @@ export function setDockSize(t: number): void {
 export function setAccent(color: string | null): void {
   if (color) root().style.setProperty("--accent", color);
   else root().style.removeProperty("--accent");
+}
+
+export function setEdge(edge: "bottom" | "top"): void {
+  root().dataset.edge = edge;
+}
+
+export function setSpacing(hundredths: number): void {
+  root().style.setProperty("--gap", `calc(var(--T) * ${hundredths / 100})`);
+}
+
+export function setClearMaterial(material: ClearMaterial): void {
+  root().dataset.clear = material;
 }

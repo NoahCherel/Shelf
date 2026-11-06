@@ -1,5 +1,5 @@
 import { invoke } from "../../core/tauri";
-import { useSettings } from "../../core/settings";
+import { useSettings, type SettingsData } from "../../core/settings";
 
 /** A value kept outside the settings file, like Windows' own startup list. */
 export interface External<V> {
@@ -14,6 +14,8 @@ interface Common {
   tip: string;
   /** Runs after the setting changes. */
   onChange?: (value: never) => void;
+  /** Shown but out of use while this holds, as when another setting overrides it. */
+  disabledWhen?: (s: SettingsData) => boolean;
 }
 
 export type RowDef =
@@ -65,11 +67,25 @@ export const SCHEMA: PageDef[] = [
       section("Dock style", [
         choice("style", {
           label: "Style",
-          tip: "Liquid Glass bends what's behind the dock. Black is solid and uses the least power.",
+          tip: "Liquid Glass bends what's behind the dock, and iOS Glass tints it more deeply. Midnight, Black and White are solid and use the least power. Clear has no bar, only widgets.",
           options: [
             { value: "liquid", label: "Liquid Glass" },
+            { value: "ios", label: "iOS Glass" },
+            { value: "midnight", label: "Midnight" },
             { value: "black", label: "Black" },
+            { value: "white", label: "White" },
+            { value: "clear", label: "Clear" },
           ],
+        }),
+        choice("clearMaterial", {
+          label: "Clear widgets",
+          tip: "With Clear, what the widgets are made of: frosted glass, or solid black or white.",
+          options: [
+            { value: "frosted", label: "Frosted" },
+            { value: "black", label: "Black" },
+            { value: "white", label: "White" },
+          ],
+          disabledWhen: (s) => s.style !== "clear",
         }),
         choice("theme", {
           label: "Theme",
@@ -98,13 +114,46 @@ export const SCHEMA: PageDef[] = [
         }),
       ]),
       section("Position", [
+        choice("edge", {
+          label: "Screen edge",
+          tip: "Which edge the dock sits on. You can also drag it there by an empty spot.",
+          options: [
+            { value: "bottom", label: "Bottom" },
+            { value: "top", label: "Top" },
+          ],
+        }),
+        choice("dockWidth", {
+          label: "Width",
+          tip: "Pill fits its contents. Full width spans the whole edge, like the taskbar.",
+          options: [
+            { value: "pill", label: "Pill" },
+            { value: "full", label: "Full width" },
+          ],
+        }),
         toggle("floatOverWindows", {
           label: "Float over windows",
-          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop above it.",
+          tip: "The dock sits on top of your apps, and they use the whole screen. Off, maximized windows stop short of it. Auto-hide always floats.",
+          disabledWhen: (s) => s.autoHide,
+        }),
+        toggle("autoHide", {
+          label: "Auto-hide",
+          tip: "The dock slides away when you're not using it, and comes back when the pointer touches its edge or Start opens.",
+        }),
+        toggle("showOnDesktop", {
+          label: "Stay up on the desktop",
+          tip: "With auto-hide, the dock stays up whenever no app is in front.",
+          disabledWhen: (s) => !s.autoHide,
         }),
         slider("edgeGap", {
           label: "Distance from edge",
-          tip: "The space between the dock and the bottom of the screen.",
+          tip: "The space between the dock and its edge of the screen. A full-width dock sits right on the edge.",
+          min: 0,
+          max: 24,
+          marks: {},
+        }),
+        slider("spacing", {
+          label: "Spacing",
+          tip: "The space between widgets.",
           min: 0,
           max: 24,
           marks: {},

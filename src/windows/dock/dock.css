@@ -4,7 +4,6 @@
   top: 0;
   display: flex;
   align-items: center;
-  gap: var(--gap);
   width: max-content;
   min-width: var(--T);
   height: var(--bar-h);
@@ -12,6 +11,70 @@
   border-radius: var(--bar-radius);
   background: var(--bar-fill);
   box-shadow: inset 0 0 0 var(--rim-w) var(--bar-rim);
+}
+
+/* The tiles, in their own row so a narrowed dock can scroll them under its glass. */
+.dock__scroll {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--gap);
+  min-width: 0;
+  height: 100%;
+}
+
+/* The whole edge, like the taskbar, with the widgets together in the middle. */
+.dock[data-width="full"] {
+  border-radius: 0;
+}
+
+.dock[data-width="full"] .dock__scroll {
+  justify-content: center;
+}
+
+/* Narrowed by its ends: the rest scrolls, with tiles cut by rounded corners at the ends. */
+.dock[data-narrow="true"] .dock__scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-radius: calc(var(--bar-radius) - var(--bar-pad));
+}
+
+.dock[data-narrow="true"] .slot--shrink {
+  flex: none;
+}
+
+.dock__end {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: calc(var(--bar-pad) + 3px);
+  cursor: ew-resize;
+}
+
+.dock__end--left {
+  left: 0;
+}
+
+.dock__end--right {
+  right: 0;
+}
+
+/* At full width each widget sits where it was put. */
+.dock[data-width="full"] .dock__scroll {
+  position: relative;
+}
+
+.dock[data-width="full"] .slot {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.slot[data-moving="true"] {
+  z-index: 2;
+  opacity: 0.85;
+  cursor: grabbing;
 }
 
 /* The shader draws the fill and rim, so the page draws neither. */
@@ -59,4 +122,74 @@
 .slot__remove svg {
   width: 62%;
   height: 62%;
+}
+
+/* The top and bottom borders are handles to move the dock by. They leave the ends to narrow it. */
+.dock__grip {
+  position: absolute;
+  left: calc(var(--bar-pad) + 4px);
+  right: calc(var(--bar-pad) + 4px);
+  z-index: 3;
+  height: max(var(--bar-pad), 5px);
+  cursor: grab;
+}
+
+.dock__grip--top {
+  top: 0;
+}
+
+.dock__grip--bottom {
+  bottom: 0;
+}
+
+/* A widget added to the dock opens up, and one removed folds away where it was. */
+.slot--new {
+  animation: slot-in 300ms ease-in-out;
+}
+
+.slot--leaving {
+  pointer-events: none;
+  overflow: hidden;
+  animation: slot-out 300ms ease-in-out forwards;
+}
+
+@keyframes slot-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes slot-out {
+  from {
+    max-width: var(--w);
+  }
+  to {
+    max-width: 0;
+    margin-right: calc(var(--gap) * -1);
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+/* At full width the others don't close up, so it only fades. */
+.dock[data-width="full"] .slot--leaving {
+  animation-name: slot-fade;
+}
+
+@keyframes slot-fade {
+  to {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot--new {
+    animation: none;
+  }
+
+  .slot--leaving {
+    display: none;
+  }
 }

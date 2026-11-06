@@ -193,7 +193,7 @@ await settings.eval(`document.querySelector('[aria-label="M"]').click()`);
 await sleep(600);
 await settings.eval(`[...document.querySelectorAll(".side__row")].find((e) => e.textContent === "Appearance").click()`);
 await sleep(200);
-await settings.eval(`document.querySelector('[role="radio"][aria-checked="false"]').click()`);
+await settings.eval(`[...document.querySelectorAll('[aria-label="Style"] [role="radio"]')].find((e) => e.textContent === "Black").click()`);
 await sleep(1000);
 check("switching to Black stops the glass", await dock.eval(`document.querySelector("canvas.glass") === null`));
 await dock.shot("dock-black.png");

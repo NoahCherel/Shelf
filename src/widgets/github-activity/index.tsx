@@ -99,12 +99,20 @@ function GithubCard({ data, status, error }: TileProps<GithubData>) {
   );
 }
 
-// A believable pattern for the picker and the not-yet-connected tile.
+const SAMPLE_LEVELS = [2, 1, 3, 0, 2, 0, 1, 3, 0, 3, 2, 3, 0, 3, 2, 4, 3, 2, 1, 2, 3, 1, 2, 0, 3, 4, 0, 1, 2, 3, 1, 2, 0, 0, 3, 0, 2, 0, 1];
+let sampleDays: { today: string; days: GithubData["days"] } | null = null;
+
+// A believable pattern for the picker and the not-yet-connected tile. It always ends on the day
+// it's drawn, however long ago this code loaded, and stays the same array within a day.
 const SAMPLE: GithubData = {
-  days: Array.from({ length: 39 }, (_, i) => {
-    const level = [2, 1, 3, 0, 2, 0, 1, 3, 0, 3, 2, 3, 0, 3, 2, 4, 3, 2, 1, 2, 3, 1, 2, 0, 3, 4, 0, 1, 2, 3, 1, 2, 0, 0, 3, 0, 2, 0, 1][i];
-    return { date: localDateKey(Date.now() - (38 - i) * 86_400_000), level, count: level * 2 };
-  }),
+  get days() {
+    const today = localDateKey();
+    if (sampleDays?.today !== today) {
+      const days = SAMPLE_LEVELS.map((level, i) => ({ date: localDateKey(Date.now() - (SAMPLE_LEVELS.length - 1 - i) * 86_400_000), level, count: level * 2 }));
+      sampleDays = { today, days };
+    }
+    return sampleDays.days;
+  },
 };
 
 export default defineWidget<GithubData>({

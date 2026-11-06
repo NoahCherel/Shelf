@@ -108,6 +108,8 @@ These need a real pointer, and closing or switching real windows.
 
 ## Right-clicking an app
 
+- [x] **Every time:** each right-click shows the right app's menu, including when switching from one app to another (confirmed by the owner, 2026-11-06).
+- [ ] **Focus taken:** when another app takes the focus as the menu opens, the menu stays, and the next click outside it closes it.
 - [ ] **Menu:** the app's icon and name, pin or unpin, and close, in Windows' language, looking like Windows' own.
 - [ ] **Pin:** pinning an open app keeps its icon after closing it, and after restarting Shelf.
 - [ ] **Unpin:** unpinning takes it off the dock. It's still pinned on Windows' own taskbar, which Shelf leaves alone.
@@ -129,6 +131,48 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Starting Shelf:** nothing animates at launch.
 - [ ] **Closing:** an app's icon folds away where it was, and a pinned app's icon stays.
 - [ ] **Reopening at once:** opening the app again as it folds leaves one icon, not two.
+
+## Where the dock sits
+
+- [ ] **To the top:** dragging the dock by an empty spot moves it, and letting go in the top half keeps it there after a restart.
+- [ ] **Locked:** with Lock dock on, dragging an empty spot does nothing, until the picker is open.
+- [ ] **Below it:** at the top, cards, menus, previews and the hidden icons open below the dock, and none runs off the screen.
+- [ ] **Start:** Windows' Start menu likely still opens at the bottom. Say whether that bothers you.
+- [ ] **Full width:** the dock spans the whole edge, right on it, with the widgets in the middle, and its glass doesn't bend at the two ends.
+- [ ] **Spacing:** the slider changes the space between widgets, and the default looks as before.
+
+- [ ] **Previews at the top:** below a top dock, moving onto an app's previews keeps them open.
+- [ ] **Anywhere:** at full width, dragging a widget puts it exactly where it's let go, it stays there after a restart, and neighbours only step aside when they'd overlap.
+- [ ] **Switching width:** going from full width to pill and back keeps the dock showing.
+- [ ] **Clear all:** in the notifications card, it removes every notification.
+- [ ] **Narrow:** pulling an end of the pill narrows it, the rest scrolls with the wheel or a swipe, and a double-click on an end brings it back.
+- [ ] **Volume:** over a narrowed dock, the wheel on the sound icon still sets the volume.
+
+## Styles
+
+- [ ] **iOS Glass:** like Liquid Glass with a deeper tint, and switching between the two is instant.
+- [ ] **Midnight:** deep black with a fine rim, dark in light mode too.
+- [ ] **White:** solid white with readable dark text, in both modes.
+- [ ] **Clear:** no bar, and each widget and the apps stand out in frosted, black or white. Gaps between widgets still catch clicks, which don't reach the app behind.
+- [ ] **Accent:** your own colour applies everywhere the nine do.
+
+## Dragging apps
+
+- [ ] **Along:** an app's icon drags along the dock and stays where it's let go, after a restart too.
+- [ ] **Off:** pulling a pinned app well above or below the dock fades it, and letting go unpins it. An open app that isn't pinned goes back. Not tried with a real pointer: the dock's window is only as tall as the bar.
+- [ ] **No click:** letting go of a drag doesn't open the app or its previews.
+- [ ] **Dropping a program:** a .exe or a shortcut dragged from the desktop or File Explorer onto the dock pins it. Dragging from Start may give nothing to pin.
+- [ ] **Widgets:** a widget added from the picker opens up, and one removed folds away where it was.
+
+## Auto-hide
+
+- [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.
+- [ ] **Coming back:** touching the edge with the pointer, anywhere along it, brings it back, and so does the Windows key.
+- [ ] **Staying:** it stays up while a card, a menu, previews, the hidden icons, Start, the picker or Settings is open.
+- [ ] **Fullscreen:** in a game or a video, touching the edge never brings it back.
+- [ ] **Taskbar:** with auto-hide on, Windows' taskbar never comes up beside it, even in its Auto-hide mode.
+- [ ] **Desktop:** with Stay up on the desktop on, it stays up while no app is in front.
+- [ ] **Sleep:** after sleep or unlocking, a hidden dock stays hidden until you call it.
 
 ## A day of use
 

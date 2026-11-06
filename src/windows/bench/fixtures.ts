@@ -104,12 +104,12 @@ const frameSoon = () => {
 };
 
 /** Commands every scene can answer. A scene's own `backend` overrides any of them. */
-export function baseBackend(settings: Record<string, unknown>, layout: string[]): Handlers {
+export function baseBackend(settings: Record<string, unknown>, layout: string[], positions: Record<string, number> = {}): Handlers {
   const inSeconds = (s: number) => BENCH_NOW / 1000 + s;
   return {
     store_load: ({ name }: { name: string }) => {
       if (name === "settings") return settings;
-      if (name === "layout") return { version: 2, ids: layout };
+      if (name === "layout") return { version: 2, ids: layout, positions };
       return null;
     },
     store_save: () => null,

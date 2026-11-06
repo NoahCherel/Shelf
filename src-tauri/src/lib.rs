@@ -2,6 +2,7 @@
 
 mod apps;
 mod claude_usage;
+mod diag;
 mod glass;
 mod net;
 mod preview;
@@ -13,7 +14,7 @@ mod system;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, RunEvent, WindowEvent};
+use tauri::{AppHandle, DragDropEvent, Manager, RunEvent, WindowEvent};
 
 use shell::events;
 use shell::taskbar::TASKBAR;
@@ -119,6 +120,9 @@ pub fn run() {
             net::http_get,
             events::shell_status,
             shell::dock::set_dock_width,
+            shell::dock::dock_drag,
+            shell::dock::dock_drag_end,
+            shell::dock::set_dock_behaviour,
             shell::card::open_card,
             shell::card::fit_card,
             shell::card::card_current,
@@ -180,8 +184,11 @@ pub fn run() {
             apps::start_quick_menu,
             apps::apps_menu,
             apps::apps_menu_choose,
+            apps::apps_reorder,
+            apps::apps_unpin,
             claude_usage,
             claude_connect,
+            diag::diag_note,
             quit,
         ])
         .on_window_event(|window, event| match (event, window.label()) {
@@ -192,10 +199,18 @@ pub fn run() {
                 shell::card::on_close(window);
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
+            // Something dragged from Windows over the dock holds it up while auto-hide is on.
+            (WindowEvent::DragDrop(DragDropEvent::Enter { .. } | DragDropEvent::Over { .. }), "dock") => shell::dock::os_drag(true),
+            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => shell::dock::os_drag(false),
+            (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
+                shell::dock::os_drag(false);
+                apps::pin_dropped(window.app_handle().clone(), paths.clone());
+            }
             (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
             _ => {}
         })
         .setup(|app| {
+            diag::remember(app.handle());
             search::refresh_apps();
             apps::previews::prepare(app.handle())?;
             shell::dock::start(app.handle())?;

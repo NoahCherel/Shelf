@@ -1,5 +1,5 @@
 import { beforeEach, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { invoke } from "../../core/tauri";
 import { followLook } from "../../core/look";
 import { defaults, useSettings } from "../../core/settings";
@@ -16,6 +16,7 @@ vi.mock("../../core/tauri", () => ({
 
 const mockInvoke = vi.mocked(invoke);
 const open = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
+const styles = () => within(screen.getByRole("radiogroup", { name: "Style" }));
 
 beforeEach(() => {
   mockInvoke.mockReset();
@@ -28,12 +29,20 @@ it("has the Mac-style sidebar sections", () => {
   for (const name of ["Appearance", "Dock", "General", "About"]) expect(screen.getByRole("button", { name })).toBeTruthy();
 });
 
-it("offers only what M1 has, with nothing shown disabled", () => {
-  const { container } = render(<SettingsWindow />);
-  expect(screen.getByRole("radio", { name: "Liquid Glass" })).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "Black" })).toBeTruthy();
-  expect(screen.queryByRole("radio", { name: "Midnight" })).toBeNull();
-  expect(container.querySelector("[disabled]")).toBeNull();
+it("offers all six styles, and Clear's material only matters with Clear", () => {
+  render(<SettingsWindow />);
+  for (const name of ["Liquid Glass", "iOS Glass", "Midnight", "Black", "White", "Clear"]) expect(styles().getByRole("radio", { name })).toBeTruthy();
+  const material = () => screen.getByRole("radio", { name: "Frosted" });
+  expect(material().matches(":disabled")).toBe(true);
+  fireEvent.click(styles().getByRole("radio", { name: "Clear" }));
+  expect(useSettings.getState().style).toBe("clear");
+  expect(material().matches(":disabled")).toBe(false);
+});
+
+it("any colour can be the accent, besides the nine", () => {
+  render(<SettingsWindow />);
+  fireEvent.change(screen.getByLabelText("Your own colour"), { target: { value: "#12ab34" } });
+  expect(useSettings.getState().accent).toBe("#12ab34");
 });
 
 it("adding a setting needs one schema line and renders with its info tip", () => {
@@ -83,7 +92,7 @@ it("there are nine accents, and choosing one applies", () => {
 
 it("choosing a style applies", () => {
   render(<SettingsWindow />);
-  fireEvent.click(screen.getByRole("radio", { name: "Black" }));
+  fireEvent.click(styles().getByRole("radio", { name: "Black" }));
   expect(useSettings.getState().style).toBe("black");
 });
 
@@ -137,4 +146,15 @@ it("closes through Rust", () => {
   render(<SettingsWindow />);
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(mockInvoke).toHaveBeenCalledWith("close_window", { kind: "settings" });
+});
+
+it("with auto-hide on, floating over windows can't be changed, as nothing is reserved anyway", () => {
+  render(<SettingsWindow />);
+  open("Dock");
+  const float = () => screen.getByRole("switch", { name: "Float over windows" }) as HTMLButtonElement;
+  expect(float().matches(":disabled")).toBe(false);
+  fireEvent.click(screen.getByRole("switch", { name: "Auto-hide" }));
+  expect(useSettings.getState().autoHide).toBe(true);
+  expect(float().matches(":disabled")).toBe(true);
+  expect(screen.getByRole("switch", { name: "Stay up on the desktop" })).toBeTruthy();
 });

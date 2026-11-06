@@ -76,3 +76,42 @@ it("load applies what's saved", async () => {
   expect(useSettings.getState().size).toBe(44);
   expect(useSettings.getState().github.user).toBe("octocat");
 });
+
+it("the dock starts as it always has: a pill at the bottom, spaced as before", () => {
+  const d = defaults();
+  expect([d.edge, d.dockWidth, d.spacing]).toEqual(["bottom", "pill", 4]);
+});
+
+it("position settings fall back on their own, and spacing stays within its slider", () => {
+  const s = sanitize({ edge: "left", dockWidth: "huge", spacing: 99 });
+  expect([s.edge, s.dockWidth, s.spacing]).toEqual(["bottom", "pill", 24]);
+  const t = sanitize({ edge: "top", dockWidth: "full", spacing: -1 });
+  expect([t.edge, t.dockWidth, t.spacing]).toEqual(["top", "full", 0]);
+});
+
+it("auto-hide and its desktop option start off, and only take true or false", () => {
+  expect([defaults().autoHide, defaults().showOnDesktop]).toEqual([false, false]);
+  const s = sanitize({ autoHide: "yes", showOnDesktop: true });
+  expect([s.autoHide, s.showOnDesktop]).toEqual([false, true]);
+});
+
+it("a narrowed dock keeps a sensible width, or none", () => {
+  expect(defaults().narrowWidth).toBeNull();
+  expect(sanitize({ narrowWidth: 300 }).narrowWidth).toBe(300);
+  expect(sanitize({ narrowWidth: 10 }).narrowWidth).toBe(40);
+  expect(sanitize({ narrowWidth: "wide" }).narrowWidth).toBeNull();
+});
+
+it("all six styles are kept, and Clear's material falls back on its own", () => {
+  for (const style of ["liquid", "ios", "midnight", "black", "white", "clear"]) expect(sanitize({ style }).style).toBe(style);
+  expect(defaults().clearMaterial).toBe("frosted");
+  expect(sanitize({ clearMaterial: "white" }).clearMaterial).toBe("white");
+  expect(sanitize({ clearMaterial: "gold" }).clearMaterial).toBe("frosted");
+});
+
+it("a pill starts in the middle of its edge, and stays on it", () => {
+  expect(defaults().pillAt).toBe(0.5);
+  expect(sanitize({ pillAt: 0.1 }).pillAt).toBe(0.1);
+  expect(sanitize({ pillAt: 3 }).pillAt).toBe(1);
+  expect(sanitize({ pillAt: "left" }).pillAt).toBe(0.5);
+});

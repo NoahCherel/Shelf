@@ -1,0 +1,15 @@
+/* Solid white with light tiles. */
+:root[data-style="white"] {
+  --bar-fill: #f7f7f9;
+  --bar-rim: #0000000f;
+}
+
+/* The bar stays white in dark mode, as Black stays black in light. Cards and windows follow the theme. */
+:root[data-style="white"] .dock {
+  --fill: #0000000a;
+  --rim: #00000012;
+  --fg: #1c1c1e;
+  --muted: #6e6e73;
+  --track: #0000001a;
+  color: var(--fg);
+}

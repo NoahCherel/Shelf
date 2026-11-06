@@ -13,7 +13,7 @@ const saved = () => mockInvoke.mock.calls.filter((c) => c[0] === "store_save").m
 beforeEach(() => {
   mockInvoke.mockReset();
   mockInvoke.mockResolvedValue(null);
-  useLayout.setState({ ids: ["apps", "clock"] });
+  useLayout.setState({ ids: ["apps", "clock"], positions: {} });
 });
 
 describe("changes", () => {
@@ -41,7 +41,7 @@ describe("changes", () => {
 
   it("every change saves with a version", () => {
     useLayout.getState().add("battery");
-    expect(saved()).toEqual([{ name: "layout", value: { version: 2, ids: ["apps", "clock", "battery"] } }]);
+    expect(saved()).toEqual([{ name: "layout", value: { version: 2, ids: ["apps", "clock", "battery"], positions: {} } }]);
   });
 });
 
@@ -96,5 +96,29 @@ describe("load", () => {
     mockInvoke.mockResolvedValue({ version: 2, ids: ["clock", "gone-widget"] });
     await useLayout.getState().load();
     expect(saved()).toEqual([]);
+  });
+});
+
+describe("where widgets sit on a full-width dock", () => {
+  it("positions load with the layout, without junk, unknown widgets or old spaces", async () => {
+    mockInvoke.mockResolvedValueOnce({ version: 2, ids: ["apps", "space:1", "clock"], positions: { apps: 0, clock: 1.4, gone: 0.5, battery: "x" } });
+    await useLayout.getState().load();
+    expect(useLayout.getState().ids).toEqual(["apps", "clock"]);
+    expect(useLayout.getState().positions).toEqual({ apps: 0, clock: 1 });
+  });
+
+  it("placing a widget saves where it went and the new order", () => {
+    useLayout.setState({ ids: ["apps", "clock", "battery"], positions: {} });
+    useLayout.getState().place("apps", 0.75, ["clock", "apps", "battery"]);
+    expect(useLayout.getState().ids).toEqual(["clock", "apps", "battery"]);
+    expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["clock", "apps", "battery"], positions: { apps: 0.75 } } });
+  });
+
+  it("adding or removing a widget, as the picker does, keeps everyone's position", () => {
+    useLayout.setState({ ids: ["apps", "clock"], positions: { apps: 0, clock: 1 } });
+    useLayout.getState().add("battery");
+    expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["apps", "clock", "battery"], positions: { apps: 0, clock: 1 } } });
+    useLayout.getState().remove("clock");
+    expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["apps", "battery"], positions: { apps: 0 } } });
   });
 });

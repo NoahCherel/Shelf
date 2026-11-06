@@ -21,3 +21,15 @@
 .card-slide--snug {
   width: max-content;
 }
+
+/* Below a dock at the top, it comes down from it. */
+:root[data-edge="top"] .card-slide {
+  animation-name: card-in-below;
+}
+
+@keyframes card-in-below {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+}

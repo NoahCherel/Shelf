@@ -17,6 +17,7 @@ export interface Scene {
   steps?: { hover?: string; click?: string; type?: string }[]; // selectors, run through the debug port
   measure?: { name: string; expect: string }[]; // JavaScript run in the page; each must be true
   scale?: number; // display scale, default 1.25 as on the owner's PC
+  positions?: Record<string, number>; // where widgets sit on a full-width dock
 }
 
 const DOCK = ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"];
@@ -36,6 +37,64 @@ export const scenes: Scene[] = [
     measure: [{ name: "the bar is centred", expect: `Math.abs(document.querySelector(".dock").getBoundingClientRect().left + document.querySelector(".dock").getBoundingClientRect().width / 2 - innerWidth / 2) < 2` }],
   },
   { id: "dock-ribbons", size: WIDE, wallpaper: "ribbons", theme: "dark", dock: DOCK },
+  {
+    id: "dock-top",
+    size: TALL,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    settings: { edge: "top" },
+    card: "__panel:sound",
+    anchor: '[data-widget-id="system-status"]',
+    measure: [{ name: "the bar is at the top", expect: `document.querySelector(".dock").getBoundingClientRect().top < 10` }],
+  },
+  {
+    id: "dock-full",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    settings: { dockWidth: "full" },
+    measure: [
+      { name: "the bar spans the screen", expect: `Math.round(document.querySelector(".dock").getBoundingClientRect().width) === innerWidth` },
+      { name: "the bar sits on the edge", expect: `Math.round(document.querySelector(".dock").getBoundingClientRect().bottom) === innerHeight` },
+      {
+        name: "the widgets are together in the middle",
+        expect: `(() => { const s = [...document.querySelectorAll(".slot")].map((e) => e.getBoundingClientRect()); return Math.abs(s[0].left - (innerWidth - s[s.length - 1].right)) < 3; })()`,
+      },
+    ],
+  },
+  {
+    id: "dock-full-placed",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: ["apps", "claude-plan-usage", "github-activity", "system-status", "clock-and-weather"],
+    positions: { apps: 0, "claude-plan-usage": 0.35, "github-activity": 0.6, "system-status": 0.93, "clock-and-weather": 1 },
+    settings: { dockWidth: "full" },
+    measure: [
+      { name: "the apps start at the left end", expect: `document.querySelector('[data-widget-id="apps"]').getBoundingClientRect().left < 10` },
+      { name: "the clock ends at the right end", expect: `innerWidth - document.querySelector('[data-widget-id="clock-and-weather"]').getBoundingClientRect().right < 10` },
+      {
+        name: "nothing overlaps",
+        expect: `(() => { const r = [...document.querySelectorAll(".slot")].map((e) => e.getBoundingClientRect()).sort((a, b) => a.left - b.left); return r.every((x, i) => !i || x.left >= r[i - 1].right - 0.5); })()`,
+      },
+    ],
+  },
+  {
+    id: "dock-top-ios",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: ["claude-usage", "github-activity", "apps", "system-status", "clock", "battery"],
+    settings: { style: "ios", edge: "top", spacing: 24, edgeGap: 0 },
+    measure: [
+      { name: "the pill is narrower than the screen", expect: `document.querySelector(".dock").getBoundingClientRect().width < innerWidth - 100` },
+      { name: "the bar shows", expect: `document.querySelectorAll(".slot:not(.slot--space)").length === 6 && document.querySelector(".dock").getBoundingClientRect().height > 40` },
+    ],
+  },
+  { id: "dock-full-black", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK, settings: { dockWidth: "full", style: "black" } },
+  { id: "dock-spaced", size: WIDE, wallpaper: "glow", theme: "dark", dock: DOCK, settings: { spacing: 24 } },
   { id: "dock-light", size: WIDE, wallpaper: "pale", theme: "light", dock: DOCK },
   {
     id: "dock-focus",

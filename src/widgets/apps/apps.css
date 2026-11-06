@@ -137,3 +137,13 @@
     display: none;
   }
 }
+
+/* Being dragged along the dock, above its neighbours. */
+.app[data-dragging="true"] {
+  z-index: 2;
+}
+
+/* Pulled off the dock far enough to be unpinned on letting go. */
+.app--off {
+  opacity: 0.3;
+}

@@ -1,9 +1,14 @@
 //! The one shared card window: placed over its tile, closed by clicking away.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+
+use windows::Win32::Foundation::POINT;
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
+use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 use super::dock::Rect;
 
@@ -20,9 +25,15 @@ fn limit_height(height: f64, room: f64) -> f64 {
     height.min(MAX_HEIGHT).min(room)
 }
 
-/// Logical px between the top of the screen and the dock, less a margin at each end.
-fn room_above(dock: Rect, monitor: Rect, margin: i32, scale: f64) -> f64 {
-    (dock.y - monitor.y - 2 * margin) as f64 / scale
+/// A dock in the top half of the screen opens things below it.
+fn dock_is_at_top(dock: Rect, monitor: Rect) -> bool {
+    dock.y + dock.h / 2 < monitor.y + monitor.h / 2
+}
+
+/// Logical px between the dock and the far edge of the screen, less a margin at each end.
+fn room_for_card(dock: Rect, monitor: Rect, margin: i32, scale: f64) -> f64 {
+    let room = if dock_is_at_top(dock, monitor) { monitor.y + monitor.h - (dock.y + dock.h) } else { dock.y - monitor.y };
+    (room - 2 * margin) as f64 / scale
 }
 
 #[derive(Clone, Copy, Default)]
@@ -31,16 +42,25 @@ pub struct Span {
     pub w: i32,
 }
 
-/// Centred on the tile, above the dock, kept on the monitor. On a screen too
-/// small for it, the card gets shorter rather than rising off the top.
+/// Centred on the tile, on the screen side of the dock, kept on the monitor. On a
+/// screen too small for it, the card gets shorter rather than running off the edge.
 pub fn card_rect(tile: Span, dock: Rect, monitor: Rect, size: (i32, i32), margin: i32) -> Rect {
     let (w, h) = size;
     let min_x = monitor.x + margin;
     let max_x = (monitor.x + monitor.w - w - margin).max(min_x);
     let x = (tile.x + tile.w / 2 - w / 2).clamp(min_x, max_x);
+    if dock_is_at_top(dock, monitor) {
+        let top = dock.y + dock.h + margin;
+        return Rect { x, y: top, w, h: h.min(monitor.y + monitor.h - margin - top) };
+    }
     let bottom = dock.y - margin;
     let top = (bottom - h).max(monitor.y + margin);
     Rect { x, y: top, w, h: bottom - top }
+}
+
+/// The menus a right-click opens, as opposed to cards a click toggles.
+fn is_menu(id: &str) -> bool {
+    id.starts_with("__menu:") || id.starts_with("__appmenu:")
 }
 
 #[derive(PartialEq, Debug)]
@@ -59,7 +79,16 @@ pub struct CardState {
 }
 
 impl CardState {
-    pub fn request(&mut self, id: &str, now: u64) -> CardMove {
+    /// `focused` is whether the card window has the focus. One that doesn't was covered by another app
+    /// the moment it opened, so a click on its tile brings it back rather than closing what can't be seen.
+    pub fn request(&mut self, id: &str, now: u64, focused: bool) -> CardMove {
+        // A right-click always opens its menu, as on Windows. Its press already closed any menu
+        // that was open, as a click elsewhere, so toggling or the reopen guard would swallow it.
+        if is_menu(id) || (self.open.as_deref() == Some(id) && !focused) {
+            self.open = Some(id.to_string());
+            self.opened_at = now;
+            return CardMove::Open;
+        }
         if self.open.as_deref() == Some(id) {
             self.closed(now);
             return CardMove::Close;
@@ -113,6 +142,7 @@ fn card_window(app: &AppHandle) -> Result<WebviewWindow, String> {
 /// The only place the card hides. The page unmounts what it shows, which stops its providers
 /// and drops anything typed into it.
 fn hide_card(app: &AppHandle) -> Result<(), String> {
+    crate::diag::note("card hidden");
     let card = card_window(app)?;
     card.hide().map_err(|e| e.to_string())?;
     let _ = app.emit_to("card", "card-closed", ());
@@ -130,7 +160,7 @@ fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
         let tile = *TILE.lock().unwrap_or_else(|e| e.into_inner());
         let margin = (MARGIN * scale).round() as i32;
-        let height = limit_height(logical.1, room_above(dock_rect, monitor, margin, scale));
+        let height = limit_height(logical.1, room_for_card(dock_rect, monitor, margin, scale));
         let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
         let r = card_rect(tile, dock_rect, monitor, wanted, margin);
         card.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
@@ -150,7 +180,7 @@ pub fn card_room(app: AppHandle) -> Result<f64, String> {
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
         let margin = (MARGIN * scale).round() as i32;
-        Ok(limit_height(f64::MAX, room_above(dock_rect, monitor, margin, scale)))
+        Ok(limit_height(f64::MAX, room_for_card(dock_rect, monitor, margin, scale)))
     };
     run().map_err(|e| e.to_string())
 }
@@ -166,7 +196,10 @@ pub fn open_card(
     height: f64,
 ) -> Result<(), String> {
     let card = card_window(&app)?;
-    match with_state(|s| s.request(&widget_id, now())) {
+    let focused = card.is_focused().unwrap_or(true);
+    let request = with_state(|s| s.request(&widget_id, now(), focused));
+    crate::diag::note(&format!("card asked for {widget_id}, focused {focused}: {request:?}"));
+    match request {
         CardMove::Ignore => return Ok(()),
         CardMove::Close => return hide_card(&app),
         CardMove::Open => {}
@@ -198,10 +231,16 @@ pub fn swap_card(app: AppHandle, widget_id: String, width: f64) -> Result<(), St
 /// The page reports how tall its content is, once rendered.
 #[tauri::command]
 pub fn fit_card(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
-    if with_state(|s| s.open.is_none()) {
+    // A card sized to nothing puts its page to sleep, and it then never grows back.
+    if with_state(|s| s.open.is_none()) || width < 1.0 || height < 1.0 {
         return Ok(());
     }
     place(&app, (width, height))
+}
+
+/// A card or menu is showing.
+pub fn is_open() -> bool {
+    with_state(|s| s.open.is_some())
 }
 
 /// Catches up a page that loaded after `card-open` fired.
@@ -216,8 +255,73 @@ pub fn close_card(app: AppHandle) -> Result<(), String> {
     hide_card(&app)
 }
 
+/// Losing the focus while a button is held is a click somewhere else. Without one, another app took
+/// the focus on its own, as Orca was recorded doing just after a menu opened, and the card stays.
+pub fn blur_is_click_away(button_down: bool) -> bool {
+    button_down
+}
+
+/// While the card is up without the focus, a press outside it is clicking away.
+pub fn press_closes(button_down: bool, pointer: (i32, i32), card: Rect) -> bool {
+    let (x, y) = pointer;
+    let inside = x >= card.x && x < card.x + card.w && y >= card.y && y < card.y + card.h;
+    button_down && !inside
+}
+
+fn button_down() -> bool {
+    [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].iter().any(|vk| unsafe { GetAsyncKeyState(vk.0 as i32) } < 0)
+}
+
+/// Down now, or pressed since the last check: a quick click can start and end between two checks.
+fn button_pressed() -> bool {
+    [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].iter().any(|vk| unsafe { GetAsyncKeyState(vk.0 as i32) } as u16 & 0x8001 != 0)
+}
+
+const PRESS_CHECK: Duration = Duration::from_millis(40);
+static WATCHING: AtomicBool = AtomicBool::new(false);
+
+/// The card lost the focus without a click: closes it at the next press outside it, as it gets no
+/// more blur to say so. Stops once it's closed or has the focus back.
+fn close_at_next_press_outside(app: AppHandle) {
+    if WATCHING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        // Clears the "pressed since" flag left by whatever came before.
+        button_pressed();
+        loop {
+            std::thread::sleep(PRESS_CHECK);
+            let Ok(card) = card_window(&app) else { break };
+            if with_state(|s| s.open.is_none()) || card.is_focused().unwrap_or(false) {
+                break;
+            }
+            let (Ok(pos), Ok(size)) = (card.outer_position(), card.outer_size()) else { break };
+            let mut p = POINT::default();
+            if unsafe { GetCursorPos(&mut p) }.is_err() {
+                continue;
+            }
+            if press_closes(button_pressed(), (p.x, p.y), Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }) {
+                with_state(|s| s.closed(now()));
+                let _ = hide_card(&app);
+                break;
+            }
+        }
+        WATCHING.store(false, Ordering::SeqCst);
+    });
+}
+
 /// Clicking away closes the card.
 pub fn on_blur(window: &tauri::Window) {
+    let down = button_down();
+    crate::diag::note(&format!("card lost the focus, button down {down}; {}", crate::diag::card_window_state()));
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_millis(50));
+        crate::diag::note(&format!("50 ms later: {}", crate::diag::card_window_state()));
+    });
+    if !blur_is_click_away(down) {
+        close_at_next_press_outside(window.app_handle().clone());
+        return;
+    }
     if with_state(|s| s.blur_closes(now())) {
         let _ = hide_card(window.app_handle());
     }
@@ -266,26 +370,54 @@ mod tests {
         assert_eq!(r.h, 528 - 8 - 8, "height reduced, still above the dock");
     }
 
+    const TOP_DOCK: Rect = Rect { x: 460, y: 8, w: 1000, h: 72 };
+
+    #[test]
+    fn with_the_dock_at_the_top_the_card_opens_below_it() {
+        let r = card_rect(Span { x: 900, w: 100 }, TOP_DOCK, MONITOR, (300, 400), 8);
+        assert_eq!(r, Rect { x: 800, y: 88, w: 300, h: 400 });
+    }
+
+    #[test]
+    fn below_a_top_dock_the_card_never_passes_the_bottom_of_the_screen() {
+        let r = card_rect(Span { x: 900, w: 100 }, TOP_DOCK, MONITOR, (300, 5000), 8);
+        assert_eq!((r.y, r.y + r.h), (88, 1080 - 8));
+    }
+
+    #[test]
+    fn below_a_top_dock_the_room_is_what_lies_under_it() {
+        assert_eq!(room_for_card(TOP_DOCK, MONITOR, 8, 1.0), 984.0);
+        assert_eq!(room_for_card(TOP_DOCK, MONITOR, 8, 2.0), 492.0);
+    }
+
+    #[test]
+    fn a_top_dock_is_recognised_on_a_monitor_with_an_offset_origin() {
+        let m = Rect { x: 0, y: -1080, w: 1920, h: 1080 };
+        let dock = Rect { x: 460, y: -1072, w: 1000, h: 72 };
+        let r = card_rect(Span { x: 900, w: 100 }, dock, m, (300, 400), 8);
+        assert_eq!(r.y, -1072 + 72 + 8);
+    }
+
     #[test]
     fn clicking_the_open_card_tile_closes_it() {
         let mut s = CardState::default();
-        assert_eq!(s.request("clock", 0), CardMove::Open);
-        assert_eq!(s.request("clock", 10), CardMove::Close);
+        assert_eq!(s.request("clock", 0, true), CardMove::Open);
+        assert_eq!(s.request("clock", 10, true), CardMove::Close);
     }
 
     #[test]
     fn the_blur_from_clicking_the_same_tile_does_not_reopen_it() {
         let mut s = CardState::default();
-        s.request("clock", 0);
+        s.request("clock", 0, true);
         s.closed(1000); // clicking the tile blurs the card before the click arrives
-        assert_eq!(s.request("clock", 1100), CardMove::Ignore);
-        assert_eq!(s.request("clock", 1400), CardMove::Open, "a later click is real");
+        assert_eq!(s.request("clock", 1100, true), CardMove::Ignore);
+        assert_eq!(s.request("clock", 1400, true), CardMove::Open, "a later click is real");
     }
 
     #[test]
     fn the_focus_settling_right_after_opening_does_not_close_it() {
         let mut s = CardState::default();
-        s.request("clock", 1000);
+        s.request("clock", 1000, true);
         assert!(!s.blur_closes(1100), "Windows moves focus into the web view as it opens");
         assert!(s.open.is_some());
         assert!(s.blur_closes(1400), "clicking away later does close it");
@@ -295,10 +427,10 @@ mod tests {
     #[test]
     fn after_a_swap_the_same_tile_closes_the_new_card() {
         let mut s = CardState::default();
-        s.request("quick", 0);
+        s.request("quick", 0, true);
         s.swap("wifi");
         assert_eq!(s.open.as_deref(), Some("wifi"));
-        assert_eq!(s.request("wifi", 1000), CardMove::Close);
+        assert_eq!(s.request("wifi", 1000, true), CardMove::Close);
     }
 
     #[test]
@@ -326,16 +458,52 @@ mod tests {
     fn the_room_is_what_lies_above_the_dock() {
         let monitor = Rect { x: 0, y: 0, w: 1366, h: 768 };
         let dock = Rect { x: 200, y: 700, w: 900, h: 68 };
-        assert_eq!(room_above(dock, monitor, 8, 1.0), 684.0);
-        assert_eq!(room_above(dock, monitor, 8, 2.0), 342.0);
+        assert_eq!(room_for_card(dock, monitor, 8, 1.0), 684.0);
+        assert_eq!(room_for_card(dock, monitor, 8, 2.0), 342.0);
+    }
+
+    #[test]
+    fn a_card_another_app_came_in_front_of_is_brought_back_rather_than_closed() {
+        let mut s = CardState::default();
+        assert_eq!(s.request("clock", 0, true), CardMove::Open);
+        // Another app covered it at once, so it never had the focus: the next click shows it again.
+        assert_eq!(s.request("clock", 1000, false), CardMove::Open);
+        assert_eq!(s.open.as_deref(), Some("clock"));
+        assert_eq!(s.request("clock", 2000, true), CardMove::Close, "in front and focused, the same click closes it");
+    }
+
+    #[test]
+    fn losing_the_focus_to_a_click_elsewhere_closes_it_but_not_to_an_app_taking_it() {
+        assert!(blur_is_click_away(true));
+        assert!(!blur_is_click_away(false), "Orca took the focus on its own: the card stays");
+    }
+
+    #[test]
+    fn once_another_app_has_the_focus_a_press_outside_the_card_closes_it() {
+        let card = Rect { x: 800, y: 600, w: 300, h: 400 };
+        assert!(press_closes(true, (100, 100), card));
+        assert!(!press_closes(true, (900, 700), card), "a press on the card itself");
+        assert!(!press_closes(false, (100, 100), card), "no press, nothing to close for");
+    }
+
+    #[test]
+    fn every_right_click_opens_its_menu_even_right_after_one_closed() {
+        let mut s = CardState::default();
+        assert_eq!(s.request("__appmenu:discord", 0, true), CardMove::Open);
+        // The press of the next right-click closes the open menu as a click elsewhere...
+        s.closed(400);
+        // ...and its release, 100 ms later, still opens the menu.
+        assert_eq!(s.request("__appmenu:discord", 500, false), CardMove::Open);
+        assert_eq!(s.request("__menu:clock", 600, true), CardMove::Open);
+        assert_eq!(s.request("__menu:clock", 700, true), CardMove::Open, "not closed by its own right-click");
     }
 
     #[test]
     fn another_tile_opens_straight_away() {
         let mut s = CardState::default();
-        s.request("clock", 0);
+        s.request("clock", 0, true);
         s.closed(1000);
-        assert_eq!(s.request("battery", 1050), CardMove::Open);
+        assert_eq!(s.request("battery", 1050, true), CardMove::Open);
         assert_eq!(s.open.as_deref(), Some("battery"));
     }
 }

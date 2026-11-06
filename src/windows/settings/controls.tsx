@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { appVersion } from "../../core/tauri";
 import { Switch } from "../../design/parts/Switch";
 import { useSettings } from "../../core/settings";
@@ -104,6 +104,9 @@ function AccentRow({ row }: { row: RowDef }) {
           onClick={() => save(accent.color)}
         />
       ))}
+      <label className="accent accent--own" title="Your own colour" style={{ background: ACCENTS.some((a) => a.color === current) ? undefined : current }}>
+        <input type="color" aria-label="Your own colour" value={current} onChange={(e) => save(e.target.value)} />
+      </label>
     </div>
   );
 }
@@ -135,6 +138,17 @@ function Control({ row }: { row: RowDef }) {
   }
 }
 
+/** A fieldset turns off every control inside it at once. */
+function Usable({ row, children }: { row: RowDef; children: ReactNode }) {
+  const off = useSettings((s) => row.disabledWhen?.(s) ?? false);
+  if (!row.disabledWhen) return <>{children}</>;
+  return (
+    <fieldset className="setting__control" disabled={off}>
+      {children}
+    </fieldset>
+  );
+}
+
 function Tip({ text }: { text: string }) {
   return (
     <span className="tip" role="img" aria-label={text} title={text}>
@@ -160,7 +174,9 @@ function Row({ row }: { row: RowDef }) {
         {row.label}
         <Tip text={row.tip} />
       </span>
-      <Control row={row} />
+      <Usable row={row}>
+        <Control row={row} />
+      </Usable>
     </div>
   );
 }

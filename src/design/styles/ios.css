@@ -1,0 +1,10 @@
+/* When the shader can't run, the bar falls back to a deeper translucent look than Liquid's. */
+:root[data-style="ios"] {
+  --bar-fill: #121214ea;
+  --bar-rim: #ffffff24;
+}
+
+:root[data-style="ios"][data-theme="light"] {
+  --bar-fill: #f2f2f5ea;
+  --bar-rim: #0000001a;
+}

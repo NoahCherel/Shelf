@@ -17,6 +17,23 @@ export interface ClaudeData {
   updatedMs: number;
 }
 
+/** Counts from whenever it's drawn, so the same text shows however long ago this code loaded. */
+export const CLAUDE_SAMPLE: ClaudeData = {
+  session: {
+    percent: 100,
+    get resetsAt() {
+      return Date.now() + 85 * 60_000;
+    },
+  },
+  weekly: {
+    percent: 37,
+    get resetsAt() {
+      return Date.now() + 4 * 86_400_000;
+    },
+  },
+  updatedMs: 0,
+};
+
 interface RawWindow {
   used_percentage: number;
   resets_at: number;

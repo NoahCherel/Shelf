@@ -71,10 +71,11 @@ fn fitted(source: (i32, i32), slot: Box4) -> Box4 {
     Box4 { left, top, right: left + w, bottom: top + h }
 }
 
-/// On the strip, or in the gap between it and the dock.
+/// On the strip, or in the gap between it and the dock, whichever side of the dock it opened on.
 fn heading_for_strip(pointer: (i32, i32), dock: Rect, strip: Rect) -> bool {
     let (x, y) = pointer;
-    x >= strip.x && x < strip.x + strip.w && y >= strip.y && y < dock.y
+    let (top, bottom) = if strip.y >= dock.y + dock.h { (dock.y + dock.h, strip.y + strip.h) } else { (strip.y, dock.y) };
+    x >= strip.x && x < strip.x + strip.w && y >= top && y < bottom
 }
 
 fn pointer_within(pointer: (i32, i32), dock: Rect, strip: Rect) -> bool {
@@ -178,6 +179,7 @@ fn clear_pictures() {
 }
 
 fn hide(app: &AppHandle) -> Result<(), String> {
+    crate::diag::note("previews hidden");
     ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
     let _ = set_peek(app, None);
     clear_pictures();
@@ -258,6 +260,17 @@ fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
 }
 
 /// Clicks on the strip mustn't take focus from your app, as with the dock.
+/// Previews open right where an app's menu does, so none show while a menu or card is open, as on
+/// Windows. A right-click just as they were being prepared used to put them over the menu.
+fn may_show(card_open: bool) -> bool {
+    !card_open
+}
+
+/// The strip of previews is showing.
+pub fn is_showing() -> bool {
+    SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+}
+
 pub fn prepare(app: &AppHandle) -> Result<(), String> {
     let window = preview_window(app)?;
     let raw = window.hwnd().map_err(|e| e.to_string())?;
@@ -273,6 +286,9 @@ pub fn prepare(app: &AppHandle) -> Result<(), String> {
 #[tauri::command(async)]
 pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
     let opening = HOVER.keep();
+    if !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
     if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some(key.as_str()) {
         return Ok(());
     }
@@ -313,8 +329,8 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
         Ok(Some((shown, dock_rect, strip)))
     };
     let Some((shown, dock_rect, strip)) = run().map_err(|e| e.to_string())? else { return Ok(()) };
-    // The pointer may have moved on while the windows were being listed.
-    if !HOVER.still_leaving(opening) {
+    // The pointer may have moved on while the windows were being listed, or a menu opened.
+    if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
         return Ok(());
     }
     let _ = set_peek(&app, None);
@@ -322,6 +338,7 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     *ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()) = shown.windows.iter().map(|w| w.hwnd).collect();
     *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(key);
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
+    crate::diag::note("previews shown");
     window.show().map_err(|e| e.to_string())?;
     watch_pointer(app.clone(), dock_rect, strip);
     Ok(())
@@ -511,6 +528,25 @@ mod tests {
         assert!(is_newest(&last, 2));
         assert!(!is_newest(&last, 1), "a leave overtaken by the next hover must not end the peek");
         assert!(is_newest(&last, 3));
+    }
+
+    #[test]
+    fn under_a_dock_at_the_top_the_strip_and_the_gap_keep_it_open() {
+        let dock = Rect { x: 300, y: 8, w: 1000, h: 70 };
+        let strip = Rect { x: 500, y: 88, w: 400, h: 170 };
+        assert!(heading_for_strip((600, 150), dock, strip), "on the strip");
+        assert!(heading_for_strip((600, 82), dock, strip), "in the gap");
+        assert!(!heading_for_strip((600, 40), dock, strip), "back on the dock");
+        assert!(!heading_for_strip((600, 300), dock, strip), "past it");
+        assert!(pointer_within((600, 150), dock, strip));
+        assert!(pointer_within((600, 40), dock, strip));
+        assert!(!pointer_within((600, 600), dock, strip));
+    }
+
+    #[test]
+    fn no_previews_while_a_menu_or_card_is_open() {
+        assert!(!may_show(true), "they'd open right where the menu is, over it");
+        assert!(may_show(false));
     }
 
     #[test]

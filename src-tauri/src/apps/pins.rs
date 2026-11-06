@@ -17,6 +17,8 @@ use super::windows::{store_string, APP_ID_KEY};
 /// Pins made from the dock's own menu. Windows has no public way to pin to its taskbar, and it's
 /// hidden anyway, so these sit on top of its list and leave it untouched.
 pub const OVERLAY: &str = "dock-pins";
+/// How many apps' places are remembered. Apps that come and go would otherwise grow it forever.
+pub const ORDER_LIMIT: usize = 200;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct AddedPin {
@@ -31,6 +33,44 @@ pub struct Overlay {
     added: Vec<AddedPin>,
     #[serde(default)]
     removed: Vec<String>,
+    /// The dock's order, as last arranged by dragging. Apps not in it go after.
+    #[serde(default)]
+    order: Vec<String>,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum Dropped {
+    Program,
+    Shortcut,
+    Folder,
+    File,
+}
+
+fn file_stem(path: &str) -> &str {
+    let file = path.rsplit(['\\', '/']).next().unwrap_or(path);
+    file.rsplit_once('.').map_or(file, |(stem, _)| stem)
+}
+
+/// What a path dropped on the dock is. Only programs and shortcuts become pinned apps.
+pub fn dropped(path: &str, is_dir: impl Fn(&str) -> bool) -> Dropped {
+    let lower = path.to_lowercase();
+    if lower.ends_with(".exe") {
+        Dropped::Program
+    } else if lower.ends_with(".lnk") {
+        Dropped::Shortcut
+    } else if is_dir(path) {
+        Dropped::Folder
+    } else {
+        Dropped::File
+    }
+}
+
+/// The saved order first, then everything it doesn't know, as it came.
+pub fn arrange(mut entries: Vec<AppEntry>, order: &[String]) -> Vec<AppEntry> {
+    let place = |key: &str| order.iter().position(|k| k == key).unwrap_or(usize::MAX);
+    // A stable sort keeps the unknown ones in their own order.
+    entries.sort_by_key(|e| place(&e.key));
+    entries
 }
 
 fn is_path(key: &str) -> bool {
@@ -54,6 +94,22 @@ impl Overlay {
         if !self.added.iter().any(|a| a.key == entry.key) {
             let source = entry.icon_source.clone().or(entry.launch.clone()).unwrap_or_else(|| entry.key.clone());
             self.added.push(AddedPin { key: entry.key.clone(), name: entry.name.clone(), source });
+        }
+    }
+
+    fn set_order(&mut self, keys: Vec<String>) {
+        let mut seen = std::collections::HashSet::new();
+        self.order = keys.into_iter().filter(|k| seen.insert(k.clone())).take(ORDER_LIMIT).collect();
+    }
+
+    /// A program, or a shortcut to one, dropped on the dock. `opens` is what a shortcut points to.
+    fn pin_program(&mut self, path: &str, opens: Option<&str>) {
+        let key = opens.unwrap_or(path).to_lowercase();
+        if let Some(hidden) = self.removed.iter().position(|k| *k == key) {
+            self.removed.remove(hidden);
+        }
+        if !self.added.iter().any(|a| a.key == key) {
+            self.added.push(AddedPin { key, name: file_stem(path).to_string(), source: path.to_string() });
         }
     }
 
@@ -101,6 +157,27 @@ pub fn pin(entry: &AppEntry) -> serde_json::Value {
 /// What to save after unpinning.
 pub fn unpin(key: &str) -> serde_json::Value {
     changed(|o| o.unpin(key))
+}
+
+/// What to save after the apps were dragged into a new order.
+pub fn reordered(keys: Vec<String>) -> serde_json::Value {
+    changed(|o| o.set_order(keys))
+}
+
+/// The saved order of the dock's apps.
+pub fn order() -> Vec<String> {
+    Overlay::from_saved(crate::store::load(OVERLAY)).order
+}
+
+/// What to save after a program or shortcut was dropped on the dock; None for anything else.
+/// Call on a thread with COM initialised, as a shortcut has to be read.
+pub fn pin_dropped(path: &str) -> Option<serde_json::Value> {
+    let opens = match dropped(path, |p| Path::new(p).is_dir()) {
+        Dropped::Program => None,
+        Dropped::Shortcut => Some(read_link(Path::new(path))?.target?),
+        Dropped::Folder | Dropped::File => return None,
+    };
+    Some(changed(|o| o.pin_program(path, opens.as_deref())))
 }
 
 /// Only re-read when the folder changes.
@@ -229,6 +306,71 @@ mod overlay_tests {
         let mut overlay = Overlay::default();
         overlay.pin(&entry(r"c:\gone.exe", "Gone", r"C:\gone.exe"));
         assert!(apply(Vec::new(), &overlay, |_| false).is_empty());
+    }
+
+    fn named(keys: &[&str]) -> Vec<AppEntry> {
+        keys.iter().map(|k| entry(k, k, k)).collect()
+    }
+
+    fn keys(entries: &[AppEntry]) -> Vec<&str> {
+        entries.iter().map(|e| e.key.as_str()).collect()
+    }
+
+    #[test]
+    fn the_saved_order_is_kept_and_apps_it_doesnt_know_go_after() {
+        let order = vec!["c".to_string(), "a".to_string()];
+        let arranged = arrange(named(&["a", "b", "c", "d"]), &order);
+        assert_eq!(keys(&arranged), ["c", "a", "b", "d"]);
+    }
+
+    #[test]
+    fn with_no_order_saved_nothing_moves() {
+        assert_eq!(keys(&arrange(named(&["a", "b"]), &[])), ["a", "b"]);
+    }
+
+    #[test]
+    fn an_order_is_saved_without_repeats_and_within_its_limit() {
+        let mut overlay = Overlay::default();
+        overlay.set_order(vec!["b".into(), "a".into(), "b".into()]);
+        assert_eq!(overlay.order, ["b", "a"]);
+        overlay.set_order((0..500).map(|i| i.to_string()).collect());
+        assert_eq!(overlay.order.len(), ORDER_LIMIT);
+    }
+
+    #[test]
+    fn a_file_saved_before_there_was_an_order_still_reads() {
+        let old = Overlay::from_saved(Some(serde_json::json!({ "added": [], "removed": ["x"] })));
+        assert_eq!(old.removed, ["x"]);
+        assert!(old.order.is_empty());
+    }
+
+    #[test]
+    fn what_is_dropped_on_the_dock_is_sorted_by_what_it_is() {
+        let dir = |p: &str| p.ends_with("Folder");
+        assert_eq!(dropped(r"C:\Apps\tool.EXE", dir), Dropped::Program);
+        assert_eq!(dropped(r"C:\Users\me\Desktop\Game.lnk", dir), Dropped::Shortcut);
+        assert_eq!(dropped(r"C:\Users\me\Folder", dir), Dropped::Folder);
+        assert_eq!(dropped(r"C:\Users\me\notes.txt", dir), Dropped::File);
+    }
+
+    #[test]
+    fn a_dropped_program_is_pinned_by_its_path_with_its_file_name() {
+        let mut overlay = Overlay::default();
+        overlay.pin_program(r"C:\Apps\Tool.exe", None);
+        let pins = apply(Vec::new(), &overlay, EXISTS);
+        assert_eq!(pins[0].name, "Tool");
+        assert_eq!(pins[0].target.as_deref(), Some(r"C:\Apps\Tool.exe"));
+        overlay.pin_program(r"C:\Apps\Tool.exe", None);
+        assert_eq!(overlay.added.len(), 1, "not twice");
+    }
+
+    #[test]
+    fn a_dropped_shortcut_is_pinned_by_what_it_opens() {
+        let mut overlay = Overlay::default();
+        overlay.pin_program(r"C:\Users\me\Desktop\Game.lnk", Some(r"D:\Games\game.exe"));
+        assert_eq!(overlay.added[0].key, r"d:\games\game.exe");
+        assert_eq!(overlay.added[0].name, "Game");
+        assert_eq!(overlay.added[0].source, r"C:\Users\me\Desktop\Game.lnk");
     }
 
     #[test]

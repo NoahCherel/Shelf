@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
 import apps from "./index";
-import { AppsTile, stableOrder, type AppEntry } from "./Tile";
+import { AppsTile, dragOutcome, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
 
@@ -385,5 +385,72 @@ describe("an app leaving the dock", () => {
     rerender(<AppsTile data={[app("a", true)]} status="ready" />);
     unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("dragging apps along the dock", () => {
+  const T = 50;
+  const list = [app("a"), app("b", true), app("c")];
+
+  it("letting go over another app puts it there", () => {
+    expect(dragOutcome({ active: "a", over: "c", dy: 0 }, list, T)).toEqual({ kind: "reorder", keys: ["b", "c", "a"] });
+  });
+
+  it("letting go where it started does nothing", () => {
+    expect(dragOutcome({ active: "a", over: "a", dy: 0 }, list, T)).toBeNull();
+    expect(dragOutcome({ active: "a", over: null, dy: 0 }, list, T)).toBeNull();
+  });
+
+  it("pulled well off the dock, a pinned app is unpinned", () => {
+    expect(dragOutcome({ active: "a", over: "c", dy: -60 }, list, T)).toEqual({ kind: "unpin", key: "a" });
+    expect(dragOutcome({ active: "a", over: "c", dy: 60 }, list, T)).toEqual({ kind: "unpin", key: "a" });
+  });
+
+  it("an open app that isn't pinned can't be pulled off, so it just goes back", () => {
+    expect(dragOutcome({ active: "b", over: "a", dy: -60 }, list, T)).toBeNull();
+  });
+
+  it("is off once it's pulled further than most of a tile", () => {
+    expect(isPulledOff(-44, T)).toBe(false);
+    expect(isPulledOff(-46, T)).toBe(true);
+  });
+
+  it("after a drag, the next list from Rust is taken in its own order", async () => {
+    mockInvoke.mockResolvedValueOnce([app("c"), app("a")]);
+    markReordered();
+    const next = await apps.provider!.fetch([app("a"), app("c")]);
+    expect(next.map((e) => e.key)).toEqual(["c", "a"]);
+    mockInvoke.mockResolvedValueOnce([app("c"), app("a")]);
+    const later = await apps.provider!.fetch([app("a"), app("c")]);
+    // Only that once.
+    expect(later.map((e) => e.key)).toEqual(["a", "c"]);
+  });
+
+  it("pressing an app doesn't start moving the whole widget", () => {
+    const outer = vi.fn();
+    const { container } = render(
+      <div onPointerDown={outer}>
+        <AppsTile data={[app("a")]} status="ready" />
+      </div>,
+    );
+    fireEvent.pointerDown(container.querySelector('[data-key="a"]')!, { button: 0, pointerId: 1 });
+    expect(outer).not.toHaveBeenCalled();
+    fireEvent.pointerDown(container.querySelector('[aria-label="Start"]')!, { button: 0, pointerId: 1 });
+    expect(outer).toHaveBeenCalled();
+  });
+});
+
+describe("an app dragged past either end of the apps", () => {
+  const box = { left: 100, right: 400 };
+  const icon = { left: 150, width: 48 };
+
+  it("stops at the edge instead of sliding out of sight", () => {
+    expect(keptInside(-500, icon, box)).toBe(-50);
+    expect(keptInside(500, icon, box)).toBe(202);
+  });
+
+  it("moves freely in between", () => {
+    expect(keptInside(30, icon, box)).toBe(30);
+    expect(keptInside(-50, icon, box)).toBe(-50);
   });
 });

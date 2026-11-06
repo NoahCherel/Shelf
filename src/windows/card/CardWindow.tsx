@@ -15,6 +15,16 @@ const MENU_PREFIX = "__menu:";
 const APP_MENU_PREFIX = "__appmenu:";
 const PANEL_PREFIX = "__panel:";
 
+/**
+ * The size to give the window, or null while there's nothing to show yet. A window sized to nothing
+ * makes WebView2 put its page to sleep, and a sleeping page never measures what arrives next: an
+ * app's menu, empty until its rows came, stayed invisible, then showed the last app's on the next click.
+ */
+export function fitFor(width: number | undefined, contentWidth: number, contentHeight: number): { width: number; height: number } | null {
+  const w = width ?? contentWidth;
+  return w > 0 && contentHeight > 0 ? { width: w, height: contentHeight } : null;
+}
+
 /** Height fits what's shown; Rust keeps it on the screen. */
 /** With no width, the card window takes the content's own width. */
 function Fitted({ width, children }: { width?: number; children: ReactNode }) {
@@ -27,7 +37,8 @@ function Fitted({ width, children }: { width?: number; children: ReactNode }) {
       () => {},
     );
     const observer = new ResizeObserver(() => {
-      invoke("fit_card", { width: width ?? el.offsetWidth, height: el.offsetHeight }).catch(() => {});
+      const size = fitFor(width, el.offsetWidth, el.offsetHeight);
+      if (size) invoke("fit_card", size).catch(() => {});
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -124,6 +135,9 @@ export function CardWindow() {
       setShown(null);
     });
     window.addEventListener("focus", catchUp);
+    // For the diagnostic trace: whether WebView2 thinks this window can be seen.
+    const onVisibility = () => invoke("diag_note", { what: `card page ${document.visibilityState}` }).catch(() => {});
+    document.addEventListener("visibilitychange", onVisibility);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") invoke("close_card").catch(() => {});
     };
@@ -132,6 +146,7 @@ export function CardWindow() {
       off.then((stop) => stop());
       offClosed.then((stop) => stop());
       window.removeEventListener("focus", catchUp);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("keydown", onKey);
     };
   }, []);
