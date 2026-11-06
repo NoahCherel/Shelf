@@ -141,3 +141,55 @@
 .dock__grip--bottom {
   bottom: 0;
 }
+
+/* A widget added to the dock opens up, and one removed folds away where it was. */
+.slot--new {
+  animation: slot-in 300ms ease-in-out;
+}
+
+.slot--leaving {
+  pointer-events: none;
+  overflow: hidden;
+  animation: slot-out 300ms ease-in-out forwards;
+}
+
+@keyframes slot-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes slot-out {
+  from {
+    max-width: var(--w);
+  }
+  to {
+    max-width: 0;
+    margin-right: calc(var(--gap) * -1);
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+/* At full width the others don't close up, so it only fades. */
+.dock[data-width="full"] .slot--leaving {
+  animation-name: slot-fade;
+}
+
+@keyframes slot-fade {
+  to {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot--new {
+    animation: none;
+  }
+
+  .slot--leaving {
+    display: none;
+  }
+}

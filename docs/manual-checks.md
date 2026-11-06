@@ -154,6 +154,14 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Clear:** no bar, and each widget and the apps stand out in frosted, black or white. Gaps between widgets still catch clicks, which don't reach the app behind.
 - [ ] **Accent:** your own colour applies everywhere the nine do.
 
+## Dragging apps
+
+- [ ] **Along:** an app's icon drags along the dock and stays where it's let go, after a restart too.
+- [ ] **Off:** pulling a pinned app well above or below the dock fades it, and letting go unpins it. An open app that isn't pinned goes back. Not tried with a real pointer: the dock's window is only as tall as the bar.
+- [ ] **No click:** letting go of a drag doesn't open the app or its previews.
+- [ ] **Dropping a program:** a .exe or a shortcut dragged from the desktop or File Explorer onto the dock pins it. Dragging from Start may give nothing to pin.
+- [ ] **Widgets:** a widget added from the picker opens up, and one removed folds away where it was.
+
 ## Auto-hide
 
 - [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.

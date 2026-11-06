@@ -361,3 +361,58 @@ describe("moving a pill by its top and bottom borders", () => {
     expect(screen.queryByRole("separator", { name: "Top border" })).toBeNull();
   });
 });
+
+describe("widgets coming and going", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const cls = (container: HTMLElement, id: string) => container.querySelector(`[data-widget-id="${id}"]`)?.className ?? null;
+
+  it("nothing opens up when the dock first shows its widgets", () => {
+    useLayout.setState({ ids: [] });
+    const { container } = render(<DockBar />);
+    act(() => useLayout.setState({ ids: ["apps", "clock"] }));
+    expect(cls(container, "clock")).not.toContain("slot--new");
+  });
+
+  it("a widget added afterwards opens up", () => {
+    useLayout.setState({ ids: ["apps", "clock"] });
+    const { container } = render(<DockBar />);
+    act(() => useLayout.setState({ ids: ["apps", "clock", "battery"] }));
+    expect(cls(container, "battery")).toContain("slot--new");
+    expect(cls(container, "clock")).not.toContain("slot--new");
+  });
+
+  it("a widget removed folds away where it was, then goes", () => {
+    vi.useFakeTimers();
+    const { container } = render(<DockBar />);
+    act(() => useLayout.setState({ ids: ["apps", "battery"] }));
+    expect(cls(container, "clock")).toContain("slot--leaving");
+    expect([...container.querySelectorAll("[data-widget-id]")].map((e) => (e as HTMLElement).dataset.widgetId)).toEqual(["apps", "clock", "battery"]);
+    act(() => vi.advanceTimersByTime(300));
+    expect(cls(container, "clock")).toBeNull();
+  });
+
+  it("a widget folding away can't be clicked", () => {
+    vi.useFakeTimers();
+    const { container } = render(<DockBar />);
+    act(() => useLayout.setState({ ids: ["apps", "battery"] }));
+    expect(container.querySelector('[data-widget-id="clock"]')?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+it("at full width, a widget folding away stays where it was rather than jumping", () => {
+  vi.useFakeTimers();
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    const width = this.classList.contains("dock__scroll") ? 1000 : (this as HTMLElement).dataset?.widgetId ? 100 : 0;
+    return { width, height: 50, left: 0, top: 0, right: width, bottom: 50, x: 0, y: 0, toJSON: () => ({}) };
+  });
+  useSettings.setState({ dockWidth: "full" });
+  useLayout.setState({ ids: ["apps", "clock", "battery"], positions: { apps: 0, clock: 0.5, battery: 1 } });
+  const { container } = render(<DockBar />);
+  act(() => useLayout.setState({ ids: ["apps", "battery"], positions: { apps: 0, battery: 1 } }));
+  expect(container.querySelector<HTMLElement>('[data-widget-id="clock"]')!.style.left).toBe("450px");
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
