@@ -220,6 +220,13 @@ fn saved_behaviour(settings: Option<&serde_json::Value>) -> (bool, bool) {
 static LAYOUT: Mutex<DockLayout> = Mutex::new(DockLayout { width: 400.0, bar: 55.0, gap: 6.0, float: true, edge: Edge::Bottom, along: 0.5 });
 /// Being dragged: the pointer decides where it is, and the glass waits until it lands.
 static MOVING: AtomicBool = AtomicBool::new(false);
+/// Something dragged from Windows is over the dock.
+static OS_DRAG: AtomicBool = AtomicBool::new(false);
+
+pub fn os_drag(on: bool) {
+    OS_DRAG.store(on, Ordering::Relaxed);
+}
+
 /// Sliding or slid away: auto-hide decides where it is.
 static AWAY: AtomicBool = AtomicBool::new(false);
 static AUTO_HIDE: AtomicBool = AtomicBool::new(false);
@@ -377,7 +384,8 @@ fn seen_now(app: &AppHandle) -> Option<Seen> {
         || crate::apps::start_is_open()
         || app.get_webview_window("picker").is_some()
         || app.get_webview_window("settings").is_some()
-        || MOVING.load(Ordering::Relaxed);
+        || MOVING.load(Ordering::Relaxed)
+        || OS_DRAG.load(Ordering::Relaxed);
     Some(Seen {
         at_edge: autohide::at_edge(p.x, p.y, monitor, l.edge),
         on_dock: autohide::on_dock(p.x, p.y, rest, monitor, l.edge),

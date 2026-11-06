@@ -44,7 +44,7 @@ pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) 
 
 pub(crate) fn current() -> Result<Vec<AppEntry>, String> {
     let pins = pins::with_overlay(on_com_thread(pins::list)?);
-    let entries = merge(&pins, windows::list(), windows::foreground());
+    let entries = pins::arrange(merge(&pins, windows::list(), windows::foreground()), &pins::order());
     let sources = entries.iter().filter_map(|e| Some((e.key.clone(), e.icon_source.clone()?))).collect();
     *SOURCES.lock().unwrap_or_else(|e| e.into_inner()) = Some(sources);
     Ok(entries)
@@ -128,6 +128,36 @@ pub fn start_quick_menu() -> Result<(), String> {
     crate::preview::guard()?;
     tap_keys(&[VK_LWIN, VK_X]);
     Ok(())
+}
+
+/// The apps were dragged into a new order. Only Shelf's own file changes, so the preview may do it.
+#[tauri::command(async)]
+pub fn apps_reorder(app: AppHandle, keys: Vec<String>) -> Result<(), String> {
+    crate::store::store_save(app, pins::OVERLAY.to_string(), pins::reordered(keys))
+}
+
+/// An app dragged off the dock. Only one that's pinned can go, and only from the dock.
+#[tauri::command(async)]
+pub fn apps_unpin(app: AppHandle, key: String) -> Result<(), String> {
+    let entry = current()?.into_iter().find(|e| e.key == key).ok_or("app is gone")?;
+    if !entry.pinned {
+        return Err("not pinned".into());
+    }
+    crate::store::store_save(app, pins::OVERLAY.to_string(), pins::unpin(&entry.key))
+}
+
+/// Programs and shortcuts dropped on the dock from the desktop or File Explorer are pinned.
+/// Folders and other files are left alone for now.
+pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
+    std::thread::spawn(move || {
+        for path in paths {
+            let path = path.to_string_lossy().into_owned();
+            if let Ok(Some(value)) = on_com_thread(move || pins::pin_dropped(&path)) {
+                let _ = crate::store::store_save(app.clone(), pins::OVERLAY.to_string(), value);
+            }
+        }
+        let _ = tauri::Emitter::emit(&app, "apps-changed", ());
+    });
 }
 
 /// What right-clicking this app offers, in Windows' language.

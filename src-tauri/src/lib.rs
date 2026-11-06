@@ -13,7 +13,7 @@ mod system;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, RunEvent, WindowEvent};
+use tauri::{AppHandle, DragDropEvent, Manager, RunEvent, WindowEvent};
 
 use shell::events;
 use shell::taskbar::TASKBAR;
@@ -183,6 +183,8 @@ pub fn run() {
             apps::start_quick_menu,
             apps::apps_menu,
             apps::apps_menu_choose,
+            apps::apps_reorder,
+            apps::apps_unpin,
             claude_usage,
             claude_connect,
             quit,
@@ -195,6 +197,13 @@ pub fn run() {
                 shell::card::on_close(window);
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
+            // Something dragged from Windows over the dock holds it up while auto-hide is on.
+            (WindowEvent::DragDrop(DragDropEvent::Enter { .. } | DragDropEvent::Over { .. }), "dock") => shell::dock::os_drag(true),
+            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => shell::dock::os_drag(false),
+            (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
+                shell::dock::os_drag(false);
+                apps::pin_dropped(window.app_handle().clone(), paths.clone());
+            }
             (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
             _ => {}
         })
