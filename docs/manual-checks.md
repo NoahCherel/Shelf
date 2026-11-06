@@ -139,6 +139,11 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Full width:** the dock spans the whole edge, right on it, with the widgets in the middle, and its glass doesn't bend at the two ends.
 - [ ] **Spacing:** the slider changes the space between widgets, and the default looks as before.
 
+- [ ] **Previews at the top:** below a top dock, moving onto an app's previews keeps them open.
+- [ ] **Spaces:** at full width, the dock's menu adds a flexible space. With the picker open, it shows dashed and can be dragged or removed, so widgets can sit at either end.
+- [ ] **Narrow:** pulling an end of the pill narrows it, the rest scrolls with the wheel or a swipe, and a double-click on an end brings it back.
+- [ ] **Volume:** over a narrowed dock, the wheel on the sound icon still sets the volume.
+
 ## Auto-hide
 
 - [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.
