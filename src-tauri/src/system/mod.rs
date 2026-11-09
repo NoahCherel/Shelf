@@ -62,7 +62,7 @@ fn battery() -> Option<Battery> {
 
 #[tauri::command(async)]
 pub fn system_stats(monitor: State<'_, Mutex<SysMonitor>>) -> SysStats {
-    let mut monitor = monitor.lock().unwrap();
+    let mut monitor = monitor.lock().unwrap_or_else(|e| e.into_inner());
     // CPU usage is measured between two refreshes, so back-to-back calls
     // from several windows would report garbage like 100%.
     if monitor.cpu_refreshed.elapsed() >= CPU_REFRESH_INTERVAL {

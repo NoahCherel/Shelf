@@ -217,10 +217,11 @@ impl Attempts {
     }
 
     fn begin(&self, id: &str, now: u64) -> Result<(), String> {
-        if self.current(now).is_some_and(|a| a.state == "connecting") {
+        let mut held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if held.as_ref().is_some_and(|(attempt, at)| now.saturating_sub(*at) < ATTEMPT_LIFE_MS && attempt.state == "connecting") {
             return Err("Still connecting to another network.".into());
         }
-        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some((Attempt { id: id.to_string(), state: "connecting", error: None }, now));
+        *held = Some((Attempt { id: id.to_string(), state: "connecting", error: None }, now));
         Ok(())
     }
 
@@ -655,6 +656,26 @@ mod tests {
         assert!(connect_network(&wlan, &network_id(b"New"), Some("goodpassword".into())).is_err());
         assert!(wlan.connected.borrow().is_empty());
         assert!(wlan.deleted.borrow().is_empty());
+    }
+
+    #[test]
+    fn only_one_connection_can_start_at_a_time() {
+        for _ in 0..200 {
+            let attempts = Attempts::default();
+            let started = std::sync::atomic::AtomicUsize::new(0);
+            let gate = std::sync::Barrier::new(8);
+            std::thread::scope(|scope| {
+                for _ in 0..8 {
+                    scope.spawn(|| {
+                        gate.wait();
+                        if attempts.begin("AA", 0).is_ok() {
+                            started.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        }
+                    });
+                }
+            });
+            assert_eq!(started.into_inner(), 1);
+        }
     }
 
     #[test]
