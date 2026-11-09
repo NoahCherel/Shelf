@@ -190,3 +190,17 @@
   opacity: 0;
   cursor: pointer;
 }
+
+.image-row {
+  display: flex;
+  gap: 6px;
+}
+
+.field-button {
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: var(--track);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+}

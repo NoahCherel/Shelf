@@ -196,6 +196,13 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Opening in an app:** a file held at the middle of an app icon offers Open in that app, and letting go opens it there. Try a store app too.
 - [ ] **Removing, live:** an app pulled off the dock folds away with a Remove from dock bubble, and comes back if brought back before letting go.
 
+## App and folder widgets, Start image
+
+- [ ] **App:** an app added from the picker opens from its tile, shows a dot while open, and survives a restart.
+- [ ] **Folder:** Add a folder opens the Windows dialog over the picker, and the tile opens that folder.
+- [ ] **Gone:** a deleted folder leaves the dock within a minute.
+- [ ] **Start image:** Choose puts your picture on Start, cropped square; Use logo brings the logo back.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

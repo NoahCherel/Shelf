@@ -8,7 +8,7 @@ data="$APPDATA/Shelf/data"
 for f in layout settings dock-pins start-image; do [ -f "$data/$f.json" ] && mv "$data/$f.json" "$data/$f.json.e2e"; done
 powershell -NoProfile -Command "\$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='--remote-debugging-port=9333'; Start-Process 'src-tauri\target\release\shelf.exe'"
 sleep 8
-node src/test/cdp-check.mjs "$1" 2>&1 | cut -c1-200
+timeout 300 node src/test/cdp-check.mjs "$1" 2>&1 | cut -c1-200
 "src-tauri/target/release/shelf.exe" --quit
 sleep 4
 if tasklist //FI "IMAGENAME eq shelf.exe" | grep -q shelf; then

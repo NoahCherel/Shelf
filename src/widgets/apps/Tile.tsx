@@ -3,6 +3,7 @@ import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type D
 import { arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { useSettings } from "../../core/settings";
 import { usePicker } from "../../core/shell";
+import { START_IMAGE, validStartImage } from "../../core/startImage";
 import { invoke, listen } from "../../core/tauri";
 import { openPanel } from "../../panels";
 import type { TileProps } from "../../core/widget";
@@ -194,6 +195,29 @@ function SearchGlyph() {
       <path d="M19.300 19.300 25 25" stroke="currentColor" strokeWidth="2.800" strokeLinecap="round" />
     </svg>
   );
+}
+
+/** The picture chosen for Start, if any, kept up to date from Settings. */
+function useStartImage(preview?: boolean): string | null {
+  const [image, setImage] = useState<string | null>(null);
+  useEffect(() => {
+    if (preview) return;
+    let live = true;
+    const load = () =>
+      Promise.resolve(invoke<{ data?: unknown } | null>("store_load", { name: START_IMAGE })).then(
+        (saved) => live && setImage(validStartImage(saved?.data) ? saved!.data as string : null),
+        () => {},
+      );
+    load();
+    const off = listen<string>("store-changed", (name) => {
+      if (name === START_IMAGE) load();
+    });
+    return () => {
+      live = false;
+      off.then((stop) => stop());
+    };
+  }, [preview]);
+  return image;
 }
 
 function StartLogo() {
@@ -406,6 +430,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   useEffect(() => setOrder(null), [fetched]);
   const data = useMemo(() => (order && fetched ? [...fetched].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) : fetched), [fetched, order]);
   const previews = useAppPreviews(preview);
+  const startImage = useStartImage(preview);
   const box = useRef<HTMLDivElement>(null);
   const osDrag = useOsDrag(box, data, preview);
   const arrived = useArrivals(data, preview);
@@ -517,7 +542,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
         onClick={() => !preview && invoke("start_menu").catch(() => {})}
         onContextMenu={(e) => windowsMenu(e, "start_quick_menu")}
       >
-        <StartLogo />
+        {startImage ? <img className="app__icon app__icon--start" src={startImage} alt="" draggable={false} /> : <StartLogo />}
       </button>
       <button
         type="button"

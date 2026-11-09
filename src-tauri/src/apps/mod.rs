@@ -6,6 +6,7 @@ pub mod jumplist;
 pub mod menu;
 pub mod merge;
 mod pins;
+pub mod pin_widget;
 pub mod previews;
 pub mod stack;
 mod windows;

@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { saveStartImage, shrinkImage } from "../../core/startImage";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { appVersion } from "../../core/tauri";
 import { Switch } from "../../design/parts/Switch";
 import { useSettings } from "../../core/settings";
@@ -119,8 +120,29 @@ function VersionRow() {
   return <span className="version">{version}</span>;
 }
 
+/** A picture of the owner's, made small here and kept in Shelf's own storage. */
+function ImageRow({ row }: { row: RowDef }) {
+  const input = useRef<HTMLInputElement>(null);
+  const choose = (file: File | undefined) => {
+    if (file) shrinkImage(file).then(saveStartImage, () => {});
+  };
+  return (
+    <span className="image-row">
+      <input ref={input} type="file" accept="image/*" hidden aria-label={row.label} onChange={(e) => choose(e.target.files?.[0])} />
+      <button type="button" className="field-button" onClick={() => input.current?.click()}>
+        Choose…
+      </button>
+      <button type="button" className="field-button" onClick={() => void saveStartImage(null)}>
+        Use logo
+      </button>
+    </span>
+  );
+}
+
 function Control({ row }: { row: RowDef }) {
   switch (row.kind) {
+    case "image":
+      return <ImageRow row={row} />;
     case "toggle":
       return <ToggleRow row={row} />;
     case "slider":

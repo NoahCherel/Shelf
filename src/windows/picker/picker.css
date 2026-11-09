@@ -187,3 +187,64 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+/* Installed apps and folders, each of which can be a widget. */
+.choices__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.choices__folder {
+  padding: 5px 12px;
+  border-radius: 7px;
+  background: var(--track);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--fg);
+  text-align: left;
+}
+
+.choice:hover {
+  background: var(--track);
+}
+
+.choice[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.choice__icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.choice__icon--blank {
+  border-radius: 6px;
+  background: var(--track);
+}
+
+.choice__name {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

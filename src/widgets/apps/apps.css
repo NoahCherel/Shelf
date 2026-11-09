@@ -191,3 +191,8 @@
 .app--gap .app__icon {
   opacity: 0.75;
 }
+
+.app__icon--start {
+  border-radius: calc(var(--T) * 0.14);
+  object-fit: cover;
+}
