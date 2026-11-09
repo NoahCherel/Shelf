@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { setDockIds } from "./dockIds";
 import { invoke, listen } from "./tauri";
+import { isPinId } from "./pinWidget";
 import { widgets } from "./registry";
 
 export const DEFAULT_LAYOUT = ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"];
@@ -23,7 +24,7 @@ interface Layout {
 
 function known(ids: unknown[]): string[] {
   const registered = new Set(widgets.map((w) => w.id));
-  const clean = ids.filter((id): id is string => typeof id === "string" && registered.has(id));
+  const clean = ids.filter((id): id is string => typeof id === "string" && (registered.has(id) || isPinId(id)));
   return [...new Set(clean)];
 }
 

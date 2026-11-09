@@ -82,6 +82,14 @@ fn read_apps() -> Result<Vec<SearchItem>, String> {
     Ok(items)
 }
 
+/// An app's name from the list: None until the list is known, then None inside if it isn't on it.
+pub fn listed_name(parsing: &str) -> Option<Option<String>> {
+    let apps = APPS.lock().unwrap_or_else(|e| e.into_inner());
+    let list = apps.as_ref().filter(|l| !l.is_empty())?;
+    let id = format!("app:{parsing}");
+    Some(list.iter().find(|a| a.id.eq_ignore_ascii_case(&id)).map(|a| a.name.clone()))
+}
+
 /// Listing every app takes about a second, so it happens in the background.
 pub fn refresh_apps() {
     if REFRESHING.swap(true, Ordering::SeqCst) {

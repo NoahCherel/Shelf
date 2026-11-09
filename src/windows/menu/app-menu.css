@@ -74,3 +74,38 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+/* A jump list's sections sit above the app's own items, under Windows' grey section names. */
+.amenu__title {
+  padding: 8px 12px 4px;
+  color: var(--amenu-fg);
+  opacity: 0.6;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Where a line's picture goes until it comes. */
+.amenu__placeholder {
+  width: 16px;
+  height: 16px;
+}
+
+.amenu__sep {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--amenu-edge);
+}
+
+/* A long list scrolls rather than running off the screen. */
+.amenu__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 360px;
+}
+
+.amenu__section .amenu__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -34,7 +34,7 @@ function useCardPlacement(scene: Scene) {
 function CardLayer({ scene }: { scene: Scene }) {
   const card = useCardPlacement(scene);
   const id = scene.card!;
-  const width = id.startsWith("__appmenu:") ? "max-content" : id.startsWith("__menu:") ? 210 : id.startsWith("__panel:") ? panels[id.slice(8) as PanelId].width : 340;
+  const width = id.startsWith("__appmenu:") || id.startsWith("__group:") || id.startsWith("__stack:") ? "max-content" : id.startsWith("__menu:") ? 210 : id.startsWith("__panel:") ? panels[id.slice(8) as PanelId].width : 340;
   return (
     <div className="bench__card" ref={card} style={{ width }}>
       <CardContent id={scene.card!} n={1} />

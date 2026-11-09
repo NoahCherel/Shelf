@@ -199,3 +199,9 @@ describe("resting on a picture", () => {
     expect(seqs()[1]).toBeGreaterThan(seqs()[0]);
   });
 });
+
+it("with no windows to show, it's the app's name in a bubble", async () => {
+  await openIt({ key: "discord", name: "Discord", slotWidth: 0, windows: [] });
+  expect(screen.getByText("Discord").className).toContain("pv-name");
+  expect(screen.queryByRole("button", { name: /Close/ })).toBeNull();
+});

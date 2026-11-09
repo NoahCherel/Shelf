@@ -30,6 +30,10 @@ const PADDING: f64 = 8.0;
 const SCREEN_MARGIN: f64 = 8.0;
 /// Padding, the title row and the picture, as in preview.css.
 const HEIGHT: f64 = 170.0;
+/// The name bubble shown over an app with no previews to show.
+const NAME_HEIGHT: f64 = 32.0;
+pub const NAME_MIN_WIDTH: f64 = 48.0;
+pub const NAME_MAX_WIDTH: f64 = 320.0;
 const DOCK_GAP: f64 = 8.0;
 /// Long enough to cross from the icon to the strip, even slowly.
 const LEAVE_GRACE: Duration = Duration::from_millis(400);
@@ -151,6 +155,8 @@ struct Shown {
     name: String,
     slot_width: f64,
     windows: Vec<ShownWindow>,
+    /// A bubble during a drag, shown with the app's picture.
+    hint: bool,
 }
 
 #[derive(Deserialize)]
@@ -260,6 +266,89 @@ fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
 }
 
 /// Clicks on the strip mustn't take focus from your app, as with the dock.
+/// About as wide as the name in Segoe UI at 12 px, with room either side.
+fn name_width(name: &str) -> f64 {
+    (name.chars().count() as f64 * 7.2 + 28.0).clamp(NAME_MIN_WIDTH, NAME_MAX_WIDTH)
+}
+
+/// The app's name in a bubble above its icon, as Windows shows for an app with no window open, or
+/// for any app when previews are turned off. It uses the previews' window, shown with no windows.
+/// Sizes the bubble and puts it over a tile. Gives the dock's rectangle and the bubble's.
+fn place_bubble(app: &AppHandle, window: &tauri::WebviewWindow, width: f64, tile_x: f64, tile_width: f64) -> Result<Option<(Rect, Rect)>, String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let run = || -> tauri::Result<Option<(Rect, Rect)>> {
+        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
+        let scale = m.scale_factor();
+        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
+        let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
+        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
+        let r = card_rect(
+            tile,
+            dock_rect,
+            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
+            ((width * scale).round() as i32, (NAME_HEIGHT * scale).round() as i32),
+            (DOCK_GAP * scale).round() as i32,
+        );
+        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
+        window.set_position(PhysicalPosition::new(r.x, r.y))?;
+        Ok(Some((dock_rect, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
+    };
+    run().map_err(|e| e.to_string())
+}
+
+/// Room for the picture beside a bubble's words.
+const HINT_ICON_WIDTH: f64 = 24.0;
+
+/// The bubble above the dock during a drag: what letting go would do. The page takes it down.
+#[tauri::command(async)]
+pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    let lang = unsafe { ::windows::Win32::Globalization::GetUserDefaultUILanguage() };
+    let name = match &key {
+        Some(key) if what == "open" => crate::apps::every_entry()?.into_iter().find(|e| e.key == *key).map(|e| e.name).unwrap_or_default(),
+        _ => String::new(),
+    };
+    let text = super::menu::hint_text(&what, lang, &name).ok_or("unknown bubble")?;
+    let window = preview_window(&app)?;
+    let picture = if key.is_some() { HINT_ICON_WIDTH } else { 0.0 };
+    if place_bubble(&app, &window, name_width(&text) + picture, tile_x, tile_width)?.is_none() {
+        return Ok(());
+    }
+    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("hint:{what}"));
+    let shown = Shown { key: key.unwrap_or_default(), name: text, slot_width: 0.0, windows: Vec::new(), hint: true };
+    app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
+    window.show().map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    let opening = HOVER.keep();
+    if !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
+    let shown_as = format!("name:{key}");
+    if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some(shown_as.as_str()) {
+        return Ok(());
+    }
+    let Some(entry) = current()?.into_iter().find(|e| e.key == key) else {
+        return hide(&app);
+    };
+    let window = preview_window(&app)?;
+    let Some((dock_rect, strip)) = place_bubble(&app, &window, name_width(&entry.name), tile_x, tile_width)? else { return Ok(()) };
+    if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
+    let _ = set_peek(&app, None);
+    clear_pictures();
+    ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(shown_as);
+    let shown = Shown { key, name: entry.name, slot_width: 0.0, windows: Vec::new(), hint: false };
+    app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
+    crate::diag::note("name shown");
+    window.show().map_err(|e| e.to_string())?;
+    watch_pointer(app.clone(), dock_rect, strip);
+    Ok(())
+}
+
 /// Previews open right where an app's menu does, so none show while a menu or card is open, as on
 /// Windows. A right-click just as they were being prepared used to put them over the menu.
 fn may_show(card_open: bool) -> bool {
@@ -318,6 +407,7 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
         window.set_position(PhysicalPosition::new(r.x, r.y))?;
         let strip = Rect { x: r.x, y: r.y, w: r.w, h: r.h };
         let shown = Shown {
+            hint: false,
             key: key.clone(),
             name: entry.name.clone(),
             slot_width: slot,
@@ -457,6 +547,7 @@ mod tests {
             windows: handles.iter().map(|h| AppWindow { hwnd: *h, title: String::new() }).collect(),
             launch: None,
             icon_source: None,
+            ..Default::default()
         }
     }
 
@@ -541,6 +632,13 @@ mod tests {
         assert!(pointer_within((600, 150), dock, strip));
         assert!(pointer_within((600, 40), dock, strip));
         assert!(!pointer_within((600, 600), dock, strip));
+    }
+
+    #[test]
+    fn the_name_bubble_is_as_wide_as_the_name_within_limits() {
+        assert!(name_width("Discord") < name_width("Explorateur de fichiers"));
+        assert_eq!(name_width(""), NAME_MIN_WIDTH);
+        assert_eq!(name_width(&"x".repeat(500)), NAME_MAX_WIDTH);
     }
 
     #[test]

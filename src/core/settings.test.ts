@@ -115,3 +115,8 @@ it("a pill starts in the middle of its edge, and stays on it", () => {
   expect(sanitize({ pillAt: 3 }).pillAt).toBe(1);
   expect(sanitize({ pillAt: "left" }).pillAt).toBe(0.5);
 });
+
+it("names and previews on hover start on, and only take true or false", () => {
+  expect([defaults().hoverNames, defaults().previews]).toEqual([true, true]);
+  expect([sanitize({ hoverNames: "no" }).hoverNames, sanitize({ previews: false }).previews]).toEqual([true, false]);
+});

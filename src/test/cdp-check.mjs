@@ -51,8 +51,12 @@ class Page {
   }
   send(method, params = {}) {
     const id = ++this.id;
-    return new Promise((resolve) => {
-      this.pending.set(id, resolve);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`no answer to ${method} ${String(params.expression ?? "").slice(0, 80)} from ${this.ws.url.slice(-12)}`)), 15000);
+      this.pending.set(id, (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      });
       this.ws.send(JSON.stringify({ id, method, params }));
     });
   }

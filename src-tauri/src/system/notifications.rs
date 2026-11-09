@@ -126,7 +126,7 @@ pub fn notification_open(id: u32) -> Result<(), String> {
     let info = found.AppInfo().map_err(|e| e.to_string())?;
     let app_id = info.AppUserModelId().map_or(String::new(), |a| a.to_string());
     let name = info.DisplayInfo().and_then(|d| d.DisplayName()).map_or(String::new(), |n| n.to_string());
-    let apps: Vec<AppMatch> = crate::apps::current()?
+    let apps: Vec<AppMatch> = crate::apps::every_entry()?
         .into_iter()
         .map(|e| AppMatch { hwnd: e.windows.first().map(|w| w.hwnd), key: e.key, name: e.name })
         .collect();

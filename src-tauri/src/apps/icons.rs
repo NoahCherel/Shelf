@@ -122,6 +122,32 @@ unsafe fn from_exe(exe: &str) -> Option<String> {
     png
 }
 
+/// An icon kept in a file at an index, as a shortcut gives it: an .ico, or a program's resources.
+unsafe fn from_file_at(file: &str, index: i32) -> Option<String> {
+    let encoded = wide(file);
+    let mut large = HICON::default();
+    let n = ExtractIconExW(PCWSTR(encoded.as_ptr()), index, Some(&mut large), None, 1);
+    if n == 0 || large.is_invalid() {
+        return None;
+    }
+    let png = icon_to_png(large);
+    let _ = DestroyIcon(large);
+    png
+}
+
+/// A jump list line's icon, from where its shortcut says, or from the file or folder it opens.
+/// Call on a thread with COM initialised.
+pub fn jump_icon(spec: &str) -> Option<String> {
+    // A browser's own picture of a site, already ready to show.
+    if spec.starts_with("data:image/") {
+        return Some(spec.to_string());
+    }
+    match super::jumplist::icon_spec(spec) {
+        Some((file, index)) => unsafe { from_file_at(file, index) }.or_else(|| icon(file)),
+        None => icon(spec),
+    }
+}
+
 /// Call on a thread with COM initialised.
 pub fn icon(source: &str) -> Option<String> {
     unsafe { from_shell(source).or_else(|| from_exe(source)) }

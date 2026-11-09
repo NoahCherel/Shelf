@@ -164,6 +164,14 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Dropping a program:** a .exe or a shortcut dragged from the desktop or File Explorer onto the dock pins it. Dragging from Start may give nothing to pin.
 - [ ] **Widgets:** a widget added from the picker opens up, and one removed folds away where it was.
 
+## Jump lists and names
+
+- [ ] **Jump lists:** right-clicking Firefox or Edge shows its frequent sites or recent files and its tasks above its own items, and choosing one does what it says.
+- [ ] **File Explorer:** its menu shows quick access, and a folder opens.
+- [ ] **No list:** Discord, Orca and others that publish none keep the usual menu.
+- [ ] **Names:** resting on an app that isn't open shows its name in a bubble, and on an open one with previews turned off.
+- [ ] **Switches:** Names on hover and Window previews, in Settings, turn each off.
+
 ## Auto-hide
 
 - [ ] **Leaving:** with nothing in use, the dock slides away smoothly after a moment, with no flash.
@@ -173,6 +181,27 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Taskbar:** with auto-hide on, Windows' taskbar never comes up beside it, even in its Auto-hide mode.
 - [ ] **Desktop:** with Stay up on the desktop on, it stays up while no app is in front.
 - [ ] **Sleep:** after sleep or unlocking, a hidden dock stays hidden until you call it.
+
+## Files, folders and groups
+
+- [ ] **Keeping a file:** a file or a folder dropped on an empty part of the dock stays there, and comes back after a restart.
+- [ ] **On an icon:** a file dropped on an app icon is not kept, and nothing else happens.
+- [ ] **Bringing forward:** a file held over an open app for under a second brings that app to the front.
+- [ ] **Stack:** clicking a folder lists what it holds, folders first; a line opens the right thing.
+- [ ] **Making a group:** an app held over another for under a second lights that one up, and letting go makes a group. A quick drag still only reorders.
+- [ ] **Group card:** clicking a group shows its apps, each opens, and its name can be edited.
+- [ ] **Leaving:** right-clicking an app in a group offers to take it out; a group left with one app comes undone.
+- [ ] **Deleted elsewhere:** a file deleted in File Explorer leaves the dock.
+- [ ] **Adding, live:** something dragged over the dock opens a place between the icons with its picture and an Add to dock bubble, and lands there.
+- [ ] **Opening in an app:** a file held at the middle of an app icon offers Open in that app, and letting go opens it there. Try a store app too.
+- [ ] **Removing, live:** an app pulled off the dock folds away with a Remove from dock bubble, and comes back if brought back before letting go.
+
+## App and folder widgets, Start image
+
+- [ ] **App:** an app added from the picker opens from its tile, shows a dot while open, and survives a restart.
+- [ ] **Folder:** Add a folder opens the Windows dialog over the picker, and the tile opens that folder.
+- [ ] **Gone:** a deleted folder leaves the dock within a minute.
+- [ ] **Start image:** Choose puts your picture on Start, cropped square; Use logo brings the logo back.
 
 ## A day of use
 

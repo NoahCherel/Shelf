@@ -6,6 +6,8 @@ import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { panels, type PanelId } from "../../panels";
 import { AppMenu } from "../menu/AppMenu";
+import { GroupCard } from "../menu/GroupCard";
+import { StackCard } from "../menu/StackCard";
 import { dockMenuItems, Menu } from "../menu/Menu";
 import "./card-window.css";
 
@@ -14,6 +16,8 @@ const MENU_WIDTH = 210;
 const MENU_PREFIX = "__menu:";
 const APP_MENU_PREFIX = "__appmenu:";
 const PANEL_PREFIX = "__panel:";
+const GROUP_PREFIX = "__group:";
+const STACK_PREFIX = "__stack:";
 
 /**
  * The size to give the window, or null while there's nothing to show yet. A window sized to nothing
@@ -87,6 +91,15 @@ export function CardContent({ id, n }: { id: string; n: number }) {
       <div className="card-window">
         <Fitted key={n}>
           <AppMenu appKey={id.slice(APP_MENU_PREFIX.length)} />
+        </Fitted>
+      </div>
+    );
+  }
+  if (id.startsWith(GROUP_PREFIX) || id.startsWith(STACK_PREFIX)) {
+    return (
+      <div className="card-window">
+        <Fitted key={n}>
+          {id.startsWith(GROUP_PREFIX) ? <GroupCard groupKey={id.slice(GROUP_PREFIX.length)} /> : <StackCard folderKey={id.slice(STACK_PREFIX.length)} />}
         </Fitted>
       </div>
     );

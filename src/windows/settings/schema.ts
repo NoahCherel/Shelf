@@ -24,6 +24,7 @@ export type RowDef =
   | (Common & { kind: "choice"; options: { value: string; label: string }[] })
   | (Common & { kind: "text"; placeholder?: string })
   | (Common & { kind: "accent" })
+  | (Common & { kind: "image" })
   | (Common & { kind: "action"; run: () => void; danger?: boolean })
   | (Common & { kind: "version" });
 
@@ -158,6 +159,11 @@ export const SCHEMA: PageDef[] = [
           max: 24,
           marks: {},
         }),
+      ]),
+      section("Apps", [
+        toggle("hoverNames", { label: "Names on hover", tip: "Shows an app's name above its icon when the pointer rests on it." }),
+        toggle("previews", { label: "Window previews", tip: "Shows pictures of an open app's windows when the pointer rests on it. Off, its name shows instead." }),
+        { kind: "image", key: "startImage", label: "Start image", tip: "A picture of yours on the Start button, instead of the logo." },
       ]),
       section("Clock", [
         toggle("hour24", { label: "24-hour time", tip: "Shows 17:30 rather than 5:30 PM on every clock." }),

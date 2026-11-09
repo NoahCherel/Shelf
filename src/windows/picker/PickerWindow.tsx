@@ -4,6 +4,7 @@ import { byCategory, widgets } from "../../core/registry";
 import { invoke } from "../../core/tauri";
 import type { Category, WidgetDef } from "../../core/widget";
 import { Sidebar } from "./Sidebar";
+import { WidgetChoices } from "./AppChoices";
 import { WidgetGrid } from "./WidgetGrid";
 import "./picker.css";
 
@@ -50,6 +51,7 @@ export function PickerWindow() {
         </header>
         <div className="picker__scroll">
           {groups.size > 0 ? <WidgetGrid groups={groups} /> : <p className="picker__none">No widgets match "{query}".</p>}
+          <WidgetChoices query={query} />
         </div>
       </main>
     </div>

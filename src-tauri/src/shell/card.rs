@@ -58,6 +58,15 @@ pub fn card_rect(tile: Span, dock: Rect, monitor: Rect, size: (i32, i32), margin
     Rect { x, y: top, w, h: bottom - top }
 }
 
+/// What the trace may say about a card: never the path of someone's file or folder.
+fn traceable(id: &str) -> &str {
+    if id.contains("item:") {
+        id.split_once(':').map_or(id, |(kind, _)| kind)
+    } else {
+        id
+    }
+}
+
 /// The menus a right-click opens, as opposed to cards a click toggles.
 fn is_menu(id: &str) -> bool {
     id.starts_with("__menu:") || id.starts_with("__appmenu:")
@@ -198,7 +207,7 @@ pub fn open_card(
     let card = card_window(&app)?;
     let focused = card.is_focused().unwrap_or(true);
     let request = with_state(|s| s.request(&widget_id, now(), focused));
-    crate::diag::note(&format!("card asked for {widget_id}, focused {focused}: {request:?}"));
+    crate::diag::note(&format!("card asked for {}, focused {focused}: {request:?}", traceable(&widget_id)));
     match request {
         CardMove::Ignore => return Ok(()),
         CardMove::Close => return hide_card(&app),
@@ -489,6 +498,9 @@ mod tests {
     #[test]
     fn every_right_click_opens_its_menu_even_right_after_one_closed() {
         let mut s = CardState::default();
+        assert_eq!(traceable(r"__stack:item:c:\users\me\secret"), "__stack");
+        assert_eq!(traceable(r"__appmenu:item:c:\a.txt"), "__appmenu");
+        assert_eq!(traceable("__appmenu:discord"), "__appmenu:discord");
         assert_eq!(s.request("__appmenu:discord", 0, true), CardMove::Open);
         // The press of the next right-click closes the open menu as a click elsewhere...
         s.closed(400);

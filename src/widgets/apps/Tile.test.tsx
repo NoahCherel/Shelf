@@ -2,8 +2,9 @@ import { afterEach, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
+import { useSettings } from "../../core/settings";
 import apps from "./index";
-import { AppsTile, dragOutcome, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
+import { AppsTile, canGroup, dragOutcome, dropAim, heldOver, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
 
@@ -190,17 +191,39 @@ describe("several windows and previews", () => {
     expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "b" }));
   });
 
-  it("a pinned app that isn't open has no preview and keeps its name", () => {
+  it("a pinned app that isn't open shows its name after the same pause, in Windows' bubble", () => {
+    render(<AppsTile data={[app("a")]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(349));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_name", expect.anything());
+    act(() => vi.advanceTimersByTime(1));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_name", expect.objectContaining({ key: "a" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+  });
+
+  it("apps have no browser tooltip, as the bubble shows their name", () => {
+    render(<AppsTile data={[app("a"), app("b", true)]} status="ready" />);
+    expect(button("a").getAttribute("title")).toBeNull();
+    expect(button("b").getAttribute("title")).toBeNull();
+  });
+
+  it("with previews turned off, an open app shows its name instead", () => {
+    useSettings.setState({ previews: false });
+    render(<AppsTile data={[app("a", true)]} status="ready" />);
+    fireEvent.mouseEnter(button("a"));
+    act(() => vi.advanceTimersByTime(400));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_name", expect.objectContaining({ key: "a" }));
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
+    useSettings.setState({ previews: true });
+  });
+
+  it("with names turned off, a closed app shows nothing on hover", () => {
+    useSettings.setState({ hoverNames: false });
     render(<AppsTile data={[app("a")]} status="ready" />);
     fireEvent.mouseEnter(button("a"));
     act(() => vi.advanceTimersByTime(1000));
-    expect(mockInvoke).not.toHaveBeenCalledWith("preview_show", expect.anything());
-    expect(button("a").getAttribute("title")).toBe("a");
-  });
-
-  it("an open app has previews instead of a tooltip", () => {
-    render(<AppsTile data={[app("a", true)]} status="ready" />);
-    expect(button("a").getAttribute("title")).toBeNull();
+    expect(mockInvoke).not.toHaveBeenCalledWith("preview_name", expect.anything());
+    useSettings.setState({ hoverNames: true });
   });
 
   it("pressing an app hides the previews and cancels a pending one", () => {
@@ -452,5 +475,137 @@ describe("an app dragged past either end of the apps", () => {
   it("moves freely in between", () => {
     expect(keptInside(30, icon, box)).toBe(30);
     expect(keptInside(-50, icon, box)).toBe(-50);
+  });
+});
+
+describe("files, folders and groups", () => {
+  const T = 50;
+  const group: AppEntry = { ...app("group:1"), name: "Work", kind: "group", members: [app("a", true), app("b"), app("c"), app("d"), app("e")], windows: [{ hwnd: 1, title: "w" }] };
+  const folder: AppEntry = { ...app("item:c:\\work"), name: "Work folder", kind: "folder" };
+  const file: AppEntry = { ...app("item:c:\\a.txt"), name: "a.txt", kind: "file" };
+
+  it("an app held over another is grouped with it when let go", () => {
+    expect(dragOutcome({ active: "a", over: "b", dy: 0, onto: "b" }, [app("a"), app("b")], T)).toEqual({ kind: "group", onto: "b", key: "a" });
+  });
+
+  it("only apps go in groups, and only on an app or a group", () => {
+    expect(canGroup(app("a"), app("b"))).toBe(true);
+    expect(canGroup(app("a"), group)).toBe(true);
+    expect(canGroup(app("a"), app("a"))).toBe(false);
+    expect(canGroup(group, app("a"))).toBe(false);
+    expect(canGroup(file, app("a"))).toBe(false);
+    expect(canGroup(app("a"), folder)).toBe(false);
+    expect(dragOutcome({ active: "a", over: "x", dy: 0, onto: "x" }, [app("a"), { ...file, key: "x" }], T)?.kind).toBe("reorder");
+  });
+
+  it("pulling off the dock wins over holding on an app", () => {
+    expect(dragOutcome({ active: "a", over: "b", dy: 100, onto: "b" }, [app("a"), app("b")], T)).toEqual({ kind: "unpin", key: "a" });
+  });
+
+  it("an app counts as held over another only when near its middle", () => {
+    expect(heldOver({ left: 100, width: 48 }, { left: 105, width: 48 }, T)).toBe(true);
+    expect(heldOver({ left: 100, width: 48 }, { left: 130, width: 48 }, T)).toBe(false);
+  });
+
+  it("a group's tile shows four of its apps, a dot, and opens its card", () => {
+    const { container } = render(<AppsTile data={[group]} status="ready" />);
+    expect(container.querySelectorAll(".app__mini").length).toBe(4);
+    expect(container.querySelectorAll(".app__dot").length).toBe(1);
+    mockInvoke.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__group:group:1" }));
+    expect(mockInvoke.mock.calls.map((c) => c[0])).not.toContain("apps_activate");
+  });
+
+  it("a folder opens its stack, and a file opens like an app", () => {
+    render(<AppsTile data={[folder, file]} status="ready" />);
+    fireEvent.click(screen.getByRole("button", { name: "Work folder" }));
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__stack:item:c:\\work" }));
+    fireEvent.click(screen.getByRole("button", { name: "a.txt" }));
+    expect(mockInvoke).toHaveBeenCalledWith("apps_activate", { key: "item:c:\\a.txt" });
+  });
+
+  describe("what something dragged from Windows would do", () => {
+    const tiles = [{ key: "a", left: 100, width: 40 }, { key: "b", left: 140, width: 40 }];
+    const box = { left: 0, right: 200 };
+    const yes = () => true;
+
+    it("opens in the app at the middle of its icon", () => {
+      expect(dropAim(120, tiles, null, box, false, yes)).toEqual({ open: "a" });
+    });
+
+    it("opens a place at the edges of an icon, on the nearer side", () => {
+      expect(dropAim(103, tiles, null, box, false, yes)).toEqual({ place: 0 });
+      expect(dropAim(137, tiles, null, box, false, yes)).toEqual({ place: 1 });
+      expect(dropAim(177, tiles, null, box, false, yes)).toEqual({ place: 2 });
+    });
+
+    it("a program is always added, even at the middle of an icon", () => {
+      expect(dropAim(120, tiles, null, box, true, yes)).toEqual({ place: 1 });
+    });
+
+    it("the middle of something that can't open it is only a place", () => {
+      expect(dropAim(120, tiles, null, box, false, () => false)).toEqual({ place: 1 });
+    });
+
+    it("a place stays open while the pointer is in it", () => {
+      expect(dropAim(150, tiles, { left: 140, width: 40, index: 1 }, box, false, yes)).toEqual({ place: 1 });
+    });
+
+    it("over the rest of the dock it goes last", () => {
+      expect(dropAim(500, tiles, null, box, false, yes)).toEqual({ place: 2 });
+    });
+
+    it("before the first app it goes first", () => {
+      expect(dropAim(50, tiles, null, box, false, yes)).toEqual({ place: 0 });
+    });
+  });
+
+  describe("something dragged from Windows", () => {
+    let handlers: Record<string, (p: unknown) => void>;
+    const hints = () => mockInvoke.mock.calls.filter((c) => c[0] === "preview_hint").map((c) => (c[1] as { what: string }).what);
+    async function shown(data: AppEntry[]) {
+      handlers = {};
+      vi.mocked(listen).mockImplementation(async (name: string, fn: (p: never) => void) => {
+        handlers[name] = fn as (p: unknown) => void;
+        return () => {};
+      });
+      const view = render(<AppsTile data={data} status="ready" />);
+      await act(async () => {});
+      view.container.querySelector<HTMLElement>(".apps")!.getBoundingClientRect = () => ({ left: 0, right: 400 }) as DOMRect;
+      view.container.querySelectorAll<HTMLElement>("[data-key]").forEach((tile, i) => {
+        tile.getBoundingClientRect = () => ({ left: 100 + i * 40, width: 40 }) as DOMRect;
+      });
+      mockInvoke.mockClear();
+      return view;
+    }
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.mocked(listen).mockImplementation(async () => () => {});
+    });
+
+    it("opens a place between the icons with a bubble, and closes it on leaving", async () => {
+      const { container } = await shown([app("a"), app("b")]);
+      act(() => handlers["os-drag"]({ x: 141, y: 10, pinnable: false }));
+      expect(container.querySelector(".app--gap")).toBeTruthy();
+      expect(mockInvoke).toHaveBeenCalledWith("apps_drag_target", { key: null, index: 1 });
+      expect(hints()).toEqual(["add"]);
+      act(() => handlers["os-drag"](null));
+      expect(container.querySelector(".app--gap")).toBeNull();
+      expect(mockInvoke).toHaveBeenCalledWith("apps_drag_target", { key: null, index: null });
+      expect(mockInvoke).toHaveBeenCalledWith("preview_hide");
+    });
+
+    it("at the middle of an open app it offers to open there, and raises it after a moment", async () => {
+      vi.useFakeTimers();
+      const { container } = await shown([app("code", true)]);
+      act(() => handlers["os-drag"]({ x: 120, y: 10, pinnable: false }));
+      act(() => handlers["os-drag"]({ x: 121, y: 10, pinnable: false }));
+      expect(container.querySelector(".app--gap")).toBeNull();
+      expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_drag_target")).toEqual([["apps_drag_target", { key: "code", index: null }]]);
+      expect(hints()).toEqual(["open"]);
+      vi.advanceTimersByTime(1000);
+      expect(mockInvoke).toHaveBeenCalledWith("apps_drag_raise", { key: "code" });
+    });
   });
 });

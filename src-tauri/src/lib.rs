@@ -144,6 +144,7 @@ pub fn run() {
             system::notifications::notifications_clear,
             system::notifications::notification_open,
             apps::previews::preview_show,
+            apps::previews::preview_name,
             apps::previews::preview_slots,
             apps::previews::preview_peek,
             apps::previews::preview_keep,
@@ -184,8 +185,22 @@ pub fn run() {
             apps::start_quick_menu,
             apps::apps_menu,
             apps::apps_menu_choose,
+            apps::apps_menu_icons,
             apps::apps_reorder,
             apps::apps_unpin,
+            apps::apps_group,
+            apps::apps_group_rename,
+            apps::apps_stack,
+            apps::apps_stack_icons,
+            apps::apps_stack_open,
+            apps::apps_drag_target,
+            apps::apps_drag_raise,
+            apps::apps_drag_icon,
+            apps::pin_widget::pin_widget_info,
+            apps::pin_widget::pin_widget_icon,
+            apps::pin_widget::pin_widget_open,
+            apps::pin_widget::pick_folder,
+            apps::previews::preview_hint,
             claude_usage,
             claude_connect,
             diag::diag_note,
@@ -200,11 +215,25 @@ pub fn run() {
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             // Something dragged from Windows over the dock holds it up while auto-hide is on.
-            (WindowEvent::DragDrop(DragDropEvent::Enter { .. } | DragDropEvent::Over { .. }), "dock") => shell::dock::os_drag(true),
-            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => shell::dock::os_drag(false),
+            (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), "dock") => {
+                if let WindowEvent::DragDrop(DragDropEvent::Enter { paths, .. }) = event {
+                    diag::note("drag from Windows entered the dock");
+                    apps::drag_entered(paths);
+                }
+                shell::dock::os_drag(true);
+                let at = serde_json::json!({ "x": position.x, "y": position.y, "pinnable": apps::drag_is_pinnable() });
+                let _ = tauri::Emitter::emit(window, "os-drag", at);
+            }
+            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => {
+                diag::note("drag from Windows left the dock");
+                shell::dock::os_drag(false);
+                let _ = tauri::Emitter::emit(window, "os-drag", serde_json::Value::Null);
+            }
             (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
+                diag::note(&format!("{} dropped on the dock", paths.len()));
                 shell::dock::os_drag(false);
                 apps::pin_dropped(window.app_handle().clone(), paths.clone());
+                let _ = tauri::Emitter::emit(window, "os-drag", serde_json::Value::Null);
             }
             (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
             _ => {}
