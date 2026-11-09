@@ -210,14 +210,19 @@ pub fn run() {
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             // Something dragged from Windows over the dock holds it up while auto-hide is on.
             (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), "dock") => {
+                if matches!(event, WindowEvent::DragDrop(DragDropEvent::Enter { .. })) {
+                    diag::note("drag from Windows entered the dock");
+                }
                 shell::dock::os_drag(true);
                 let _ = tauri::Emitter::emit(window, "os-drag", Some((position.x, position.y)));
             }
             (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => {
+                diag::note("drag from Windows left the dock");
                 shell::dock::os_drag(false);
                 let _ = tauri::Emitter::emit(window, "os-drag", None::<(f64, f64)>);
             }
             (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
+                diag::note(&format!("{} dropped on the dock", paths.len()));
                 shell::dock::os_drag(false);
                 apps::pin_dropped(window.app_handle().clone(), paths.clone());
                 let _ = tauri::Emitter::emit(window, "os-drag", None::<(f64, f64)>);

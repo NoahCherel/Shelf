@@ -250,11 +250,15 @@ pub fn apps_drag_raise(key: String) -> Result<(), String> {
 /// shortcuts as apps, the rest as files and folders.
 pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
     let on_icon = DRAG_TARGET.lock().unwrap_or_else(|e| e.into_inner()).take().is_some();
+    crate::diag::note(&format!("drop on an icon: {on_icon}"));
     std::thread::spawn(move || {
         for path in paths {
             let path = path.to_string_lossy().into_owned();
-            if let Ok(Some(value)) = on_com_thread(move || pins::pin_dropped(&path, on_icon)) {
-                let _ = crate::store::store_save(app.clone(), pins::OVERLAY.to_string(), value);
+            let kept = on_com_thread(move || pins::pin_dropped(&path, on_icon));
+            crate::diag::note(&format!("drop kept: {}", matches!(kept, Ok(Some(_)))));
+            if let Ok(Some(value)) = kept {
+                let saved = crate::store::store_save(app.clone(), pins::OVERLAY.to_string(), value);
+                crate::diag::note(&format!("drop saved: {}", saved.is_ok()));
             }
         }
         let _ = tauri::Emitter::emit(&app, "apps-changed", ());

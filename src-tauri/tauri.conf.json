@@ -25,7 +25,9 @@
         "maximizable": false,
         "minimizable": false,
         "shadow": false,
-        "visible": false,
+        "visible": true,
+        "x": -32000,
+        "y": -32000,
         "focus": false,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1"
       },

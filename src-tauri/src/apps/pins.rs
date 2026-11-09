@@ -272,7 +272,8 @@ fn apply(windows_pins: Vec<Pin>, overlay: &Overlay, exists: impl Fn(&str) -> boo
         let pin = Pin {
             name: added.name.clone(),
             link: added.source.clone(),
-            target: path.then(|| added.source.clone()),
+            // A shortcut is known by what it opens, like the windows that come from it.
+            target: path.then(|| if added.source.to_lowercase().ends_with(".lnk") { added.key.clone() } else { added.source.clone() }),
             app_id: (!path).then(|| added.key.clone()),
         };
         if keep_pin(&pin, &exists) && !pins.iter().any(|p| key_of(p) == added.key) {
@@ -427,7 +428,7 @@ pub fn list() -> Vec<Pin> {
 #[cfg(test)]
 mod overlay_tests {
     use super::*;
-    use crate::apps::merge::AppWindow;
+    use crate::apps::merge::{merge, AppWindow};
 
     fn pin(name: &str, target: &str) -> Pin {
         Pin { name: name.into(), link: format!("{name}.lnk"), target: Some(target.into()), app_id: None }
@@ -720,6 +721,18 @@ mod overlay_tests {
         assert!(!can_group(&of("f", AppKind::File), &of("b", AppKind::App)));
         assert!(!can_group(&of("g", AppKind::Group), &of("b", AppKind::App)));
         assert!(!can_group(&of("a", AppKind::App), &of("d", AppKind::Folder)));
+    }
+
+    #[test]
+    fn a_dropped_shortcut_is_known_by_what_it_opens_so_it_can_be_taken_off() {
+        let mut overlay = Overlay::default();
+        overlay.pin_program(r"C:\Users\me\Desktop\Game.lnk", Some(r"D:\Games\game.exe"));
+        let pins = apply(Vec::new(), &overlay, EXISTS);
+        assert_eq!(key_of(&pins[0]), overlay.added[0].key, "the key the dock shows is the one saved");
+        assert_eq!(pins[0].link, r"C:\Users\me\Desktop\Game.lnk", "it still opens and looks like its shortcut");
+        let shown = merge(&pins, Vec::new(), 0);
+        overlay.unpin(&shown[0].key);
+        assert!(apply(Vec::new(), &overlay, EXISTS).is_empty());
     }
 
     #[test]
