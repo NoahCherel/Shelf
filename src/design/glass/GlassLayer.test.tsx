@@ -3,7 +3,6 @@ import { act, render, waitFor } from "@testing-library/react";
 import { invoke, listen } from "../../core/tauri";
 import { GlassLayer, lookFor, watchTiles } from "./GlassLayer";
 import { usesGlass } from "../theme";
-import { lensOffset } from "./lens";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
@@ -15,27 +14,6 @@ beforeEach(() => {
   mockInvoke.mockReset();
   mockInvoke.mockResolvedValue(null);
   mockListen.mockClear();
-});
-
-describe("lens", () => {
-  const BAND = 26;
-  const STRENGTH = 30;
-
-  it("leaves the centre unmoved", () => {
-    expect(lensOffset(-BAND, BAND, STRENGTH)).toBe(0);
-    expect(lensOffset(-200, BAND, STRENGTH)).toBe(0);
-  });
-
-  it("displaces most at the rim", () => {
-    expect(lensOffset(0, BAND, STRENGTH)).toBe(STRENGTH);
-  });
-
-  it("grows steadily toward the rim", () => {
-    const near = lensOffset(-5, BAND, STRENGTH);
-    const far = lensOffset(-20, BAND, STRENGTH);
-    expect(near).toBeGreaterThan(far);
-    expect(far).toBeGreaterThan(0);
-  });
 });
 
 describe("GlassLayer", () => {

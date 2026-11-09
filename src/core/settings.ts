@@ -42,10 +42,10 @@ export interface SettingsData {
   github: { user: string };
 }
 
-export const SIZE_MIN = 40;
-export const SIZE_MAX = 62;
-export const GAP_MAX = 24;
-export const SPACING_MAX = 24;
+const SIZE_MIN = 40;
+const SIZE_MAX = 62;
+const GAP_MAX = 24;
+const SPACING_MAX = 24;
 
 export function defaults(): SettingsData {
   return {

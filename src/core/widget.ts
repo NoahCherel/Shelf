@@ -49,7 +49,7 @@ export interface MenuItem {
   checked?: boolean;
 }
 
-export interface MenuCtx {
+interface MenuCtx {
   refresh: () => void;
 }
 

@@ -1,21 +1,6 @@
 import { useId } from "react";
 import "./parts.css";
 
-/** A line through the values in a 100 × 100 box; flat at mid-height when they don't vary. */
-export function sparkPath(values: number[]): string {
-  if (values.length === 0) return "";
-  const series = values.length === 1 ? [values[0], values[0]] : values;
-  const low = Math.min(...series);
-  const range = Math.max(...series) - low;
-  const step = 100 / (series.length - 1);
-  return series
-    .map((v, i) => {
-      const y = range === 0 ? 50 : 100 - ((v - low) / range) * 100;
-      return `${i === 0 ? "M" : "L"}${+(i * step).toFixed(2)} ${+y.toFixed(2)}`;
-    })
-    .join("");
-}
-
 // The line stays in the upper part of the box, with the area filling below it.
 const TOP = 10;
 const SPAN = 50;

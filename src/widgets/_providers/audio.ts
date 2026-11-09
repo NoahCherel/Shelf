@@ -1,7 +1,7 @@
 import { invoke } from "../../core/tauri";
 import type { Provider } from "../../core/widget";
 
-export interface AudioDevice {
+interface AudioDevice {
   id: string;
   name: string;
   active: boolean;

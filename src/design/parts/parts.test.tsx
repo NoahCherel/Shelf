@@ -3,7 +3,7 @@ import { vi } from "vitest";
 import { Tile } from "./Tile";
 import { Ring } from "./Ring";
 import { Bar, levelFor } from "./Bar";
-import { endY, smoothPath, Sparkline, sparkPath } from "./Sparkline";
+import { endY, smoothPath, Sparkline } from "./Sparkline";
 import { RoundButton } from "./RoundButton";
 import { Row } from "./Row";
 import { setDockSize, setStyle, setTheme } from "../theme";
@@ -63,18 +63,18 @@ describe("Bar", () => {
 
 describe("Sparkline", () => {
   it("Sparkline draws nothing for empty values and a flat line for equal ones", () => {
-    expect(sparkPath([])).toBe("");
-    expect(sparkPath([5, 5, 5])).toBe("M0 50L50 50L100 50");
+    expect(smoothPath([])).toBe("");
+    expect(smoothPath([5, 5, 5]).startsWith("M0 35")).toBe(true);
   });
 
   it("draws one value as a flat line instead of breaking", () => {
-    expect(sparkPath([7])).toBe("M0 50L100 50");
+    expect(smoothPath([7]).startsWith("M0 35")).toBe(true);
   });
 
   it("puts the highest value at the top and the lowest at the bottom", () => {
-    const path = sparkPath([0, 10]);
-    expect(path.startsWith("M0 100")).toBe(true);
-    expect(path.endsWith("L100 0")).toBe(true);
+    const path = smoothPath([0, 10]);
+    expect(path.startsWith("M0 60")).toBe(true);
+    expect(path.endsWith(" 100 10")).toBe(true);
   });
 
   it("renders no path element for empty input", () => {

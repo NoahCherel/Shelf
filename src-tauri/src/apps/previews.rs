@@ -117,11 +117,8 @@ fn is_listed(entries: &[AppEntry], raw: isize) -> bool {
 struct Hover(AtomicU64);
 
 impl Hover {
-    fn keep(&self) -> u64 {
-        self.0.fetch_add(1, Ordering::SeqCst) + 1
-    }
-
-    fn leave(&self) -> u64 {
+    /// Something happened, so a pending close from before it no longer stands.
+    fn bump(&self) -> u64 {
         self.0.fetch_add(1, Ordering::SeqCst) + 1
     }
 
@@ -321,7 +318,7 @@ pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f
 
 #[tauri::command(async)]
 pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
-    let opening = HOVER.keep();
+    let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
     }
@@ -374,7 +371,7 @@ pub fn prepare(app: &AppHandle) -> Result<(), String> {
 /// Tile position is logical px inside the dock window.
 #[tauri::command(async)]
 pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
-    let opening = HOVER.keep();
+    let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
     }
@@ -487,12 +484,12 @@ pub fn preview_peek(app: AppHandle, hwnd: Option<isize>, seq: u64) -> Result<(),
 
 #[tauri::command]
 pub fn preview_keep() {
-    HOVER.keep();
+    HOVER.bump();
 }
 
 #[tauri::command]
 pub fn preview_leave(app: AppHandle) {
-    let token = HOVER.leave();
+    let token = HOVER.bump();
     std::thread::spawn(move || {
         std::thread::sleep(LEAVE_GRACE);
         if !HOVER.still_leaving(token) {
@@ -509,7 +506,7 @@ pub fn preview_leave(app: AppHandle) {
 
 #[tauri::command(async)]
 pub fn preview_hide(app: AppHandle) -> Result<(), String> {
-    HOVER.keep();
+    HOVER.bump();
     hide(&app)
 }
 
@@ -660,18 +657,18 @@ mod tests {
     #[test]
     fn coming_back_in_time_stops_the_close() {
         let hover = Hover::default();
-        let leaving = hover.leave();
+        let leaving = hover.bump();
         assert!(hover.still_leaving(leaving));
-        hover.keep();
+        hover.bump();
         assert!(!hover.still_leaving(leaving));
     }
 
     #[test]
     fn leaving_while_it_opens_cancels_the_opening() {
         let hover = Hover::default();
-        let opening = hover.keep();
+        let opening = hover.bump();
         assert!(hover.still_leaving(opening), "nothing has happened since");
-        hover.leave();
+        hover.bump();
         assert!(!hover.still_leaving(opening));
     }
 
@@ -695,8 +692,8 @@ mod tests {
     #[test]
     fn only_the_latest_leave_counts() {
         let hover = Hover::default();
-        let first = hover.leave();
-        let second = hover.leave();
+        let first = hover.bump();
+        let second = hover.bump();
         assert!(!hover.still_leaving(first));
         assert!(hover.still_leaving(second));
     }

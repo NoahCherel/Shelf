@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { invoke } from "../../core/tauri";
 import "./card.css";
 
-export interface CardAction {
+interface CardAction {
   label: string;
   onClick: () => void;
   danger?: boolean;

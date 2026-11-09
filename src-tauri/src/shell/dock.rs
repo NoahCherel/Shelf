@@ -1,7 +1,6 @@
 //! The dock window: where it sits, and how it reacts to the shell. Decisions live
 //! in `react`, which is pure; `run_action` is the only part that touches Windows.
 
-use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Mutex, OnceLock};
@@ -496,10 +495,10 @@ pub fn start(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let _ = TASKBAR_CREATED.set(unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) });
     unsafe {
         // Clicking the dock mustn't take focus from your app, as with the real taskbar.
-        let style = GetWindowLongPtrW(HWND(hwnd.0 as *mut c_void), GWL_EXSTYLE);
-        SetWindowLongPtrW(HWND(hwnd.0 as *mut c_void), GWL_EXSTYLE, style | WS_EX_NOACTIVATE.0 as isize);
-        let _ = SetWindowSubclass(HWND(hwnd.0 as *mut c_void), Some(on_message), 1, 0);
-        let _ = WTSRegisterSessionNotification(HWND(hwnd.0 as *mut c_void), NOTIFY_FOR_THIS_SESSION);
+        let style = GetWindowLongPtrW(HWND(hwnd.0), GWL_EXSTYLE);
+        SetWindowLongPtrW(HWND(hwnd.0), GWL_EXSTYLE, style | WS_EX_NOACTIVATE.0 as isize);
+        let _ = SetWindowSubclass(HWND(hwnd.0), Some(on_message), 1, 0);
+        let _ = WTSRegisterSessionNotification(HWND(hwnd.0), NOTIFY_FOR_THIS_SESSION);
     }
 
     register_appbar(&dock);

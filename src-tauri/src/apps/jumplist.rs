@@ -96,9 +96,9 @@ pub fn mentions(bytes: &[u8], exe: &str) -> bool {
     if wanted.is_empty() {
         return false;
     }
-    let text: Vec<u16> = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
+    let text: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
     // Links can sit at an odd offset, so the other alignment is searched too.
-    let odd: Vec<u16> = bytes.get(1..).unwrap_or(&[]).chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
+    let odd: Vec<u16> = bytes.get(1..).unwrap_or(&[]).as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
     [text, odd].iter().any(|t| t.windows(wanted.len()).any(|w| w == wanted.as_slice()))
 }
 
@@ -132,7 +132,7 @@ pub fn categories(bytes: &[u8], read: impl Fn(&[u8]) -> Option<(Option<Link>, us
                 let Some(len) = bytes.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize) else { break };
                 at += 2;
                 let Some(raw) = bytes.get(at..at + len * 2) else { break };
-                let name = String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
+                let name = String::from_utf16_lossy(&raw.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
                 at += len * 2;
                 let Some(n) = u32_at(bytes, at) else { break };
                 at += 4;
@@ -231,11 +231,11 @@ pub fn dest_list(bytes: &[u8]) -> Vec<Recent> {
         let Some(pin) = bytes.get(at + pin_at..at + pin_at + 4).map(|b| i32::from_le_bytes(b.try_into().unwrap())) else { break };
         let Some(len) = bytes.get(at + len_at..at + len_at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize) else { break };
         let Some(raw) = bytes.get(at + len_at + 2..at + len_at + 2 + len * 2) else { break };
-        let path = String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
+        let path = String::from_utf16_lossy(&raw.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
         out.push(Recent { path, when, pinned: pin >= 0 });
         at += len_at + 2 + len * 2 + 4;
     }
-    out.sort_by(|a, b| b.when.cmp(&a.when));
+    out.sort_by_key(|r| std::cmp::Reverse(r.when));
     out
 }
 

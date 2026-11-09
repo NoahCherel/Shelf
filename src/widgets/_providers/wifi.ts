@@ -1,7 +1,7 @@
 import { invoke } from "../../core/tauri";
 import type { Provider } from "../../core/widget";
 
-export type WifiAuth = "open" | "wpa2" | "wpa3" | "enterprise" | "other";
+type WifiAuth = "open" | "wpa2" | "wpa3" | "enterprise" | "other";
 
 export interface WifiNetwork {
   id: string;
@@ -12,7 +12,7 @@ export interface WifiNetwork {
   connected: boolean;
 }
 
-export interface WifiAttempt {
+interface WifiAttempt {
   id: string;
   state: "connecting" | "failed";
   error: string | null;

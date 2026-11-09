@@ -27,7 +27,7 @@ export const panels: Record<PanelId, PanelDef> = {
 
 const FIRST_HEIGHT = 300;
 
-export function panelCardId(id: PanelId): string {
+function panelCardId(id: PanelId): string {
   return `__panel:${id}`;
 }
 

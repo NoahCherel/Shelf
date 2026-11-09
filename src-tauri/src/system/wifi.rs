@@ -23,6 +23,7 @@ use windows::Win32::NetworkManagement::WiFi::{
 const ACCESS_DENIED: u32 = 5;
 const WAIT_FOR_RESULT: Duration = Duration::from_secs(20);
 const TIMED_OUT: u32 = u32::MAX;
+#[cfg(test)]
 const KEY_MISMATCH: u32 = WLAN_REASON_CODE_KEY_MISMATCH;
 /// Long enough to reopen the card and see how it went, short enough not to linger tomorrow.
 const ATTEMPT_LIFE_MS: u64 = 120_000;

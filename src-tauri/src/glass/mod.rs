@@ -2,7 +2,6 @@
 
 pub mod capture;
 
-use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -88,7 +87,7 @@ impl Backend for RealCapture {
         let notify = Box::new(move || {
             let _ = app.emit_to("dock", "glass-frame", ());
         });
-        let session = capture::start(HWND(hwnd.0 as *mut c_void), origin, notify).map_err(|e| e.to_string())?;
+        let session = capture::start(HWND(hwnd.0), origin, notify).map_err(|e| e.to_string())?;
         self.session = Some(session);
         Ok(())
     }

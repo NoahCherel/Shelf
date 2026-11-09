@@ -43,7 +43,7 @@ export const fakeWifi = (more: object = {}) => ({
 
 const searchApp = (name: string, i: number) => ({ id: `app:${i}`, name, kind: "app" });
 
-export const fakeSearchApps = () => ["Paint", "Notepad", "Photos", "Phone Link", "Paramètres", "Calculator", "Firefox", "Discord"].map(searchApp);
+const fakeSearchApps = () => ["Paint", "Notepad", "Photos", "Phone Link", "Paramètres", "Calculator", "Firefox", "Discord"].map(searchApp);
 
 export const fakeSearchFiles = () => [
   { id: "file:1", name: "Plan panneaux.pdf", kind: "file", detail: "Documents" },

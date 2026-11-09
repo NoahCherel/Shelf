@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { invoke } from "../../core/tauri";
 import "./card.css";
 
-export interface ConnectField {
+interface ConnectField {
   id: string;
   label: string;
   placeholder?: string;
