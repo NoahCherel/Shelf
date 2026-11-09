@@ -10,13 +10,14 @@ use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 
 use serde::{Deserialize, Serialize};
+use tauri::AppHandle;
 
 use super::merge::{keep_pin, AppEntry, AppKind, Pin};
 use super::windows::{store_string, APP_ID_KEY};
 
 /// Pins made from the dock's own menu. Windows has no public way to pin to its taskbar, and it's
 /// hidden anyway, so these sit on top of its list and leave it untouched.
-pub const OVERLAY: &str = "dock-pins";
+const OVERLAY: &str = "dock-pins";
 /// How many apps' places are remembered. Apps that come and go would otherwise grow it forever.
 pub const ORDER_LIMIT: usize = 200;
 /// Long enough for any sensible name, and short enough for the group's card.
@@ -296,10 +297,21 @@ pub fn with_overlay(windows_pins: Vec<Pin>) -> Vec<Pin> {
     apply(windows_pins, &Overlay::from_saved(crate::store::load(OVERLAY)), |target| Path::new(target).exists())
 }
 
-fn changed(change: impl FnOnce(&mut Overlay)) -> serde_json::Value {
-    let mut overlay = Overlay::from_saved(crate::store::load(OVERLAY));
+/// Reads, changes and saves as one step, so two changes at the same moment can't lose either.
+fn update(
+    load: impl FnOnce() -> Option<serde_json::Value>,
+    save: impl FnOnce(serde_json::Value) -> Result<(), String>,
+    change: impl FnOnce(&mut Overlay),
+) -> Result<(), String> {
+    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+    let mut overlay = Overlay::from_saved(load());
     change(&mut overlay);
-    serde_json::to_value(overlay).unwrap_or_default()
+    save(serde_json::to_value(overlay).unwrap_or_default())
+}
+
+fn changed(app: &AppHandle, change: impl FnOnce(&mut Overlay)) -> Result<(), String> {
+    update(|| crate::store::load(OVERLAY), |value| crate::store::store_save(app.clone(), OVERLAY.to_string(), value), change)
 }
 
 /// The dock's entries with its groups, files and folders.
@@ -307,10 +319,10 @@ pub fn composed(entries: Vec<AppEntry>) -> Vec<AppEntry> {
     compose(entries, &Overlay::from_saved(crate::store::load(OVERLAY)), |path| Path::new(path).exists())
 }
 
-/// What to save after one app was dragged onto another or onto a group. Apps in a group have to
-/// stay when closed, so they're pinned.
-pub fn grouped(onto: &AppEntry, dragged: &AppEntry) -> serde_json::Value {
-    changed(|o| {
+/// One app was dragged onto another or onto a group. Apps in a group have to stay when closed, so
+/// they're pinned.
+pub fn grouped(app: &AppHandle, onto: &AppEntry, dragged: &AppEntry) -> Result<(), String> {
+    changed(app, |o| {
         for entry in [onto, dragged] {
             if entry.kind == AppKind::App && !entry.pinned {
                 o.pin(entry);
@@ -320,35 +332,33 @@ pub fn grouped(onto: &AppEntry, dragged: &AppEntry) -> serde_json::Value {
     })
 }
 
-pub fn renamed_group(key: &str, name: &str) -> serde_json::Value {
-    changed(|o| o.rename_group(key, name))
+pub fn renamed_group(app: &AppHandle, key: &str, name: &str) -> Result<(), String> {
+    changed(app, |o| o.rename_group(key, name))
 }
 
-pub fn ungrouped(key: &str) -> serde_json::Value {
-    changed(|o| o.ungroup(key))
+pub fn ungrouped(app: &AppHandle, key: &str) -> Result<(), String> {
+    changed(app, |o| o.ungroup(key))
 }
 
-pub fn left_group(member: &str) -> serde_json::Value {
-    changed(|o| o.leave_group(member))
+pub fn left_group(app: &AppHandle, member: &str) -> Result<(), String> {
+    changed(app, |o| o.leave_group(member))
 }
 
-pub fn removed_item(key: &str) -> serde_json::Value {
-    changed(|o| o.remove_item(key))
+pub fn removed_item(app: &AppHandle, key: &str) -> Result<(), String> {
+    changed(app, |o| o.remove_item(key))
 }
 
-/// What to save after pinning.
-pub fn pin(entry: &AppEntry) -> serde_json::Value {
-    changed(|o| o.pin(entry))
+pub fn pin(app: &AppHandle, entry: &AppEntry) -> Result<(), String> {
+    changed(app, |o| o.pin(entry))
 }
 
-/// What to save after unpinning.
-pub fn unpin(key: &str) -> serde_json::Value {
-    changed(|o| o.unpin(key))
+pub fn unpin(app: &AppHandle, key: &str) -> Result<(), String> {
+    changed(app, |o| o.unpin(key))
 }
 
-/// What to save after the apps were dragged into a new order.
-pub fn reordered(keys: Vec<String>) -> serde_json::Value {
-    changed(|o| o.set_order(keys))
+/// The apps were dragged into a new order.
+pub fn reordered(app: &AppHandle, keys: Vec<String>) -> Result<(), String> {
+    changed(app, |o| o.set_order(keys))
 }
 
 /// The saved order of the dock's apps.
@@ -356,9 +366,9 @@ pub fn order() -> Vec<String> {
     Overlay::from_saved(crate::store::load(OVERLAY)).order
 }
 
-/// What to save after something was dropped on the dock; None if it isn't kept. Call on a thread
-/// with COM initialised, as a shortcut has to be read.
-pub fn pin_dropped(path: &str, on_icon: bool, place: Option<(usize, Vec<String>)>) -> Option<serde_json::Value> {
+/// Keeps what was dropped on the dock; None if it isn't kept. Call on a thread with COM initialised,
+/// as a shortcut has to be read.
+pub fn pin_dropped(app: &AppHandle, path: &str, on_icon: bool, place: Option<(usize, Vec<String>)>) -> Option<Result<(), String>> {
     let what = dropped(path, |p| Path::new(p).is_dir());
     if !keeps_dropped(&what, on_icon) {
         return None;
@@ -368,7 +378,7 @@ pub fn pin_dropped(path: &str, on_icon: bool, place: Option<(usize, Vec<String>)
         Dropped::Shortcut => Some(read_link(Path::new(path))?.target?),
         Dropped::Folder | Dropped::File => None,
     };
-    Some(changed(|o| {
+    Some(changed(app, |o| {
         let key = match what {
             Dropped::Folder => o.add_item(path, true),
             Dropped::File => o.add_item(path, false),
@@ -759,6 +769,34 @@ mod overlay_tests {
         assert_eq!(overlay.order, ["a", "new", "b"]);
         overlay.place_at("new", 99, vec!["a".into(), "new".into(), "b".into()]);
         assert_eq!(overlay.order, ["a", "b", "new"], "already there, it moves, and past the end is the end");
+    }
+
+    #[test]
+    fn changes_made_at_the_same_moment_are_all_kept() {
+        let saved = Mutex::new(None::<serde_json::Value>);
+        std::thread::scope(|scope| {
+            for i in 0..8 {
+                let saved = &saved;
+                scope.spawn(move || {
+                    update(
+                        || {
+                            let read = saved.lock().unwrap().clone();
+                            std::thread::sleep(std::time::Duration::from_millis(5));
+                            read
+                        },
+                        |value| {
+                            *saved.lock().unwrap() = Some(value);
+                            Ok(())
+                        },
+                        |o| {
+                            o.add_item(&format!(r"C:\file{i}.txt"), false);
+                        },
+                    )
+                    .unwrap();
+                });
+            }
+        });
+        assert_eq!(Overlay::from_saved(saved.into_inner().unwrap()).items.len(), 8);
     }
 
     #[test]

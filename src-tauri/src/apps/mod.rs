@@ -161,15 +161,15 @@ pub fn start_quick_menu() -> Result<(), String> {
 /// The apps were dragged into a new order. Only Shelf's own file changes, so the preview may do it.
 #[tauri::command(async)]
 pub fn apps_reorder(app: AppHandle, keys: Vec<String>) -> Result<(), String> {
-    crate::store::store_save(app, pins::OVERLAY.to_string(), pins::reordered(keys))
+    pins::reordered(&app, keys)
 }
 
-/// What taking this off the dock saves: a group comes undone, so no app is lost with it.
-fn taken_off(entry: &AppEntry) -> serde_json::Value {
+/// Takes this off the dock: a group comes undone, so no app is lost with it.
+fn taken_off(app: &AppHandle, entry: &AppEntry) -> Result<(), String> {
     match entry.kind {
-        AppKind::App => pins::unpin(&entry.key),
-        AppKind::File | AppKind::Folder => pins::removed_item(&entry.key),
-        AppKind::Group => pins::ungrouped(&entry.key),
+        AppKind::App => pins::unpin(app, &entry.key),
+        AppKind::File | AppKind::Folder => pins::removed_item(app, &entry.key),
+        AppKind::Group => pins::ungrouped(app, &entry.key),
     }
 }
 
@@ -180,7 +180,7 @@ pub fn apps_unpin(app: AppHandle, key: String) -> Result<(), String> {
     if !entry.pinned {
         return Err("not pinned".into());
     }
-    crate::store::store_save(app, pins::OVERLAY.to_string(), taken_off(&entry))
+    taken_off(&app, &entry)
 }
 
 /// One app held over another, or over a group.
@@ -192,12 +192,12 @@ pub fn apps_group(app: AppHandle, onto: String, dragged: String) -> Result<(), S
     if !pins::can_group(moved, target) {
         return Err("those can't be grouped".into());
     }
-    crate::store::store_save(app, pins::OVERLAY.to_string(), pins::grouped(target, moved))
+    pins::grouped(&app, target, moved)
 }
 
 #[tauri::command(async)]
 pub fn apps_group_rename(app: AppHandle, key: String, name: String) -> Result<(), String> {
-    crate::store::store_save(app, pins::OVERLAY.to_string(), pins::renamed_group(&key, &name))
+    pins::renamed_group(&app, &key, &name)
 }
 
 /// Where a folder on the dock points, only if it's one of the dock's.
@@ -302,12 +302,9 @@ pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
                 Some(Aim::Place(index)) => current().ok().map(|shown| (index + offset, shown.into_iter().map(|e| e.key).collect())),
                 _ => None,
             };
-            let kept = on_com_thread(move || pins::pin_dropped(&path, on_icon, place));
-            crate::diag::note(&format!("drop kept: {}", matches!(kept, Ok(Some(_)))));
-            if let Ok(Some(value)) = kept {
-                let saved = crate::store::store_save(app.clone(), pins::OVERLAY.to_string(), value);
-                crate::diag::note(&format!("drop saved: {}", saved.is_ok()));
-            }
+            let saving = app.clone();
+            let kept = on_com_thread(move || pins::pin_dropped(&saving, &path, on_icon, place));
+            crate::diag::note(&format!("drop kept: {}", matches!(kept, Ok(Some(Ok(()))))));
         }
         let _ = tauri::Emitter::emit(&app, "apps-changed", ());
     });
@@ -431,11 +428,11 @@ pub fn apps_menu_choose(app: AppHandle, key: String, id: String) -> Result<(), S
                 }
             }
         }
-        Own::Pin => crate::store::store_save(app, pins::OVERLAY.to_string(), pins::pin(&entry))?,
-        Own::Unpin => crate::store::store_save(app, pins::OVERLAY.to_string(), pins::unpin(&entry.key))?,
+        Own::Pin => pins::pin(&app, &entry)?,
+        Own::Unpin => pins::unpin(&app, &entry.key)?,
         Own::Close | Own::CloseAll => entry.windows.iter().for_each(|w| windows::close(w.hwnd)),
-        Own::Remove | Own::Ungroup => crate::store::store_save(app, pins::OVERLAY.to_string(), taken_off(&entry))?,
-        Own::LeaveGroup => crate::store::store_save(app, pins::OVERLAY.to_string(), pins::left_group(&entry.key))?,
+        Own::Remove | Own::Ungroup => taken_off(&app, &entry)?,
+        Own::LeaveGroup => pins::left_group(&app, &entry.key)?,
     }
     Ok(())
 }
