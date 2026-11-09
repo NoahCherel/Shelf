@@ -1,6 +1,6 @@
+import { STORE } from "./names";
 import { invoke } from "./tauri";
 
-export const START_IMAGE = "start-image";
 const SIDE = 128;
 const MOST_CHARS = 500_000;
 
@@ -19,5 +19,5 @@ export async function shrinkImage(file: Blob): Promise<string> {
 }
 
 export function saveStartImage(data: string | null): Promise<unknown> {
-  return invoke("store_save", { name: START_IMAGE, value: data ? { data } : {} });
+  return invoke("store_save", { name: STORE.startImage, value: data ? { data } : {} });
 }

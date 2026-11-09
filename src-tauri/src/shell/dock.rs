@@ -480,7 +480,7 @@ fn saved_layout(settings: Option<&serde_json::Value>) -> DockLayout {
 /// Hides the taskbar, reserves the edge and shows the dock. Runs on the main thread.
 pub fn start(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let settings = crate::store::load("settings");
+    let settings = crate::store::load(crate::store::SETTINGS);
     let (auto_hide, show_on_desktop) = saved_behaviour(settings.as_ref());
     AUTO_HIDE.store(auto_hide, Ordering::Relaxed);
     SHOW_ON_DESKTOP.store(show_on_desktop, Ordering::Relaxed);

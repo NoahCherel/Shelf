@@ -68,9 +68,12 @@ fn traceable(id: &str) -> &str {
     }
 }
 
+const MENU_PREFIX: &str = "__menu:";
+const APP_MENU_PREFIX: &str = "__appmenu:";
+
 /// The menus a right-click opens, as opposed to cards a click toggles.
 fn is_menu(id: &str) -> bool {
-    id.starts_with("__menu:") || id.starts_with("__appmenu:")
+    id.starts_with(MENU_PREFIX) || id.starts_with(APP_MENU_PREFIX)
 }
 
 #[derive(PartialEq, Debug)]

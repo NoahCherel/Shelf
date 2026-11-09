@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CARD } from "../../core/names";
 import { refresh } from "../../core/provider";
 import { byId } from "../../core/registry";
 import { invoke, listen } from "../../core/tauri";
@@ -13,11 +14,6 @@ import "./card-window.css";
 
 const DEFAULT_CARD_WIDTH = 340;
 const MENU_WIDTH = 210;
-const MENU_PREFIX = "__menu:";
-const APP_MENU_PREFIX = "__appmenu:";
-const PANEL_PREFIX = "__panel:";
-const GROUP_PREFIX = "__group:";
-const STACK_PREFIX = "__stack:";
 
 /**
  * The size to give the window, or null while there's nothing to show yet. A window sized to nothing
@@ -75,8 +71,8 @@ function MenuBody({ def }: { def: WidgetDef | undefined }) {
 
 /** What the card window shows for an id: a widget's card or a menu. */
 export function CardContent({ id, n }: { id: string; n: number }) {
-  if (id.startsWith(PANEL_PREFIX)) {
-    const panel = panels[id.slice(PANEL_PREFIX.length) as PanelId];
+  if (id.startsWith(CARD.panel)) {
+    const panel = panels[id.slice(CARD.panel.length) as PanelId];
     if (!panel) return null;
     return (
       <div className="card-window">
@@ -86,28 +82,28 @@ export function CardContent({ id, n }: { id: string; n: number }) {
       </div>
     );
   }
-  if (id.startsWith(APP_MENU_PREFIX)) {
+  if (id.startsWith(CARD.appMenu)) {
     return (
       <div className="card-window">
         <Fitted key={n}>
-          <AppMenu appKey={id.slice(APP_MENU_PREFIX.length)} />
+          <AppMenu appKey={id.slice(CARD.appMenu.length)} />
         </Fitted>
       </div>
     );
   }
-  if (id.startsWith(GROUP_PREFIX) || id.startsWith(STACK_PREFIX)) {
+  if (id.startsWith(CARD.group) || id.startsWith(CARD.stack)) {
     return (
       <div className="card-window">
         <Fitted key={n}>
-          {id.startsWith(GROUP_PREFIX) ? <GroupCard groupKey={id.slice(GROUP_PREFIX.length)} /> : <StackCard folderKey={id.slice(STACK_PREFIX.length)} />}
+          {id.startsWith(CARD.group) ? <GroupCard groupKey={id.slice(CARD.group.length)} /> : <StackCard folderKey={id.slice(CARD.stack.length)} />}
         </Fitted>
       </div>
     );
   }
-  if (id.startsWith(MENU_PREFIX)) {
+  if (id.startsWith(CARD.menu)) {
     return (
       <div className="card-window">
-        <MenuBody key={n} def={byId(id.slice(MENU_PREFIX.length))} />
+        <MenuBody key={n} def={byId(id.slice(CARD.menu.length))} />
       </div>
     );
   }

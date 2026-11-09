@@ -2,8 +2,9 @@ import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type R
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { useSettings } from "../../core/settings";
+import { CARD, STORE } from "../../core/names";
 import { usePicker } from "../../core/shell";
-import { START_IMAGE, validStartImage } from "../../core/startImage";
+import { validStartImage } from "../../core/startImage";
 import { invoke, listen } from "../../core/tauri";
 import { openPanel } from "../../panels";
 import type { TileProps } from "../../core/widget";
@@ -127,11 +128,8 @@ function Sortable({ id, disabled, children }: { id: string; disabled: boolean; c
 
 const tileSize = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--T")) || 50;
 
-const APP_MENU_PREFIX = "__appmenu:";
 const APP_MENU_WIDTH = 300;
 const APP_MENU_HEIGHT = 120;
-const GROUP_PREFIX = "__group:";
-const STACK_PREFIX = "__stack:";
 /** As long as the fold in apps.css. */
 const FOLD_MS = 300;
 const PREVIEW_PAUSE_MS = 350;
@@ -204,13 +202,13 @@ function useStartImage(preview?: boolean): string | null {
     if (preview) return;
     let live = true;
     const load = () =>
-      Promise.resolve(invoke<{ data?: unknown } | null>("store_load", { name: START_IMAGE })).then(
+      Promise.resolve(invoke<{ data?: unknown } | null>("store_load", { name: STORE.startImage })).then(
         (saved) => live && setImage(validStartImage(saved?.data) ? saved!.data as string : null),
         () => {},
       );
     load();
     const off = listen<string>("store-changed", (name) => {
-      if (name === START_IMAGE) load();
+      if (name === STORE.startImage) load();
     });
     return () => {
       live = false;
@@ -593,7 +591,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
             if (preview) return;
             if (entry.kind === "group" || entry.kind === "folder") {
               const r = e.currentTarget.getBoundingClientRect();
-              const prefix = entry.kind === "group" ? GROUP_PREFIX : STACK_PREFIX;
+              const prefix = entry.kind === "group" ? CARD.group : CARD.stack;
               invoke("open_card", { widgetId: `${prefix}${entry.key}`, tileX: r.left, tileWidth: r.width, width: APP_MENU_WIDTH, height: APP_MENU_HEIGHT }).catch(() => {});
             } else if (entry.windows.length > 1) previews.toggle(e, entry);
             else invoke("apps_activate", { key: entry.key }).catch(() => {});
@@ -604,7 +602,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
             e.stopPropagation();
             previews.press({ ...entry, windows: [] });
             const r = e.currentTarget.getBoundingClientRect();
-            invoke("open_card", { widgetId: `${APP_MENU_PREFIX}${entry.key}`, tileX: r.left, tileWidth: r.width, width: APP_MENU_WIDTH, height: APP_MENU_HEIGHT }).catch(() => {});
+            invoke("open_card", { widgetId: `${CARD.appMenu}${entry.key}`, tileX: r.left, tileWidth: r.width, width: APP_MENU_WIDTH, height: APP_MENU_HEIGHT }).catch(() => {});
           }}
         >
           {entry.kind === "group" ? <GroupIcon entry={entry} preview={preview} /> : <AppIcon entry={entry} preview={preview} />}

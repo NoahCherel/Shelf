@@ -75,7 +75,7 @@ pub fn pin_widget_icon(id: String) -> Result<Option<String>, String> {
 pub fn pin_widget_open(id: String) -> Result<(), String> {
     crate::preview::guard()?;
     let pinned = parse(&id).ok_or("not a widget of that kind")?;
-    if !in_layout(crate::store::load("layout").as_ref(), &id) {
+    if !in_layout(crate::store::load(crate::store::LAYOUT).as_ref(), &id) {
         return Err("not on the dock".into());
     }
     if let Pinned::Folder(path) = &pinned {
