@@ -9,7 +9,8 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, ShellExecuteW, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-use super::{icon_of_exe, on_com_thread};
+use super::icon_of_exe;
+use crate::util::on_com_thread;
 
 #[derive(Debug, PartialEq)]
 pub enum Pinned {

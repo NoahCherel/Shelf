@@ -112,14 +112,7 @@ unsafe fn from_exe(exe: &str) -> Option<String> {
             }
         }
     }
-    let mut large = HICON::default();
-    let n = ExtractIconExW(PCWSTR(encoded.as_ptr()), 0, Some(&mut large), None, 1);
-    if n == 0 || large.is_invalid() {
-        return None;
-    }
-    let png = icon_to_png(large);
-    let _ = DestroyIcon(large);
-    png
+    from_file_at(exe, 0)
 }
 
 /// An icon kept in a file at an index, as a shortcut gives it: an .ico, or a program's resources.

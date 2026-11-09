@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use windows::core::{interface, w, IUnknown, IUnknown_Vtbl, BOOL, GUID, HRESULT};
 use windows::Win32::Foundation::{LocalFree, HLOCAL};
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
+use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
 use windows::Win32::System::Power::{
     GetSystemPowerStatus, PowerGetActiveScheme, PowerReadDCValueIndex, PowerSetActiveScheme, PowerWriteDCValueIndex, SYSTEM_POWER_STATUS,
 };
@@ -152,12 +152,10 @@ const RADIO_MANAGER: GUID = GUID::from_u128(0x581333f6_28db_41be_bc7a_ff201f12f3
 
 /// The manager wants a single-threaded apartment, which a command's thread may not be.
 fn with_radio_manager<T: Send + 'static>(work: impl FnOnce(&IRadioManager) -> T + Send + 'static) -> Option<T> {
-    std::thread::spawn(move || unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    crate::util::on_com_thread(move || unsafe {
         let manager: IRadioManager = CoCreateInstance(&RADIO_MANAGER, None, CLSCTX_ALL).ok()?;
         Some(work(&manager))
     })
-    .join()
     .ok()
     .flatten()
 }

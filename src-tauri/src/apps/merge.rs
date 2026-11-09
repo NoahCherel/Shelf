@@ -2,6 +2,8 @@
 
 use serde::Serialize;
 
+use crate::util::file_stem;
+
 #[derive(Clone, Debug)]
 pub struct Pin {
     pub name: String,
@@ -83,11 +85,6 @@ fn same(a: &str, b: &str) -> bool {
     a.eq_ignore_ascii_case(b)
 }
 
-fn exe_stem(exe: &str) -> &str {
-    let file = exe.rsplit(['\\', '/']).next().unwrap_or(exe);
-    file.rsplit_once('.').map_or(file, |(stem, _)| stem)
-}
-
 /// Some programs describe only what they're built with.
 pub fn useful_description(text: Option<String>) -> Option<String> {
     let text = text?.trim().to_string();
@@ -96,7 +93,7 @@ pub fn useful_description(text: Option<String>) -> Option<String> {
 
 /// Store apps all run inside this host, so the program name says nothing about them.
 fn is_frame_host(exe: &str) -> bool {
-    same(exe_stem(exe), "ApplicationFrameHost")
+    same(file_stem(exe), "ApplicationFrameHost")
 }
 
 pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<AppEntry> {
@@ -115,7 +112,7 @@ pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<Ap
         .collect();
 
     for mut w in windows {
-        if w.app_id.is_none() && same(exe_stem(&w.exe), "explorer") {
+        if w.app_id.is_none() && same(file_stem(&w.exe), "explorer") {
             w.app_id = Some(EXPLORER_APP_ID.to_string());
         }
         let pinned = pins.iter().position(|p| {
@@ -128,7 +125,7 @@ pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<Ap
             let frame_host = is_frame_host(&w.exe);
             entries.push(AppEntry {
                 key,
-                name: if frame_host { w.title.clone() } else { w.description.clone().unwrap_or_else(|| exe_stem(&w.exe).to_string()) },
+                name: if frame_host { w.title.clone() } else { w.description.clone().unwrap_or_else(|| file_stem(&w.exe).to_string()) },
                 pinned: false,
                 active: false,
                 windows: Vec::new(),

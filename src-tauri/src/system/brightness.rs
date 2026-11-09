@@ -1,5 +1,6 @@
 //! The screen's brightness, through WMI. Only built-in panels answer, so an outside monitor reads as none.
 
+use crate::util::lock;
 use std::sync::Mutex;
 
 use windows::core::{w, BSTR, PCWSTR};
@@ -64,7 +65,7 @@ fn long_variant(number: i32) -> VARIANT {
 /// None when the screen can't be adjusted this way, and the card then links to Settings.
 #[tauri::command(async)]
 pub fn brightness_get() -> Option<u32> {
-    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+    let _one = lock(&ONE_AT_A_TIME);
     unsafe {
         let wmi = services().ok()?;
         let row = first_row(&wmi, "SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active=TRUE")?;
@@ -84,7 +85,7 @@ pub fn brightness_get() -> Option<u32> {
 #[tauri::command(async)]
 pub fn brightness_set(percent: u32) -> Result<(), String> {
     crate::preview::guard()?;
-    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+    let _one = lock(&ONE_AT_A_TIME);
     let unable = "Windows couldn't change the brightness.".to_string();
     unsafe {
         let wmi = services().map_err(|_| unable.clone())?;

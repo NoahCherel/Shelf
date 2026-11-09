@@ -1,5 +1,6 @@
 //! The Wi-Fi card's list and connections. The Windows calls sit behind `Wlan`, so tests never touch the adapter.
 
+use crate::util::lock;
 use std::ffi::c_void;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
@@ -213,12 +214,12 @@ impl Default for Attempts {
 
 impl Attempts {
     fn current(&self, now: u64) -> Option<Attempt> {
-        let held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let held = lock(&self.0);
         held.as_ref().filter(|(_, at)| now.saturating_sub(*at) < ATTEMPT_LIFE_MS).map(|(attempt, _)| attempt.clone())
     }
 
     fn begin(&self, id: &str, now: u64) -> Result<(), String> {
-        let mut held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut held = lock(&self.0);
         if held.as_ref().is_some_and(|(attempt, at)| now.saturating_sub(*at) < ATTEMPT_LIFE_MS && attempt.state == "connecting") {
             return Err("Still connecting to another network.".into());
         }
@@ -227,7 +228,7 @@ impl Attempts {
     }
 
     fn finish(&self, result: Result<(), String>, now: u64) {
-        let mut held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut held = lock(&self.0);
         match result {
             Ok(()) => *held = None,
             Err(error) => {
@@ -241,7 +242,7 @@ impl Attempts {
     }
 
     fn clear(&self) {
-        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *lock(&self.0) = None;
     }
 }
 

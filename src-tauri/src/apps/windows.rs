@@ -1,5 +1,6 @@
 //! Open top-level windows, the same set the taskbar would show.
 
+use crate::util::lock;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::mem::size_of;
@@ -90,7 +91,7 @@ unsafe extern "system" fn on_foreground(
     let start = !h.is_invalid() && is_start_host(&exe_path(window_pid(h)));
     let was_open = START_OPEN.swap(start, Ordering::Relaxed);
     if was_open && !start {
-        *START_CLOSED.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+        *lock(&START_CLOSED) = Some(Instant::now());
     }
     if let Some(app) = HANDLE.get() {
         if was_open != start {
@@ -225,7 +226,7 @@ pub fn list() -> Vec<RawWindow> {
     unsafe {
         let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut Vec<HWND> as isize));
     }
-    let mut guard = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = lock(&KNOWN);
     let old = guard.take().unwrap_or_default();
     let mut known = HashMap::new();
     let out = handles
@@ -280,7 +281,7 @@ pub fn start_is_open() -> bool {
 }
 
 pub fn ms_since_start_closed() -> Option<u64> {
-    START_CLOSED.lock().unwrap_or_else(|e| e.into_inner()).map(|at| at.elapsed().as_millis() as u64)
+    lock(&START_CLOSED).map(|at| at.elapsed().as_millis() as u64)
 }
 
 pub fn focus(raw: isize) {

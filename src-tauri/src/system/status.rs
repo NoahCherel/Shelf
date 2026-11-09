@@ -39,10 +39,6 @@ fn ssid_text(raw: &[u8], length: u32) -> String {
     String::from_utf8_lossy(&raw[..(length as usize).min(raw.len())]).into_owned()
 }
 
-fn percent(scalar: f32) -> u32 {
-    (scalar.clamp(0.0, 1.0) * 100.0).round() as u32
-}
-
 /// The connected Wi-Fi network, if any. A PC without Wi-Fi just has none.
 unsafe fn current_wifi() -> Option<Wifi> {
     let mut version = 0;
@@ -96,7 +92,7 @@ unsafe fn current_volume() -> Option<Volume> {
     let speaker = devices.GetDefaultAudioEndpoint(eRender, eMultimedia).ok()?;
     let volume: IAudioEndpointVolume = speaker.Activate(CLSCTX_ALL, None).ok()?;
     Some(Volume {
-        percent: percent(volume.GetMasterVolumeLevelScalar().ok()?),
+        percent: crate::system::percent(volume.GetMasterVolumeLevelScalar().ok()?),
         muted: volume.GetMute().ok()?.as_bool(),
     })
 }
@@ -128,8 +124,8 @@ mod tests {
 
     #[test]
     fn volume_becomes_a_whole_percent() {
-        assert_eq!(percent(0.404), 40);
-        assert_eq!(percent(1.0), 100);
-        assert_eq!(percent(-0.1), 0);
+        assert_eq!(crate::system::percent(0.404), 40);
+        assert_eq!(crate::system::percent(1.0), 100);
+        assert_eq!(crate::system::percent(-0.1), 0);
     }
 }

@@ -77,7 +77,7 @@ pub fn find<'a>(links: &'a [Link], print: &str) -> Option<&'a Link> {
 
 /// Windows' own words for each section, so the menu reads as it does on the taskbar.
 pub fn section_title(kind: Kind, lang: u16) -> &'static str {
-    let french = lang & 0x3FF == 0x0C;
+    let french = crate::util::is_french(lang);
     match (kind, french) {
         (Kind::Tasks, true) => "Tâches",
         (Kind::Tasks, false) => "Tasks",
@@ -244,7 +244,7 @@ pub fn name_of(path: &str) -> &str {
     if path.starts_with("http://") || path.starts_with("https://") {
         return path;
     }
-    path.rsplit(['\\', '/']).next().unwrap_or(path)
+    crate::util::file_name(path)
 }
 
 fn recent_folder() -> PathBuf {
@@ -406,7 +406,7 @@ mod native {
 
     /// The DestList stream of an automatic jump list file. Explorer keeps the file open, so a copy is read.
     pub fn dest_list_of(file: &std::path::Path) -> Option<Vec<u8>> {
-        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", super::super::history::unique()));
+        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", crate::util::unique_temp_name()));
         std::fs::copy(file, &copy).ok()?;
         let read = || unsafe {
             let storage: IStorage = StgOpenStorage(&HSTRING::from(copy.as_os_str()), None, STGM_READ | STGM_SHARE_EXCLUSIVE, None, 0).ok()?;

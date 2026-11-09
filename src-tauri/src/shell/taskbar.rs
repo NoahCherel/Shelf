@@ -1,6 +1,7 @@
 //! Hides the Windows taskbar and guarantees it comes back. The original setting
 //! is saved to a file first, so it can be restored even after a crash.
 
+use crate::util::lock;
 use std::mem::size_of;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
@@ -45,11 +46,11 @@ impl<A: TaskbarApi> Taskbar<A> {
     }
 
     pub fn mode(&self) -> Mode {
-        *self.mode.lock().unwrap_or_else(|e| e.into_inner())
+        *lock(&self.mode)
     }
 
     pub fn apply(&self, next: Mode) {
-        let mut mode = self.mode.lock().unwrap_or_else(|e| e.into_inner());
+        let mut mode = lock(&self.mode);
         // An existing file means a crashed run; what it holds is the real original.
         if !self.state_file.exists() {
             if let Some(dir) = self.state_file.parent() {
@@ -73,7 +74,7 @@ impl<A: TaskbarApi> Taskbar<A> {
     /// Explorer shows the taskbar again after an auto-hide change or its own
     /// restart, so this is called periodically rather than hiding it just once.
     pub fn keep(&self) {
-        let mode = self.mode.lock().unwrap_or_else(|e| e.into_inner());
+        let mode = lock(&self.mode);
         if *mode == Mode::Hidden {
             self.api.hide_windows();
         }
@@ -81,7 +82,7 @@ impl<A: TaskbarApi> Taskbar<A> {
 
     pub fn restore(&self) {
         // Held until the end so keep() can't undo this mid-restore.
-        let mut mode = self.mode.lock().unwrap_or_else(|e| e.into_inner());
+        let mut mode = lock(&self.mode);
         *mode = Mode::Off;
         // No state file means there is nothing to undo (e.g. a second restore after
         // the panic hook ran); don't guess and overwrite the user's auto-hide setting.

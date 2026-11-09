@@ -2,6 +2,7 @@
 //! this window through DWM, so they stay live and cost next to nothing, and page screenshots
 //! can't see them. The window never takes focus, so hovering can't disturb the app you're in.
 
+use crate::util::lock;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -174,7 +175,7 @@ fn hwnd_of(raw: isize) -> HWND {
 }
 
 fn clear_pictures() {
-    for picture in PICTURES.lock().unwrap_or_else(|e| e.into_inner()).drain(..) {
+    for picture in lock(&PICTURES).drain(..) {
         unsafe {
             let _ = DwmUnregisterThumbnail(picture);
         }
@@ -183,10 +184,10 @@ fn clear_pictures() {
 
 fn hide(app: &AppHandle) -> Result<(), String> {
     crate::diag::note("previews hidden");
-    ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    lock(&ON_STRIP).clear();
     let _ = set_peek(app, None);
     clear_pictures();
-    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    *lock(&SHOWN) = None;
     preview_window(app)?.hide().map_err(|e| e.to_string())?;
     app.emit("preview-closed", ()).map_err(|e| e.to_string())
 }
@@ -198,14 +199,14 @@ fn watch_pointer(app: AppHandle, dock: Rect, strip: Rect) {
     if crate::preview::is_on() {
         return;
     }
-    *AREA.lock().unwrap_or_else(|e| e.into_inner()) = Some((dock, strip));
+    *lock(&AREA) = Some((dock, strip));
     // A newer strip brings its own watcher.
     let mine = OPENINGS.fetch_add(1, Ordering::SeqCst) + 1;
     std::thread::spawn(move || {
         let mut outside = 0;
         loop {
             std::thread::sleep(POINTER_CHECK);
-            if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_none() || OPENINGS.load(Ordering::SeqCst) != mine {
+            if lock(&SHOWN).is_none() || OPENINGS.load(Ordering::SeqCst) != mine {
                 return;
             }
             outside = match real_pointer() {
@@ -310,7 +311,7 @@ pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f
     if place_bubble(&app, &window, name_width(&text) + picture, tile_x, tile_width)?.is_none() {
         return Ok(());
     }
-    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("hint:{what}"));
+    *lock(&SHOWN) = Some(format!("hint:{what}"));
     let shown = Shown { key: key.unwrap_or_default(), name: text, slot_width: 0.0, windows: Vec::new(), hint: true };
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     window.show().map_err(|e| e.to_string())
@@ -323,7 +324,7 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
         return Ok(());
     }
     let shown_as = format!("name:{key}");
-    if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some(shown_as.as_str()) {
+    if lock(&SHOWN).as_deref() == Some(shown_as.as_str()) {
         return Ok(());
     }
     let Some(entry) = current()?.into_iter().find(|e| e.key == key) else {
@@ -336,8 +337,8 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     }
     let _ = set_peek(&app, None);
     clear_pictures();
-    ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
-    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(shown_as);
+    lock(&ON_STRIP).clear();
+    *lock(&SHOWN) = Some(shown_as);
     let shown = Shown { key, name: entry.name, slot_width: 0.0, windows: Vec::new(), hint: false };
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     crate::diag::note("name shown");
@@ -354,7 +355,7 @@ fn may_show(card_open: bool) -> bool {
 
 /// The strip of previews is showing.
 pub fn is_showing() -> bool {
-    SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+    lock(&SHOWN).is_some()
 }
 
 pub fn prepare(app: &AppHandle) -> Result<(), String> {
@@ -375,7 +376,7 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
     }
-    if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some(key.as_str()) {
+    if lock(&SHOWN).as_deref() == Some(key.as_str()) {
         return Ok(());
     }
     let entries = current()?;
@@ -422,8 +423,8 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     }
     let _ = set_peek(&app, None);
     clear_pictures();
-    *ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()) = shown.windows.iter().map(|w| w.hwnd).collect();
-    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(key);
+    *lock(&ON_STRIP) = shown.windows.iter().map(|w| w.hwnd).collect();
+    *lock(&SHOWN) = Some(key);
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     crate::diag::note("previews shown");
     window.show().map_err(|e| e.to_string())?;
@@ -434,14 +435,14 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
 /// Where the page laid out each picture, in logical px. Windows draws them from here on.
 #[tauri::command(async)]
 pub fn preview_slots(app: AppHandle, slots: Vec<Slot>) -> Result<(), String> {
-    if SHOWN.lock().unwrap_or_else(|e| e.into_inner()).is_none() {
+    if lock(&SHOWN).is_none() {
         return Ok(());
     }
     let window = preview_window(&app)?;
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let target = window.hwnd().map_err(|e| e.to_string())?;
     clear_pictures();
-    let mut pictures = PICTURES.lock().unwrap_or_else(|e| e.into_inner());
+    let mut pictures = lock(&PICTURES);
     for slot in slots {
         unsafe {
             let Ok(picture) = DwmRegisterThumbnail(HWND(target.0), hwnd_of(slot.hwnd)) else { continue };
@@ -475,7 +476,7 @@ pub fn preview_peek(app: AppHandle, hwnd: Option<isize>, seq: u64) -> Result<(),
         return Ok(());
     }
     // Held throughout: closing the strip clears this first, so a peek can't start just after it closed.
-    let on_strip = ON_STRIP.lock().unwrap_or_else(|e| e.into_inner());
+    let on_strip = lock(&ON_STRIP);
     if hwnd.is_some_and(|raw| !may_peek(&on_strip, raw)) {
         return Err("not on the strip".into());
     }
@@ -496,7 +497,7 @@ pub fn preview_leave(app: AppHandle) {
             return;
         }
         // The page isn't always told when the pointer reaches the strip, but the pointer itself knows.
-        let area = *AREA.lock().unwrap_or_else(|e| e.into_inner());
+        let area = *lock(&AREA);
         let heading = !crate::preview::is_on() && area.zip(real_pointer()).is_some_and(|((dock, strip), pointer)| heading_for_strip(pointer, dock, strip));
         if !heading {
             let _ = hide(&app);
@@ -557,7 +558,7 @@ mod tests {
     #[test]
     fn many_windows_shrink_to_fit_the_screen() {
         let width = slot_width(8, 1536.0);
-        assert!(width < SLOT && width >= SMALLEST_SLOT);
+        assert!((SMALLEST_SLOT..SLOT).contains(&width));
         assert!(strip_width(8, width) <= 1536.0 - 2.0 * SCREEN_MARGIN);
     }
 

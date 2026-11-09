@@ -52,17 +52,8 @@ struct RawSession {
     expired: bool,
 }
 
-fn to_percent(scalar: f32) -> u32 {
-    (scalar.clamp(0.0, 1.0) * 100.0).round() as u32
-}
-
 fn to_scalar(percent: u32) -> f32 {
     percent.min(100) as f32 / 100.0
-}
-
-fn program_name(exe: &str) -> &str {
-    let file = exe.rsplit(['\\', '/']).next().unwrap_or(exe);
-    file.rsplit_once('.').map_or(file, |(stem, _)| stem)
 }
 
 fn session_name(raw: &RawSession) -> String {
@@ -70,7 +61,7 @@ fn session_name(raw: &RawSession) -> String {
     if !raw.name.is_empty() && !raw.name.starts_with('@') {
         return raw.name.clone();
     }
-    match program_name(&raw.exe) {
+    match crate::util::file_stem(&raw.exe) {
         "" if raw.pid == 0 => "System sounds".to_string(),
         "" => "Unknown app".to_string(),
         name => name.to_string(),
@@ -130,7 +121,7 @@ unsafe fn sessions(speaker: &IMMDevice) -> Vec<RawSession> {
             pid,
             name: name.unwrap_or_default(),
             exe: if pid == 0 { String::new() } else { exe_of_pid(pid) },
-            volume: to_percent(volume.GetMasterVolume().unwrap_or(0.0)),
+            volume: crate::system::percent(volume.GetMasterVolume().unwrap_or(0.0)),
             muted: volume.GetMute().is_ok_and(|m| m.as_bool()),
             expired: control.GetState().is_ok_and(|s| s == AudioSessionStateExpired),
         });
@@ -163,7 +154,7 @@ pub fn audio_state() -> AudioState {
         }
         let endpoint = speaker.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None).ok();
         AudioState {
-            volume: endpoint.as_ref().and_then(|v| v.GetMasterVolumeLevelScalar().ok()).map_or(0, to_percent),
+            volume: endpoint.as_ref().and_then(|v| v.GetMasterVolumeLevelScalar().ok()).map_or(0, crate::system::percent),
             muted: endpoint.as_ref().and_then(|v| v.GetMute().ok()).is_some_and(|m| m.as_bool()),
             device: device_name(&speaker),
             devices: list,
@@ -274,9 +265,9 @@ mod tests {
     fn percent_is_clamped_both_ways() {
         assert_eq!(to_scalar(150), 1.0);
         assert_eq!(to_scalar(0), 0.0);
-        assert_eq!(to_percent(1.5), 100);
-        assert_eq!(to_percent(-1.0), 0);
-        assert_eq!(to_percent(0.404), 40);
+        assert_eq!(crate::system::percent(1.5), 100);
+        assert_eq!(crate::system::percent(-1.0), 0);
+        assert_eq!(crate::system::percent(0.404), 40);
     }
 
     #[test]

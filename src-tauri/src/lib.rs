@@ -11,6 +11,7 @@ mod secrets;
 mod shell;
 mod store;
 mod system;
+mod util;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;

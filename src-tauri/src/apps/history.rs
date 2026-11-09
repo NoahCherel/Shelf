@@ -2,7 +2,6 @@
 //! history, which is never written to, and kept nowhere.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use base64::Engine;
 use rusqlite::{Connection, OpenFlags};
@@ -26,7 +25,7 @@ pub enum Browser {
 
 /// Which browser a program is, and where it keeps its history.
 pub fn browser_for(exe: &str) -> Option<Browser> {
-    let name = exe.rsplit(['\\', '/']).next().unwrap_or(exe).to_lowercase();
+    let name = crate::util::file_name(exe).to_lowercase();
     let local = || PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default());
     match name.as_str() {
         "firefox.exe" => {
@@ -138,17 +137,11 @@ fn with_icons(mut visits: Vec<Visit>, icons: &Path, query: &str) -> Vec<Visit> {
     visits
 }
 
-/// A name for a temporary copy, so two menus opening at once can't remove each other's.
-pub fn unique() -> String {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    format!("{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed))
-}
-
 /// Runs `read` on a copy of a database the browser keeps open, with its write-ahead log so the
 /// latest visits are there, then removes the copy.
 fn read_copy<T>(db: &Path, read: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
     let name = db.file_name()?.to_string_lossy().into_owned();
-    let folder = std::env::temp_dir().join(format!("shelf-history-{}", unique()));
+    let folder = std::env::temp_dir().join(format!("shelf-history-{}", crate::util::unique_temp_name()));
     std::fs::create_dir_all(&folder).ok()?;
     let copy = folder.join(&name);
     let result = (|| {

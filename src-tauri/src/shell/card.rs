@@ -1,5 +1,6 @@
 //! The one shared card window: placed over its tile, closed by clicking away.
 
+use crate::util::lock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
@@ -140,7 +141,7 @@ fn now() -> u64 {
 }
 
 fn with_state<R>(f: impl FnOnce(&mut CardState) -> R) -> R {
-    let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = lock(&STATE);
     f(guard.get_or_insert_with(CardState::default))
 }
 
@@ -167,7 +168,7 @@ fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
         let monitor = Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 };
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
-        let tile = *TILE.lock().unwrap_or_else(|e| e.into_inner());
+        let tile = *lock(&TILE);
         let margin = (MARGIN * scale).round() as i32;
         let height = limit_height(logical.1, room_for_card(dock_rect, monitor, margin, scale));
         let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
@@ -216,7 +217,7 @@ pub fn open_card(
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let scale = dock.scale_factor().map_err(|e| e.to_string())?;
     let origin = dock.outer_position().map_err(|e| e.to_string())?.x;
-    *TILE.lock().unwrap_or_else(|e| e.into_inner()) =
+    *lock(&TILE) =
         Span { x: origin + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
     place(&app, (width, height))?;
     app.emit_to("card", "card-open", &widget_id).map_err(|e| e.to_string())?;

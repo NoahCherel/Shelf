@@ -1,5 +1,6 @@
 //! The apps pinned to the Windows taskbar, read from their shortcuts.
 
+use crate::util::lock;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -12,6 +13,7 @@ use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
+use crate::util::file_stem;
 use super::merge::{keep_pin, AppEntry, AppKind, Pin};
 use super::windows::{store_string, APP_ID_KEY};
 
@@ -70,11 +72,6 @@ pub enum Dropped {
     Shortcut,
     Folder,
     File,
-}
-
-fn file_stem(path: &str) -> &str {
-    let file = path.rsplit(['\\', '/']).next().unwrap_or(path);
-    file.rsplit_once('.').map_or(file, |(stem, _)| stem)
 }
 
 /// What a path dropped on the dock is. Only programs and shortcuts become pinned apps.
@@ -149,7 +146,7 @@ impl Overlay {
 
     fn add_item(&mut self, path: &str, folder: bool) -> String {
         if !self.items.iter().any(|i| i.path.eq_ignore_ascii_case(path)) {
-            let name = path.trim_end_matches(['\\', '/']).rsplit(['\\', '/']).next().unwrap_or(path).to_string();
+            let name = crate::util::file_name(path.trim_end_matches(['\\', '/'])).to_string();
             self.items.push(DockItem { path: path.to_string(), name, folder });
         }
         item_key(path)
@@ -304,7 +301,7 @@ fn update(
     change: impl FnOnce(&mut Overlay),
 ) -> Result<(), String> {
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
-    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+    let _one = lock(&ONE_AT_A_TIME);
     let mut overlay = Overlay::from_saved(load());
     change(&mut overlay);
     save(serde_json::to_value(overlay).unwrap_or_default())
@@ -441,7 +438,7 @@ fn read_all(dir: &Path) -> Vec<Pin> {
 pub fn list() -> Vec<Pin> {
     let dir = folder();
     let stamp = std::fs::metadata(&dir).and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
-    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut cache = lock(&CACHE);
     match &*cache {
         Some((when, pins)) if *when == stamp => pins.clone(),
         _ => {

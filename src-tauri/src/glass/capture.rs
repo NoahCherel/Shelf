@@ -1,6 +1,7 @@
 //! Live screen capture of the region behind the dock, through Windows.Graphics.Capture.
 //! Windows only delivers frames when the screen changes, so a still desktop costs nothing.
 
+use crate::util::lock;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
@@ -88,14 +89,14 @@ static LATEST: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 static START: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 pub fn set_region(region: Region) -> bool {
-    let mut current = REGION.lock().unwrap_or_else(|e| e.into_inner());
+    let mut current = lock(&REGION);
     let changed = *current != region;
     *current = region;
     changed
 }
 
 pub fn take_latest() -> Vec<u8> {
-    std::mem::take(&mut *LATEST.lock().unwrap_or_else(|e| e.into_inner()))
+    std::mem::take(&mut *lock(&LATEST))
 }
 
 struct Staging {
@@ -143,7 +144,7 @@ impl Worker {
     }
 
     fn on_frame(&mut self, source: &ID3D11Texture2D) -> windows::core::Result<()> {
-        let region = *REGION.lock().unwrap_or_else(|e| e.into_inner());
+        let region = *lock(&REGION);
         let relative = Region { x: region.x - self.origin.0, y: region.y - self.origin.1, ..region };
         let Some(r) = crop(relative, self.monitor) else { return Ok(()) };
         let staging = self.staging_for(r.w, r.h)?;
@@ -164,7 +165,7 @@ impl Worker {
             let out = pack(r.w as u32, r.h as u32, stride, 4, bytes);
             self.context.Unmap(&staging, 0);
             if self.filter.changed(&out[8..]) {
-                *LATEST.lock().unwrap_or_else(|e| e.into_inner()) = out;
+                *lock(&LATEST) = out;
                 (self.notify)();
             }
         }
@@ -247,7 +248,7 @@ pub fn start(window: HWND, origin: (i32, i32), notify: Box<dyn Fn() + Send>) -> 
             let Some(pool) = pool.as_ref() else { return Ok(()) };
             // Always collected, or the pool stops delivering.
             let frame = pool.TryGetNextFrame()?;
-            let mut worker = worker.lock().unwrap_or_else(|e| e.into_inner());
+            let mut worker = lock(&worker);
             if worker.filter.due(START.elapsed().as_millis() as u64) {
                 let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
                 let source: ID3D11Texture2D = unsafe { access.GetInterface()? };

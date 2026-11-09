@@ -11,12 +11,12 @@ pub mod previews;
 pub mod stack;
 mod windows;
 
+use crate::util::{lock, on_com_thread};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
 use ::windows::core::{w, HSTRING, PCWSTR};
 use ::windows::Win32::Globalization::GetUserDefaultUILanguage;
-use ::windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 use ::windows::Win32::UI::Input::KeyboardAndMouse::{VK_LWIN, VK_X};
 use ::windows::Win32::UI::Shell::ShellExecuteW;
 use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
@@ -49,23 +49,11 @@ enum Aim {
     Place(usize),
 }
 
-/// Shell objects need their own COM apartment, so they get their own short-lived thread.
-pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, String> {
-    std::thread::spawn(move || {
-        unsafe {
-            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-        }
-        f()
-    })
-    .join()
-    .map_err(|_| "shell call failed".to_string())
-}
-
 pub(crate) fn current() -> Result<Vec<AppEntry>, String> {
     let pins = pins::with_overlay(on_com_thread(pins::list)?);
     let entries = pins::arrange(pins::composed(merge(&pins, windows::list(), windows::foreground())), &pins::order());
     let sources = every_one(&entries).filter_map(|e| Some((e.key.clone(), e.icon_source.clone()?))).collect();
-    *SOURCES.lock().unwrap_or_else(|e| e.into_inner()) = Some(sources);
+    *lock(&SOURCES) = Some(sources);
     Ok(entries)
 }
 
@@ -85,16 +73,16 @@ pub fn apps_list() -> Result<Vec<AppEntry>, String> {
 
 #[tauri::command(async)]
 pub fn apps_icon(key: String) -> Result<Option<String>, String> {
-    let _one = ONE_LOOKUP.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(known) = ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&key)) {
+    let _one = lock(&ONE_LOOKUP);
+    if let Some(known) = lock(&ICONS).as_ref().and_then(|m| m.get(&key)) {
         return Ok(Some(known.clone()));
     }
-    let source = SOURCES.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&key).cloned());
+    let source = lock(&SOURCES).as_ref().and_then(|m| m.get(&key).cloned());
     let Some(source) = source else { return Ok(None) };
     let icon = on_com_thread(move || icons::icon(&source))?;
     // A miss isn't remembered: the page asks again.
     if let Some(found) = &icon {
-        let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cache = lock(&ICONS);
         cache.get_or_insert_with(HashMap::new).insert(key, found.clone());
     }
     Ok(icon)
@@ -106,14 +94,14 @@ pub fn bring_forward(raw: isize) {
 
 /// The icon of a program, file or folder by its path, from the same cache as the apps themselves.
 pub fn icon_of_exe(exe: String) -> Result<Option<String>, String> {
-    let _one = ONE_LOOKUP.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(known) = ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&exe)) {
+    let _one = lock(&ONE_LOOKUP);
+    if let Some(known) = lock(&ICONS).as_ref().and_then(|m| m.get(&exe)) {
         return Ok(Some(known.clone()));
     }
     let source = exe.clone();
     let icon = on_com_thread(move || icons::icon(&source))?;
     if let Some(found) = &icon {
-        let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cache = lock(&ICONS);
         cache.get_or_insert_with(HashMap::new).insert(exe, found.clone());
     }
     Ok(icon)
@@ -234,7 +222,7 @@ pub fn apps_stack_open(key: String, id: String) -> Result<(), String> {
 /// What letting go would do, as the page sees it: open in the app `key`, or take the place `index`.
 #[tauri::command]
 pub fn apps_drag_target(key: Option<String>, index: Option<usize>) {
-    *DRAG_AIM.lock().unwrap_or_else(|e| e.into_inner()) = key.map(Aim::Open).or(index.map(Aim::Place));
+    *lock(&DRAG_AIM) = key.map(Aim::Open).or(index.map(Aim::Place));
 }
 
 /// A drag from Windows has come onto the dock. Whether it's only programs is decided here, once:
@@ -242,7 +230,7 @@ pub fn apps_drag_target(key: Option<String>, index: Option<usize>) {
 pub fn drag_entered(paths: &[std::path::PathBuf]) {
     let pinnable = paths.iter().all(|p| matches!(pins::dropped(&p.to_string_lossy(), |d| std::path::Path::new(d).is_dir()), pins::Dropped::Program | pins::Dropped::Shortcut));
     DRAG_PINNABLE.store(pinnable, std::sync::atomic::Ordering::Relaxed);
-    *DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()) = paths.to_vec();
+    *lock(&DRAG_PATHS) = paths.to_vec();
 }
 
 pub fn drag_is_pinnable() -> bool {
@@ -252,7 +240,7 @@ pub fn drag_is_pinnable() -> bool {
 /// The picture of what's being dragged, for the place the dock opens for it.
 #[tauri::command(async)]
 pub fn apps_drag_icon() -> Result<Option<String>, String> {
-    let Some(first) = DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).first().cloned() else { return Ok(None) };
+    let Some(first) = lock(&DRAG_PATHS).first().cloned() else { return Ok(None) };
     icon_of_exe(first.to_string_lossy().into_owned())
 }
 
@@ -283,8 +271,8 @@ pub fn apps_drag_raise(key: String) -> Result<(), String> {
 /// What's dropped on the dock from the desktop or File Explorer is kept on it: programs and
 /// shortcuts as apps, the rest as files and folders.
 pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
-    DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).clear();
-    let aim = DRAG_AIM.lock().unwrap_or_else(|e| e.into_inner()).take();
+    lock(&DRAG_PATHS).clear();
+    let aim = lock(&DRAG_AIM).take();
     let on_icon = matches!(aim, Some(Aim::Open(_)));
     crate::diag::note(&format!("drop on an icon: {on_icon}"));
     std::thread::spawn(move || {
@@ -376,7 +364,7 @@ pub fn apps_menu(key: String) -> Result<menu::AppMenu, String> {
     let for_lists = entry.clone();
     let lists = if entry.kind == AppKind::App { on_com_thread(move || jump_lists(&for_lists, lang)).unwrap_or_default() } else { Vec::new() };
     let shown = lists.iter().flat_map(|(_, links)| links.clone()).collect();
-    *LAST_JUMP.lock().unwrap_or_else(|e| e.into_inner()) = Some((entry.key.clone(), shown));
+    *lock(&LAST_JUMP) = Some((entry.key.clone(), shown));
     Ok(menu::menu_for(&entry, lang, lists))
 }
 
@@ -384,7 +372,7 @@ pub fn apps_menu(key: String) -> Result<menu::AppMenu, String> {
 /// come after the menu, so it isn't held up, and are kept once found.
 #[tauri::command(async)]
 pub fn apps_menu_icons(key: String) -> Result<Vec<(String, String)>, String> {
-    let links = match &*LAST_JUMP.lock().unwrap_or_else(|e| e.into_inner()) {
+    let links = match &*lock(&LAST_JUMP) {
         Some((shown_for, links)) if *shown_for == key => links.clone(),
         _ => return Ok(Vec::new()),
     };
@@ -392,13 +380,13 @@ pub fn apps_menu_icons(key: String) -> Result<Vec<(String, String)>, String> {
         links
             .iter()
             .filter_map(|link| {
-                let known = JUMP_ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&link.icon).cloned());
+                let known = lock(&JUMP_ICONS).as_ref().and_then(|m| m.get(&link.icon).cloned());
                 let icon = known.unwrap_or_else(|| {
                     let found = icons::jump_icon(&link.icon);
-                    JUMP_ICONS.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).insert(link.icon.clone(), found.clone());
+                    lock(&JUMP_ICONS).get_or_insert_with(HashMap::new).insert(link.icon.clone(), found.clone());
                     found
                 })?;
-                Some((format!("jump:{}", jumplist::fingerprint(link)), icon))
+                Some((menu::jump_id(link), icon))
             })
             .collect()
     })
