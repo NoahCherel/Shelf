@@ -231,34 +231,43 @@ pub fn start(window: HWND, origin: (i32, i32), notify: Box<dyn Fn() + Send>) -> 
 
     unsafe { SetWindowDisplayAffinity(window, WDA_EXCLUDEFROMCAPTURE)? };
 
-    let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(&winrt, DirectXPixelFormat::B8G8R8A8UIntNormalized, 1, size)?;
-    let worker = Arc::new(Mutex::new(Worker {
-        device,
-        context,
-        staging: None,
-        filter: FrameFilter::default(),
-        monitor: (size.Width, size.Height),
-        origin,
-        notify,
-    }));
-    let token = pool.FrameArrived(&TypedEventHandler::new(move |pool: windows::core::Ref<'_, Direct3D11CaptureFramePool>, _| {
-        let Some(pool) = pool.as_ref() else { return Ok(()) };
-        // Always collected, or the pool stops delivering.
-        let frame = pool.TryGetNextFrame()?;
-        let mut worker = worker.lock().unwrap_or_else(|e| e.into_inner());
-        if worker.filter.due(START.elapsed().as_millis() as u64) {
-            let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
-            let source: ID3D11Texture2D = unsafe { access.GetInterface()? };
-            let _ = worker.on_frame(&source);
-        }
-        Ok(())
-    }))?;
+    // The session's drop puts the dock back in captures, but only once there is a session.
+    let session = (|| -> windows::core::Result<Session> {
+        let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(&winrt, DirectXPixelFormat::B8G8R8A8UIntNormalized, 1, size)?;
+        let worker = Arc::new(Mutex::new(Worker {
+            device,
+            context,
+            staging: None,
+            filter: FrameFilter::default(),
+            monitor: (size.Width, size.Height),
+            origin,
+            notify,
+        }));
+        let token = pool.FrameArrived(&TypedEventHandler::new(move |pool: windows::core::Ref<'_, Direct3D11CaptureFramePool>, _| {
+            let Some(pool) = pool.as_ref() else { return Ok(()) };
+            // Always collected, or the pool stops delivering.
+            let frame = pool.TryGetNextFrame()?;
+            let mut worker = worker.lock().unwrap_or_else(|e| e.into_inner());
+            if worker.filter.due(START.elapsed().as_millis() as u64) {
+                let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
+                let source: ID3D11Texture2D = unsafe { access.GetInterface()? };
+                let _ = worker.on_frame(&source);
+            }
+            Ok(())
+        }))?;
 
-    let session = pool.CreateCaptureSession(&item)?;
-    let _ = session.SetIsCursorCaptureEnabled(false);
-    let _ = session.SetIsBorderRequired(false);
-    session.StartCapture()?;
-    Ok(Session { session, pool, token, window })
+        let session = pool.CreateCaptureSession(&item)?;
+        let _ = session.SetIsCursorCaptureEnabled(false);
+        let _ = session.SetIsBorderRequired(false);
+        session.StartCapture()?;
+        Ok(Session { session, pool, token, window })
+    })();
+    if session.is_err() {
+        unsafe {
+            let _ = SetWindowDisplayAffinity(window, WDA_NONE);
+        }
+    }
+    session
 }
 
 #[cfg(test)]
