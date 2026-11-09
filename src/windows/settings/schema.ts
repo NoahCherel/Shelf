@@ -88,6 +88,10 @@ export const SCHEMA: PageDef[] = [
           ],
           disabledWhen: (s) => s.style !== "clear",
         }),
+        toggle("visibleInCaptures", {
+          label: "Show in screenshots",
+          tip: "The dock appears in screenshots and screen sharing. The glass styles then use a solid background, as live glass needs the dock left out of captures.",
+        }),
         choice("theme", {
           label: "Theme",
           tip: "Auto follows Windows' light or dark mode.",

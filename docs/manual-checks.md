@@ -203,6 +203,10 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Gone:** a deleted folder leaves the dock within a minute.
 - [ ] **Start image:** Choose puts your picture on Start, cropped square; Use logo brings the logo back.
 
+## Screenshots
+
+- [ ] **Show in screenshots:** with it on, the dock appears in a Win+Shift+S capture and in screen sharing, on a solid background. With it off, the glass comes back and the dock leaves captures.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?
