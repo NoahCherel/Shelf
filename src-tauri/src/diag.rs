@@ -34,6 +34,10 @@ fn program_in_front() -> String {
     exe.rsplit(['\\', '/']).next().unwrap_or(&exe).to_string()
 }
 
+pub fn enabled() -> bool {
+    *ON
+}
+
 /// Notes one thing Shelf did. Cheap and silent when off.
 pub fn note(what: &str) {
     if !*ON {

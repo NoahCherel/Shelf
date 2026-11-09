@@ -323,10 +323,12 @@ fn close_at_next_press_outside(app: AppHandle) {
 pub fn on_blur(window: &tauri::Window) {
     let down = button_down();
     crate::diag::note(&format!("card lost the focus, button down {down}; {}", crate::diag::card_window_state()));
-    std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_millis(50));
-        crate::diag::note(&format!("50 ms later: {}", crate::diag::card_window_state()));
-    });
+    if crate::diag::enabled() {
+        std::thread::spawn(|| {
+            std::thread::sleep(Duration::from_millis(50));
+            crate::diag::note(&format!("50 ms later: {}", crate::diag::card_window_state()));
+        });
+    }
     if !blur_is_click_away(down) {
         close_at_next_press_outside(window.app_handle().clone());
         return;
