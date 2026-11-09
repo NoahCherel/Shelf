@@ -137,6 +137,19 @@ pub fn menu_for(entry: &AppEntry, lang: u16, lists: Vec<(String, Vec<Link>)>) ->
     }
 }
 
+/// The bubble above the dock during a drag, in Windows' language. Only these, whatever the page asks.
+pub fn hint_text(what: &str, lang: u16, name: &str) -> Option<String> {
+    let french = lang & 0x3FF == 0x0C;
+    match (what, french) {
+        ("add", true) => Some("Ajouter au dock".to_string()),
+        ("add", false) => Some("Add to dock".to_string()),
+        ("remove", _) => Some(label(Own::Remove, lang).to_string()),
+        ("open", true) => Some(format!("Ouvrir dans {name}")),
+        ("open", false) => Some(format!("Open in {name}")),
+        _ => None,
+    }
+}
+
 pub fn should_press_start(open_now: bool, since_closed_ms: Option<u64>) -> bool {
     open_now || !since_closed_ms.is_some_and(|ms| ms < START_REOPEN_GUARD_MS)
 }
@@ -219,6 +232,16 @@ mod tests {
         for item in [Own::Remove, Own::Ungroup, Own::LeaveGroup] {
             assert_eq!(own_from(own_id(item)), Some(item));
         }
+    }
+
+    #[test]
+    fn the_bubbles_during_a_drag_speak_windows_language() {
+        assert_eq!(hint_text("add", FRENCH, ""), Some("Ajouter au dock".to_string()));
+        assert_eq!(hint_text("remove", FRENCH, ""), Some("Retirer du dock".to_string()));
+        assert_eq!(hint_text("open", FRENCH, "Word"), Some("Ouvrir dans Word".to_string()));
+        assert_eq!(hint_text("add", ENGLISH, ""), Some("Add to dock".to_string()));
+        assert_eq!(hint_text("open", ENGLISH, "Word"), Some("Open in Word".to_string()));
+        assert_eq!(hint_text("calc.exe", FRENCH, ""), None);
     }
 
     #[test]

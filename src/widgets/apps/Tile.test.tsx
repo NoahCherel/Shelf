@@ -4,7 +4,7 @@ import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
 import { useSettings } from "../../core/settings";
 import apps from "./index";
-import { AppsTile, appUnder, canGroup, dragOutcome, heldOver, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
+import { AppsTile, canGroup, dragOutcome, dropAim, heldOver, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
 
@@ -525,34 +525,87 @@ describe("files, folders and groups", () => {
     expect(mockInvoke).toHaveBeenCalledWith("apps_activate", { key: "item:c:\\a.txt" });
   });
 
-  it("finds the app under something dragged from Windows, and nothing elsewhere", () => {
-    const { container } = render(<AppsTile data={[app("code")]} status="ready" />);
-    expect(appUnder(container.querySelector("[data-key] img, [data-key] span"))).toBe("code");
-    expect(appUnder(screen.getByRole("button", { name: "Start" }))).toBeNull();
-    expect(appUnder(null)).toBeNull();
+  describe("what something dragged from Windows would do", () => {
+    const tiles = [{ key: "a", left: 100, width: 40 }, { key: "b", left: 140, width: 40 }];
+    const box = { left: 0, right: 200 };
+    const yes = () => true;
+
+    it("opens in the app at the middle of its icon", () => {
+      expect(dropAim(120, tiles, null, box, false, yes)).toEqual({ open: "a" });
+    });
+
+    it("opens a place at the edges of an icon, on the nearer side", () => {
+      expect(dropAim(103, tiles, null, box, false, yes)).toEqual({ place: 0 });
+      expect(dropAim(137, tiles, null, box, false, yes)).toEqual({ place: 1 });
+      expect(dropAim(177, tiles, null, box, false, yes)).toEqual({ place: 2 });
+    });
+
+    it("a program is always added, even at the middle of an icon", () => {
+      expect(dropAim(120, tiles, null, box, true, yes)).toEqual({ place: 1 });
+    });
+
+    it("the middle of something that can't open it is only a place", () => {
+      expect(dropAim(120, tiles, null, box, false, () => false)).toEqual({ place: 1 });
+    });
+
+    it("a place stays open while the pointer is in it", () => {
+      expect(dropAim(150, tiles, { left: 140, width: 40, index: 1 }, box, false, yes)).toEqual({ place: 1 });
+    });
+
+    it("over the rest of the dock it goes last", () => {
+      expect(dropAim(500, tiles, null, box, false, yes)).toEqual({ place: 2 });
+    });
+
+    it("before the first app it goes first", () => {
+      expect(dropAim(50, tiles, null, box, false, yes)).toEqual({ place: 0 });
+    });
   });
 
-  it("something from Windows held over an app raises it, and leaving forgets the app", async () => {
-    vi.useFakeTimers();
-    const handlers: Record<string, (p: unknown) => void> = {};
-    vi.mocked(listen).mockImplementation(async (name: string, fn: (p: never) => void) => {
-      handlers[name] = fn as (p: unknown) => void;
-      return () => {};
+  describe("something dragged from Windows", () => {
+    let handlers: Record<string, (p: unknown) => void>;
+    const hints = () => mockInvoke.mock.calls.filter((c) => c[0] === "preview_hint").map((c) => (c[1] as { what: string }).what);
+    async function shown(data: AppEntry[]) {
+      handlers = {};
+      vi.mocked(listen).mockImplementation(async (name: string, fn: (p: never) => void) => {
+        handlers[name] = fn as (p: unknown) => void;
+        return () => {};
+      });
+      const view = render(<AppsTile data={data} status="ready" />);
+      await act(async () => {});
+      view.container.querySelector<HTMLElement>(".apps")!.getBoundingClientRect = () => ({ left: 0, right: 400 }) as DOMRect;
+      view.container.querySelectorAll<HTMLElement>("[data-key]").forEach((tile, i) => {
+        tile.getBoundingClientRect = () => ({ left: 100 + i * 40, width: 40 }) as DOMRect;
+      });
+      mockInvoke.mockClear();
+      return view;
+    }
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.mocked(listen).mockImplementation(async () => () => {});
     });
-    const { container } = render(<AppsTile data={[app("code", true)]} status="ready" />);
-    await act(async () => {});
-    const tile = container.querySelector("[data-key]")!;
-    const under = vi.fn(() => tile);
-    (document as unknown as { elementFromPoint: unknown }).elementFromPoint = under;
-    mockInvoke.mockClear();
-    handlers["os-drag"]([100, 10]);
-    handlers["os-drag"]([101, 10]);
-    expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_drag_target")).toEqual([["apps_drag_target", { key: "code" }]]);
-    vi.advanceTimersByTime(1000);
-    expect(mockInvoke).toHaveBeenCalledWith("apps_drag_raise", { key: "code" });
-    handlers["os-drag"](null);
-    expect(mockInvoke).toHaveBeenCalledWith("apps_drag_target", { key: null });
-    vi.useRealTimers();
-    vi.mocked(listen).mockImplementation(async () => () => {});
+
+    it("opens a place between the icons with a bubble, and closes it on leaving", async () => {
+      const { container } = await shown([app("a"), app("b")]);
+      act(() => handlers["os-drag"]({ x: 141, y: 10, pinnable: false }));
+      expect(container.querySelector(".app--gap")).toBeTruthy();
+      expect(mockInvoke).toHaveBeenCalledWith("apps_drag_target", { key: null, index: 1 });
+      expect(hints()).toEqual(["add"]);
+      act(() => handlers["os-drag"](null));
+      expect(container.querySelector(".app--gap")).toBeNull();
+      expect(mockInvoke).toHaveBeenCalledWith("apps_drag_target", { key: null, index: null });
+      expect(mockInvoke).toHaveBeenCalledWith("preview_hide");
+    });
+
+    it("at the middle of an open app it offers to open there, and raises it after a moment", async () => {
+      vi.useFakeTimers();
+      const { container } = await shown([app("code", true)]);
+      act(() => handlers["os-drag"]({ x: 120, y: 10, pinnable: false }));
+      act(() => handlers["os-drag"]({ x: 121, y: 10, pinnable: false }));
+      expect(container.querySelector(".app--gap")).toBeNull();
+      expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_drag_target")).toEqual([["apps_drag_target", { key: "code", index: null }]]);
+      expect(hints()).toEqual(["open"]);
+      vi.advanceTimersByTime(1000);
+      expect(mockInvoke).toHaveBeenCalledWith("apps_drag_raise", { key: "code" });
+    });
   });
 });

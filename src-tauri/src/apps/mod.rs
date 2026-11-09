@@ -36,8 +36,16 @@ static SOURCES: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 static LAST_JUMP: Mutex<Option<(String, Vec<jumplist::Link>)>> = Mutex::new(None);
 /// Icons of jump list lines by where they come from, found or not.
 static JUMP_ICONS: Mutex<Option<HashMap<String, Option<String>>>> = Mutex::new(None);
-/// The app whose icon something dragged from Windows is over.
-static DRAG_TARGET: Mutex<Option<String>> = Mutex::new(None);
+/// What letting go of something dragged from Windows would do.
+static DRAG_AIM: Mutex<Option<Aim>> = Mutex::new(None);
+/// What's being dragged from Windows.
+static DRAG_PATHS: Mutex<Vec<std::path::PathBuf>> = Mutex::new(Vec::new());
+
+#[derive(Clone, Debug)]
+enum Aim {
+    Open(String),
+    Place(usize),
+}
 
 /// Shell objects need their own COM apartment, so they get their own short-lived thread.
 pub fn on_com_thread<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> Result<R, String> {
@@ -229,10 +237,39 @@ pub fn apps_stack_open(key: String, id: String) -> Result<(), String> {
     })?
 }
 
-/// Which app's icon something dragged from Windows is over, as the page sees it.
+/// What letting go would do, as the page sees it: open in the app `key`, or take the place `index`.
 #[tauri::command]
-pub fn apps_drag_target(key: Option<String>) {
-    *DRAG_TARGET.lock().unwrap_or_else(|e| e.into_inner()) = key;
+pub fn apps_drag_target(key: Option<String>, index: Option<usize>) {
+    *DRAG_AIM.lock().unwrap_or_else(|e| e.into_inner()) = key.map(Aim::Open).or(index.map(Aim::Place));
+}
+
+/// A drag from Windows has come onto the dock. True if it would be pinned wherever it's dropped.
+pub fn drag_entered(paths: &[std::path::PathBuf]) {
+    *DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()) = paths.to_vec();
+}
+
+pub fn drag_is_pinnable() -> bool {
+    DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).iter().all(|p| matches!(pins::dropped(&p.to_string_lossy(), |d| std::path::Path::new(d).is_dir()), pins::Dropped::Program | pins::Dropped::Shortcut))
+}
+
+/// The picture of what's being dragged, for the place the dock opens for it.
+#[tauri::command(async)]
+pub fn apps_drag_icon() -> Result<Option<String>, String> {
+    let Some(first) = DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).first().cloned() else { return Ok(None) };
+    on_com_thread(move || icons::icon(&first.to_string_lossy()))
+}
+
+/// Opens what was dropped on an app's icon with that app.
+fn open_in_app(key: &str, paths: &[String]) {
+    if crate::preview::guard().is_err() {
+        return;
+    }
+    let launch = every_entry().ok().and_then(|all| all.into_iter().find(|e| e.key == key && e.kind == AppKind::App)).and_then(|e| e.launch);
+    let Some(launch) = launch else { return };
+    let params = paths.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(" ");
+    unsafe {
+        ShellExecuteW(None, w!("open"), &HSTRING::from(launch), &HSTRING::from(params), PCWSTR::null(), SW_SHOWNORMAL);
+    }
 }
 
 /// Something dragged from Windows has stayed over this app: it comes to the front, to be dropped on.
@@ -249,12 +286,26 @@ pub fn apps_drag_raise(key: String) -> Result<(), String> {
 /// What's dropped on the dock from the desktop or File Explorer is kept on it: programs and
 /// shortcuts as apps, the rest as files and folders.
 pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
-    let on_icon = DRAG_TARGET.lock().unwrap_or_else(|e| e.into_inner()).take().is_some();
+    DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    let aim = DRAG_AIM.lock().unwrap_or_else(|e| e.into_inner()).take();
+    let on_icon = matches!(aim, Some(Aim::Open(_)));
     crate::diag::note(&format!("drop on an icon: {on_icon}"));
     std::thread::spawn(move || {
-        for path in paths {
+        if let Some(Aim::Open(key)) = &aim {
+            let files: Vec<String> = paths
+                .iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .filter(|p| matches!(pins::dropped(p, |d| std::path::Path::new(d).is_dir()), pins::Dropped::File | pins::Dropped::Folder))
+                .collect();
+            open_in_app(key, &files);
+        }
+        for (offset, path) in paths.into_iter().enumerate() {
             let path = path.to_string_lossy().into_owned();
-            let kept = on_com_thread(move || pins::pin_dropped(&path, on_icon));
+            let place = match aim {
+                Some(Aim::Place(index)) => current().ok().map(|shown| (index + offset, shown.into_iter().map(|e| e.key).collect())),
+                _ => None,
+            };
+            let kept = on_com_thread(move || pins::pin_dropped(&path, on_icon, place));
             crate::diag::note(&format!("drop kept: {}", matches!(kept, Ok(Some(_)))));
             if let Ok(Some(value)) = kept {
                 let saved = crate::store::store_save(app.clone(), pins::OVERLAY.to_string(), value);

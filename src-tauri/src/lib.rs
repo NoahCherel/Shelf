@@ -195,6 +195,8 @@ pub fn run() {
             apps::apps_stack_open,
             apps::apps_drag_target,
             apps::apps_drag_raise,
+            apps::apps_drag_icon,
+            apps::previews::preview_hint,
             claude_usage,
             claude_connect,
             diag::diag_note,
@@ -210,22 +212,24 @@ pub fn run() {
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             // Something dragged from Windows over the dock holds it up while auto-hide is on.
             (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), "dock") => {
-                if matches!(event, WindowEvent::DragDrop(DragDropEvent::Enter { .. })) {
+                if let WindowEvent::DragDrop(DragDropEvent::Enter { paths, .. }) = event {
                     diag::note("drag from Windows entered the dock");
+                    apps::drag_entered(paths);
                 }
                 shell::dock::os_drag(true);
-                let _ = tauri::Emitter::emit(window, "os-drag", Some((position.x, position.y)));
+                let at = serde_json::json!({ "x": position.x, "y": position.y, "pinnable": apps::drag_is_pinnable() });
+                let _ = tauri::Emitter::emit(window, "os-drag", at);
             }
             (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => {
                 diag::note("drag from Windows left the dock");
                 shell::dock::os_drag(false);
-                let _ = tauri::Emitter::emit(window, "os-drag", None::<(f64, f64)>);
+                let _ = tauri::Emitter::emit(window, "os-drag", serde_json::Value::Null);
             }
             (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
                 diag::note(&format!("{} dropped on the dock", paths.len()));
                 shell::dock::os_drag(false);
                 apps::pin_dropped(window.app_handle().clone(), paths.clone());
-                let _ = tauri::Emitter::emit(window, "os-drag", None::<(f64, f64)>);
+                let _ = tauri::Emitter::emit(window, "os-drag", serde_json::Value::Null);
             }
             (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
             _ => {}

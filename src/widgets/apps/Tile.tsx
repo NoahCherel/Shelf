@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { useSettings } from "../../core/settings";
@@ -59,6 +59,8 @@ const HOLD_NEAR = 0.3;
 const HOLD_MS = 700;
 /** How long something dragged from Windows stays over an app before that app comes to the front. */
 const RAISE_MS = 700;
+/** How far an app pulled off the dock moves before its bubble catches up. */
+const BUBBLE_STEP = 12;
 
 export function heldOver(dragged: { left: number; width: number }, over: { left: number; width: number }, T: number): boolean {
   return Math.abs(dragged.left + dragged.width / 2 - (over.left + over.width / 2)) < T * HOLD_NEAR;
@@ -70,9 +72,30 @@ export function canGroup(dragged: AppEntry, onto: AppEntry): boolean {
   return dragged.key !== onto.key && app(dragged) && (app(onto) || onto.kind === "group");
 }
 
-/** The tile of the dock an element is part of. */
-export function appUnder(element: Element | null): string | null {
-  return element?.closest<HTMLElement>("[data-key]")?.dataset.key ?? null;
+export type DropAim = { open: string } | { place: number };
+
+/**
+ * What letting go of something from Windows would do at this point along the dock: open in the app
+ * at the middle of its icon, or take a place between the icons. A place stays while the pointer is in it.
+ */
+export function dropAim(
+  x: number,
+  tiles: { key: string; left: number; width: number }[],
+  gap: { left: number; width: number; index: number } | null,
+  box: { left: number; right: number },
+  pinnable: boolean,
+  canOpen: (key: string) => boolean,
+): DropAim {
+  if (gap && x >= gap.left && x < gap.left + gap.width) return { place: gap.index };
+  if (x < box.left || x > box.right) return { place: tiles.length };
+  for (const [i, tile] of tiles.entries()) {
+    if (x >= tile.left + tile.width) continue;
+    if (x < tile.left) return { place: i };
+    const middle = tile.left + tile.width / 2;
+    if (!pinnable && canOpen(tile.key) && Math.abs(x - middle) < tile.width / 4) return { open: tile.key };
+    return { place: x < middle ? i : i + 1 };
+  }
+  return { place: tiles.length };
 }
 
 export type DragResult = { kind: "reorder"; keys: string[] } | { kind: "unpin"; key: string } | { kind: "group"; onto: string; key: string } | null;
@@ -249,26 +272,68 @@ function useAppPreviews(preview?: boolean) {
   return { enter, leave, press, toggle };
 }
 
-/** Something dragged from Windows: Rust is told which app it's over, and an app it stays on comes forward. */
-function useOsDrag(preview?: boolean) {
+/**
+ * Something dragged from Windows: the dock opens a place for it or offers the app under it, says so
+ * in a bubble, and tells Rust what letting go would do. An app it stays on comes forward.
+ */
+function useOsDrag(box: RefObject<HTMLDivElement | null>, entries: AppEntry[] | null | undefined, preview?: boolean) {
+  const [gap, setGap] = useState<number | null>(null);
+  const [icon, setIcon] = useState<string | null>(null);
+  const latest = useRef(entries);
+  latest.current = entries;
   useEffect(() => {
     if (preview) return;
-    let over: string | null = null;
+    let aim: string | null = null;
+    let dragging = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = listen<[number, number] | null>("os-drag", (at) => {
-      const scale = window.devicePixelRatio || 1;
-      const key = at ? appUnder(document.elementFromPoint(at[0] / scale, at[1] / scale)) : null;
-      if (key === over) return;
-      over = key;
+    const off = listen<{ x: number; y: number; pinnable: boolean } | null>("os-drag", (at) => {
+      if (!at) {
+        clearTimeout(timer);
+        if (dragging) {
+          invoke("apps_drag_target", { key: null, index: null }).catch(() => {});
+          invoke("preview_hide").catch(() => {});
+        }
+        dragging = false;
+        aim = null;
+        setGap(null);
+        setIcon(null);
+        return;
+      }
+      if (!dragging) {
+        dragging = true;
+        Promise.resolve(invoke<string | null>("apps_drag_icon")).then((found) => setIcon(found ?? null), () => {});
+      }
+      const el = box.current;
+      if (!el) return;
+      const x = at.x / (window.devicePixelRatio || 1);
+      const rect = (t: Element) => t.getBoundingClientRect();
+      const tiles = [...el.querySelectorAll("[data-key]:not(.app--leaving)")].map((t) => ({ key: (t as HTMLElement).dataset.key!, left: rect(t).left, width: rect(t).width }));
+      const open = el.querySelector(".app--gap");
+      const openGap = open ? { left: rect(open).left, width: rect(open).width, index: Number((open as HTMLElement).dataset.index) } : null;
+      const entry = (key: string) => latest.current?.find((e) => e.key === key);
+      const next = dropAim(x, tiles, openGap, rect(el), at.pinnable, (key) => (entry(key)?.kind ?? "app") === "app");
+      const id = JSON.stringify(next);
+      if (id === aim) return;
+      aim = id;
       clearTimeout(timer);
-      invoke("apps_drag_target", { key }).catch(() => {});
-      if (key) timer = setTimeout(() => invoke("apps_drag_raise", { key }).catch(() => {}), RAISE_MS);
+      if ("open" in next) {
+        const tile = tiles.find((t) => t.key === next.open)!;
+        setGap(null);
+        invoke("apps_drag_target", { key: next.open, index: null }).catch(() => {});
+        invoke("preview_hint", { what: "open", key: next.open, tileX: tile.left, tileWidth: tile.width }).catch(() => {});
+        if (entry(next.open)?.windows.length) timer = setTimeout(() => invoke("apps_drag_raise", { key: next.open }).catch(() => {}), RAISE_MS);
+      } else {
+        setGap(next.place);
+        invoke("apps_drag_target", { key: null, index: next.place }).catch(() => {});
+        invoke("preview_hint", { what: "add", key: null, tileX: x, tileWidth: 0 }).catch(() => {});
+      }
     });
     return () => {
       clearTimeout(timer);
       off.then((stop) => stop());
     };
-  }, [preview]);
+  }, [preview, box]);
+  return { gap, icon };
 }
 
 /** Apps that have turned up since the dock first loaded, for as long as they stay. */
@@ -341,7 +406,8 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   useEffect(() => setOrder(null), [fetched]);
   const data = useMemo(() => (order && fetched ? [...fetched].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) : fetched), [fetched, order]);
   const previews = useAppPreviews(preview);
-  useOsDrag(preview);
+  const box = useRef<HTMLDivElement>(null);
+  const osDrag = useOsDrag(box, data, preview);
   const arrived = useArrivals(data, preview);
   const rows = useLeaving(data, preview);
   const present = new Set((data ?? []).map((e) => e.key));
@@ -350,7 +416,6 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   const canDrag = !preview && !pickerOpen && !lockDock;
   const [pulledOff, setPulledOff] = useState<string | null>(null);
   const dragged = useRef(false);
-  const box = useRef<HTMLDivElement>(null);
   const keepInside = ({ transform, activeNodeRect }: { transform: { x: number; y: number; scaleX: number; scaleY: number }; activeNodeRect: { left: number; width: number } | null }) => {
     const bounds = box.current?.getBoundingClientRect();
     return activeNodeRect && bounds ? { ...transform, x: keptInside(transform.x, activeNodeRect, bounds) } : transform;
@@ -367,10 +432,25 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   useEffect(() => () => {
     if (hold.current) clearTimeout(hold.current.timer);
   }, []);
+  // The bubble over an app pulled off the dock, following it by steps.
+  const bubbleAt = useRef<number | null>(null);
+  const showRemoving = (off: boolean, key?: string, at?: { left: number; width: number } | null) => {
+    if (!off || !at) {
+      if (bubbleAt.current !== null) invoke("preview_hide").catch(() => {});
+      bubbleAt.current = null;
+      return;
+    }
+    const step = Math.round(at.left / BUBBLE_STEP);
+    if (step === bubbleAt.current) return;
+    bubbleAt.current = step;
+    invoke("preview_hint", { what: "remove", key, tileX: at.left, tileWidth: at.width }).catch(() => {});
+  };
   const onDragMove = (e: DragMoveEvent) => {
     const T = tileSize();
-    const off = isPulledOff(e.delta.y, T);
+    const moving = (data ?? []).find((a) => a.key === String(e.active.id));
+    const off = isPulledOff(e.delta.y, T) && !!moving?.pinned;
     setPulledOff(off ? String(e.active.id) : null);
+    showRemoving(off, String(e.active.id), e.active.rect.current.translated);
     const moved = e.active.rect.current.translated;
     const target = e.over && String(e.over.id) !== String(e.active.id) ? String(e.over.id) : null;
     const near = !off && target !== null && moved !== null && heldOver(moved, e.over!.rect, T);
@@ -381,6 +461,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   };
   const onDragEnd = (e: DragEndEvent) => {
     setPulledOff(null);
+    showRemoving(false);
     dragged.current = true;
     const result = dragOutcome({ active: String(e.active.id), over: e.over ? String(e.over.id) : null, dy: e.delta.y, onto }, data ?? [], tileSize());
     stopHolding();
@@ -420,6 +501,12 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
     e.stopPropagation();
     invoke(command, args).catch(() => {});
   };
+  const placeOf = new Map(rows.filter((e) => present.has(e.key)).map((e, i) => [e.key, i]));
+  const gapTile = osDrag.gap !== null && (
+    <span className="app app--gap" data-index={osDrag.gap} aria-hidden="true">
+      {osDrag.icon ? <img className="app__icon" src={osDrag.icon} alt="" draggable={false} /> : <span className="app__icon app__icon--blank" />}
+    </span>
+  );
   return (
     <div className="apps" ref={box}>
       <button
@@ -443,11 +530,14 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
       </button>
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[keepInside]} onDragStart={() => invoke("preview_hide").catch(() => {})} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => {
         setPulledOff(null);
+        showRemoving(false);
         stopHolding();
       }}>
-      <SortableContext items={rows.filter((e) => present.has(e.key)).map((e) => e.key)} strategy={onto ? stayPut : horizontalListSortingStrategy}>
-      {rows.map((entry) =>
-        !present.has(entry.key) && !preview ? (
+      <SortableContext items={rows.filter((e) => present.has(e.key)).map((e) => e.key)} strategy={onto || pulledOff ? stayPut : horizontalListSortingStrategy}>
+      {rows.map((entry) => (
+        <Fragment key={entry.key}>
+        {osDrag.gap === placeOf.get(entry.key) && gapTile}
+        {!present.has(entry.key) && !preview ? (
           <span key={entry.key} className="app app--leaving" data-key={entry.key} aria-hidden="true">
             {entry.kind === "group" ? <GroupIcon entry={entry} /> : <AppIcon entry={entry} />}
           </span>
@@ -497,8 +587,10 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
         </button>
         )}
         </Sortable>
-        ),
-      )}
+        )}
+        </Fragment>
+      ))}
+      {osDrag.gap !== null && osDrag.gap >= placeOf.size && gapTile}
       </SortableContext>
       </DndContext>
     </div>

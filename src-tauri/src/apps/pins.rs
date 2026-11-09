@@ -127,22 +127,31 @@ impl Overlay {
         self.order = keys.into_iter().filter(|k| seen.insert(k.clone())).take(ORDER_LIMIT).collect();
     }
 
+    /// Puts this at a place among what the dock shows.
+    fn place_at(&mut self, key: &str, index: usize, shown: Vec<String>) {
+        let mut keys: Vec<String> = shown.into_iter().filter(|k| k != key).collect();
+        keys.insert(index.min(keys.len()), key.to_string());
+        self.set_order(keys);
+    }
+
     /// A program, or a shortcut to one, dropped on the dock. `opens` is what a shortcut points to.
-    fn pin_program(&mut self, path: &str, opens: Option<&str>) {
+    fn pin_program(&mut self, path: &str, opens: Option<&str>) -> String {
         let key = opens.unwrap_or(path).to_lowercase();
         if let Some(hidden) = self.removed.iter().position(|k| *k == key) {
             self.removed.remove(hidden);
         }
         if !self.added.iter().any(|a| a.key == key) {
-            self.added.push(AddedPin { key, name: file_stem(path).to_string(), source: path.to_string() });
+            self.added.push(AddedPin { key: key.clone(), name: file_stem(path).to_string(), source: path.to_string() });
         }
+        key
     }
 
-    fn add_item(&mut self, path: &str, folder: bool) {
+    fn add_item(&mut self, path: &str, folder: bool) -> String {
         if !self.items.iter().any(|i| i.path.eq_ignore_ascii_case(path)) {
             let name = path.trim_end_matches(['\\', '/']).rsplit(['\\', '/']).next().unwrap_or(path).to_string();
             self.items.push(DockItem { path: path.to_string(), name, folder });
         }
+        item_key(path)
     }
 
     fn remove_item(&mut self, key: &str) {
@@ -349,7 +358,7 @@ pub fn order() -> Vec<String> {
 
 /// What to save after something was dropped on the dock; None if it isn't kept. Call on a thread
 /// with COM initialised, as a shortcut has to be read.
-pub fn pin_dropped(path: &str, on_icon: bool) -> Option<serde_json::Value> {
+pub fn pin_dropped(path: &str, on_icon: bool, place: Option<(usize, Vec<String>)>) -> Option<serde_json::Value> {
     let what = dropped(path, |p| Path::new(p).is_dir());
     if !keeps_dropped(&what, on_icon) {
         return None;
@@ -357,10 +366,18 @@ pub fn pin_dropped(path: &str, on_icon: bool) -> Option<serde_json::Value> {
     let opens = match what {
         Dropped::Program => None,
         Dropped::Shortcut => Some(read_link(Path::new(path))?.target?),
-        Dropped::Folder => return Some(changed(|o| o.add_item(path, true))),
-        Dropped::File => return Some(changed(|o| o.add_item(path, false))),
+        Dropped::Folder | Dropped::File => None,
     };
-    Some(changed(|o| o.pin_program(path, opens.as_deref())))
+    Some(changed(|o| {
+        let key = match what {
+            Dropped::Folder => o.add_item(path, true),
+            Dropped::File => o.add_item(path, false),
+            _ => o.pin_program(path, opens.as_deref()),
+        };
+        if let Some((index, shown)) = place {
+            o.place_at(&key, index, shown);
+        }
+    }))
 }
 
 /// What a shortcut opens. Call on a thread with COM initialised.
@@ -733,6 +750,15 @@ mod overlay_tests {
         let shown = merge(&pins, Vec::new(), 0);
         overlay.unpin(&shown[0].key);
         assert!(apply(Vec::new(), &overlay, EXISTS).is_empty());
+    }
+
+    #[test]
+    fn what_is_dropped_goes_where_the_dock_opened_a_place() {
+        let mut overlay = Overlay::default();
+        overlay.place_at("new", 1, vec!["a".into(), "b".into()]);
+        assert_eq!(overlay.order, ["a", "new", "b"]);
+        overlay.place_at("new", 99, vec!["a".into(), "new".into(), "b".into()]);
+        assert_eq!(overlay.order, ["a", "b", "new"], "already there, it moves, and past the end is the end");
     }
 
     #[test]

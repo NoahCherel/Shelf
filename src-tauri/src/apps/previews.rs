@@ -155,6 +155,8 @@ struct Shown {
     name: String,
     slot_width: f64,
     windows: Vec<ShownWindow>,
+    /// A bubble during a drag, shown with the app's picture.
+    hint: bool,
 }
 
 #[derive(Deserialize)]
@@ -271,6 +273,52 @@ fn name_width(name: &str) -> f64 {
 
 /// The app's name in a bubble above its icon, as Windows shows for an app with no window open, or
 /// for any app when previews are turned off. It uses the previews' window, shown with no windows.
+/// Sizes the bubble and puts it over a tile. Gives the dock's rectangle and the bubble's.
+fn place_bubble(app: &AppHandle, window: &tauri::WebviewWindow, width: f64, tile_x: f64, tile_width: f64) -> Result<Option<(Rect, Rect)>, String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let run = || -> tauri::Result<Option<(Rect, Rect)>> {
+        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
+        let scale = m.scale_factor();
+        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
+        let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
+        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
+        let r = card_rect(
+            tile,
+            dock_rect,
+            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
+            ((width * scale).round() as i32, (NAME_HEIGHT * scale).round() as i32),
+            (DOCK_GAP * scale).round() as i32,
+        );
+        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
+        window.set_position(PhysicalPosition::new(r.x, r.y))?;
+        Ok(Some((dock_rect, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
+    };
+    run().map_err(|e| e.to_string())
+}
+
+/// Room for the picture beside a bubble's words.
+const HINT_ICON_WIDTH: f64 = 24.0;
+
+/// The bubble above the dock during a drag: what letting go would do. The page takes it down.
+#[tauri::command(async)]
+pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    let lang = unsafe { ::windows::Win32::Globalization::GetUserDefaultUILanguage() };
+    let name = match &key {
+        Some(key) if what == "open" => crate::apps::every_entry()?.into_iter().find(|e| e.key == *key).map(|e| e.name).unwrap_or_default(),
+        _ => String::new(),
+    };
+    let text = super::menu::hint_text(&what, lang, &name).ok_or("unknown bubble")?;
+    let window = preview_window(&app)?;
+    let picture = if key.is_some() { HINT_ICON_WIDTH } else { 0.0 };
+    if place_bubble(&app, &window, name_width(&text) + picture, tile_x, tile_width)?.is_none() {
+        return Ok(());
+    }
+    *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("hint:{what}"));
+    let shown = Shown { key: key.unwrap_or_default(), name: text, slot_width: 0.0, windows: Vec::new(), hint: true };
+    app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
+    window.show().map_err(|e| e.to_string())
+}
+
 #[tauri::command(async)]
 pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
     let opening = HOVER.keep();
@@ -284,26 +332,8 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     let Some(entry) = current()?.into_iter().find(|e| e.key == key) else {
         return hide(&app);
     };
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let window = preview_window(&app)?;
-    let run = || -> tauri::Result<Option<(Rect, Rect)>> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
-        let scale = m.scale_factor();
-        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
-        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
-        let r = card_rect(
-            tile,
-            dock_rect,
-            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
-            ((name_width(&entry.name) * scale).round() as i32, (NAME_HEIGHT * scale).round() as i32),
-            (DOCK_GAP * scale).round() as i32,
-        );
-        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
-        window.set_position(PhysicalPosition::new(r.x, r.y))?;
-        Ok(Some((dock_rect, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
-    };
-    let Some((dock_rect, strip)) = run().map_err(|e| e.to_string())? else { return Ok(()) };
+    let Some((dock_rect, strip)) = place_bubble(&app, &window, name_width(&entry.name), tile_x, tile_width)? else { return Ok(()) };
     if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
         return Ok(());
     }
@@ -311,7 +341,7 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     clear_pictures();
     ON_STRIP.lock().unwrap_or_else(|e| e.into_inner()).clear();
     *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = Some(shown_as);
-    let shown = Shown { key, name: entry.name, slot_width: 0.0, windows: Vec::new() };
+    let shown = Shown { key, name: entry.name, slot_width: 0.0, windows: Vec::new(), hint: false };
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     crate::diag::note("name shown");
     window.show().map_err(|e| e.to_string())?;
@@ -377,6 +407,7 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
         window.set_position(PhysicalPosition::new(r.x, r.y))?;
         let strip = Rect { x: r.x, y: r.y, w: r.w, h: r.h };
         let shown = Shown {
+            hint: false,
             key: key.clone(),
             name: entry.name.clone(),
             slot_width: slot,

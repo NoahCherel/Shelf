@@ -11,6 +11,8 @@ export interface ShownWindow {
 export interface Shown {
   key: string;
   name: string;
+  /** A bubble during a drag, with the app's picture. */
+  hint?: boolean;
   slotWidth: number;
   windows: ShownWindow[];
 }
@@ -163,7 +165,16 @@ export function PreviewWindow() {
 
   if (!shown) return null;
   // No windows: the app's name, in Windows' tooltip bubble.
-  if (shown.windows.length === 0) return <div className="pv-name">{shown.name}</div>;
+  if (shown.windows.length === 0) {
+    return (
+      <div className="pv-name">
+        <span className="pv-name__row">
+          {shown.key && shown.name !== shown.key && shown.hint && <AppIcon appKey={shown.key} name={shown.name} />}
+          {shown.name}
+        </span>
+      </div>
+    );
+  }
 
   const closed = (hwnd: number) => {
     const windows = shown.windows.filter((w) => w.hwnd !== hwnd);

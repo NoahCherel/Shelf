@@ -192,6 +192,9 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Group card:** clicking a group shows its apps, each opens, and its name can be edited.
 - [ ] **Leaving:** right-clicking an app in a group offers to take it out; a group left with one app comes undone.
 - [ ] **Deleted elsewhere:** a file deleted in File Explorer leaves the dock.
+- [ ] **Adding, live:** something dragged over the dock opens a place between the icons with its picture and an Add to dock bubble, and lands there.
+- [ ] **Opening in an app:** a file held at the middle of an app icon offers Open in that app, and letting go opens it there. Try a store app too.
+- [ ] **Removing, live:** an app pulled off the dock folds away with a Remove from dock bubble, and comes back if brought back before letting go.
 
 ## A day of use
 
