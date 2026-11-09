@@ -404,7 +404,8 @@ export function DockBar() {
   const [glassFailed, setGlassFailed] = useState(false);
   const onGlassUnavailable = useCallback(() => setGlassFailed(true), []);
   const clearMaterial = useSettings((s) => s.clearMaterial);
-  const glass = usesGlass(style, clearMaterial) && !fullscreen && !locked && !glassFailed;
+  const visibleInCaptures = useSettings((s) => s.visibleInCaptures);
+  const glass = usesGlass(style, clearMaterial, visibleInCaptures) && !fullscreen && !locked && !glassFailed;
   const full = useSettings((s) => s.dockWidth) === "full";
   // Like the taskbar, a full-width dock sits right on the edge.
   const edgeGap = useSettings((s) => (s.dockWidth === "full" ? 0 : s.edgeGap));

@@ -3,7 +3,9 @@ export const STYLES: readonly StyleName[] = ["liquid", "ios", "midnight", "black
 export type ClearMaterial = "black" | "white" | "frosted";
 
 /** The styles drawn from a capture of the screen behind the dock. */
-export function usesGlass(style: StyleName, clearMaterial: ClearMaterial): boolean {
+export function usesGlass(style: StyleName, clearMaterial: ClearMaterial, visibleInCaptures: boolean): boolean {
+  // The glass films the screen behind the dock, so Windows has to leave the dock out of every capture.
+  if (visibleInCaptures) return false;
   return style === "liquid" || style === "ios" || (style === "clear" && clearMaterial === "frosted");
 }
 export type ThemeName = "dark" | "light";

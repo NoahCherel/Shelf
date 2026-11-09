@@ -88,9 +88,9 @@ describe("GlassLayer", () => {
 
 describe("glass for each style", () => {
   it("only the glass styles capture the screen, and Clear only when frosted", () => {
-    expect(["liquid", "ios", "midnight", "black", "white"].map((s) => usesGlass(s as never, "frosted"))).toEqual([true, true, false, false, false]);
-    expect(usesGlass("clear", "frosted")).toBe(true);
-    expect(usesGlass("clear", "black")).toBe(false);
+    expect(["liquid", "ios", "midnight", "black", "white"].map((s) => usesGlass(s as never, "frosted", false))).toEqual([true, true, false, false, false]);
+    expect(usesGlass("clear", "frosted", false)).toBe(true);
+    expect(usesGlass("clear", "black", false)).toBe(false);
   });
 
   it("iOS Glass is tinted more deeply than Liquid Glass", () => {

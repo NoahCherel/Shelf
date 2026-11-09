@@ -32,6 +32,8 @@ export interface SettingsData {
   showOnDesktop: boolean;
   /** An app's name in a bubble when hovering it. */
   hoverNames: boolean;
+  /** The dock shows in screenshots and screen sharing, at the cost of the glass. */
+  visibleInCaptures: boolean;
   /** Pictures of an open app's windows when hovering it. */
   previews: boolean;
   /** Logical px a pill was narrowed to by its ends, scrolling for the rest; null for its natural width. */
@@ -66,6 +68,7 @@ export function defaults(): SettingsData {
     showOnDesktop: false,
     narrowWidth: null,
     hoverNames: true,
+    visibleInCaptures: false,
     previews: true,
     weather: { city: "" },
     github: { user: "" },
@@ -102,6 +105,7 @@ export function sanitize(raw: unknown): SettingsData {
     autoHide: bool(raw.autoHide, d.autoHide),
     showOnDesktop: bool(raw.showOnDesktop, d.showOnDesktop),
     hoverNames: bool(raw.hoverNames, d.hoverNames),
+    visibleInCaptures: bool(raw.visibleInCaptures, d.visibleInCaptures),
     previews: bool(raw.previews, d.previews),
     narrowWidth: typeof raw.narrowWidth === "number" && Number.isFinite(raw.narrowWidth) ? Math.max(SIZE_MIN, raw.narrowWidth) : null,
     weather: { city: text(weather.city, d.weather.city) },

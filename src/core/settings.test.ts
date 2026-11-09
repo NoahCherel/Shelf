@@ -120,3 +120,9 @@ it("names and previews on hover start on, and only take true or false", () => {
   expect([defaults().hoverNames, defaults().previews]).toEqual([true, true]);
   expect([sanitize({ hoverNames: "no" }).hoverNames, sanitize({ previews: false }).previews]).toEqual([true, false]);
 });
+
+it("keeps the glass unless asked to show in captures", () => {
+  expect(defaults().visibleInCaptures).toBe(false);
+  expect(sanitize({ visibleInCaptures: true }).visibleInCaptures).toBe(true);
+  expect(sanitize({ visibleInCaptures: "yes" }).visibleInCaptures).toBe(false);
+});
