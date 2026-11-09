@@ -1,0 +1,92 @@
+/* What a group or a folder on the dock opens: the same Windows look as an app's menu. */
+.dcard-group {
+  width: 300px;
+  gap: 8px;
+  padding: 10px;
+}
+
+.dcard-group__name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+}
+
+.dcard-group__name:hover,
+.dcard-group__name:focus {
+  background: var(--amenu-hover);
+}
+
+.dcard-group__apps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+}
+
+.dcard-group__app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 2px;
+  border-radius: 6px;
+  color: inherit;
+}
+
+.dcard-group__app:hover {
+  background: var(--amenu-hover);
+}
+
+.dcard-group__icon img,
+.dcard-group__icon .amenu__blank {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.dcard-group__label {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcard-group__dot {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.dcard-stack {
+  width: 300px;
+}
+
+/* A folder can hold a lot: the list scrolls, and the way to the folder itself stays in view. */
+.dcard-stack__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  max-height: 408px;
+  scrollbar-width: thin;
+}
+
+.dcard-stack .amenu__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

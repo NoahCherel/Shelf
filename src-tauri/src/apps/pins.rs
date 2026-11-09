@@ -11,7 +11,7 @@ use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 
 use serde::{Deserialize, Serialize};
 
-use super::merge::{keep_pin, AppEntry, Pin};
+use super::merge::{keep_pin, AppEntry, AppKind, Pin};
 use super::windows::{store_string, APP_ID_KEY};
 
 /// Pins made from the dock's own menu. Windows has no public way to pin to its taskbar, and it's
@@ -19,12 +19,33 @@ use super::windows::{store_string, APP_ID_KEY};
 pub const OVERLAY: &str = "dock-pins";
 /// How many apps' places are remembered. Apps that come and go would otherwise grow it forever.
 pub const ORDER_LIMIT: usize = 200;
+/// Long enough for any sensible name, and short enough for the group's card.
+pub const GROUP_NAME_LIMIT: usize = 40;
+
+const ITEM: &str = "item:";
+const GROUP: &str = "group:";
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct AddedPin {
     key: String,
     name: String,
     source: String,
+}
+
+/// A file or folder kept on the dock.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct DockItem {
+    path: String,
+    name: String,
+    folder: bool,
+}
+
+/// Apps gathered under one tile, by their keys.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct Group {
+    id: String,
+    name: String,
+    members: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -36,6 +57,10 @@ pub struct Overlay {
     /// The dock's order, as last arranged by dragging. Apps not in it go after.
     #[serde(default)]
     order: Vec<String>,
+    #[serde(default)]
+    items: Vec<DockItem>,
+    #[serde(default)]
+    groups: Vec<Group>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -113,6 +138,65 @@ impl Overlay {
         }
     }
 
+    fn add_item(&mut self, path: &str, folder: bool) {
+        if !self.items.iter().any(|i| i.path.eq_ignore_ascii_case(path)) {
+            let name = path.trim_end_matches(['\\', '/']).rsplit(['\\', '/']).next().unwrap_or(path).to_string();
+            self.items.push(DockItem { path: path.to_string(), name, folder });
+        }
+    }
+
+    fn remove_item(&mut self, key: &str) {
+        self.items.retain(|i| item_key(&i.path) != key);
+    }
+
+    fn swap_in_order(&mut self, key: &str, with: &[String]) {
+        if let Some(at) = self.order.iter().position(|k| k == key) {
+            self.order.splice(at..=at, with.iter().cloned());
+        }
+    }
+
+    /// One app dragged onto another makes a group where the other was; onto a group, it joins.
+    fn group(&mut self, onto: &str, dragged: &str) {
+        if let Some(group) = self.groups.iter_mut().find(|g| group_key(&g.id) == onto) {
+            if !group.members.iter().any(|k| k == dragged) {
+                group.members.push(dragged.to_string());
+            }
+        } else {
+            let id = (1..).map(|n: u32| n.to_string()).find(|id| !self.groups.iter().any(|g| g.id == *id)).unwrap_or_default();
+            self.groups.push(Group { id: id.clone(), name: "Group".to_string(), members: vec![onto.to_string(), dragged.to_string()] });
+            self.swap_in_order(onto, &[group_key(&id)]);
+        }
+        self.order.retain(|k| k != dragged);
+    }
+
+    fn rename_group(&mut self, key: &str, name: &str) {
+        let name: String = name.trim().chars().take(GROUP_NAME_LIMIT).collect();
+        if let Some(group) = self.groups.iter_mut().find(|g| group_key(&g.id) == key).filter(|_| !name.is_empty()) {
+            group.name = name;
+        }
+    }
+
+    /// The apps go back where the group was.
+    fn ungroup(&mut self, key: &str) {
+        if let Some(at) = self.groups.iter().position(|g| group_key(&g.id) == key) {
+            let group = self.groups.remove(at);
+            self.swap_in_order(key, &group.members);
+        }
+    }
+
+    /// The app goes just after its group. A group can't be left with only one app.
+    fn leave_group(&mut self, member: &str) {
+        let Some(group) = self.groups.iter_mut().find(|g| g.members.iter().any(|k| k == member)) else { return };
+        let key = group_key(&group.id);
+        if group.members.len() <= 2 {
+            return self.ungroup(&key);
+        }
+        group.members.retain(|k| k != member);
+        if let Some(at) = self.order.iter().position(|k| *k == key) {
+            self.order.insert(at + 1, member.to_string());
+        }
+    }
+
     fn unpin(&mut self, key: &str) {
         let before = self.added.len();
         self.added.retain(|a| a.key != key);
@@ -120,6 +204,65 @@ impl Overlay {
             self.removed.push(key.to_string());
         }
     }
+}
+
+fn item_key(path: &str) -> String {
+    format!("{ITEM}{}", path.to_lowercase())
+}
+
+fn group_key(id: &str) -> String {
+    format!("{GROUP}{id}")
+}
+
+/// Groups in the place of their first app, then files and folders that still exist. A group with
+/// fewer than two of its apps left isn't one, and what's left of it shows on its own.
+fn compose(mut entries: Vec<AppEntry>, overlay: &Overlay, exists: impl Fn(&str) -> bool) -> Vec<AppEntry> {
+    for group in &overlay.groups {
+        let members: Vec<AppEntry> = group
+            .members
+            .iter()
+            .filter_map(|key| entries.iter().find(|e| e.key == *key).cloned())
+            .map(|member| AppEntry { grouped: true, ..member })
+            .collect();
+        if members.len() < 2 {
+            continue;
+        }
+        let at = entries.iter().position(|e| group.members.contains(&e.key)).unwrap_or(entries.len());
+        entries.retain(|e| !group.members.contains(&e.key));
+        entries.insert(
+            at,
+            AppEntry {
+                key: group_key(&group.id),
+                name: group.name.clone(),
+                pinned: true,
+                active: members.iter().any(|m| m.active),
+                windows: members.iter().flat_map(|m| m.windows.clone()).collect(),
+                kind: AppKind::Group,
+                members,
+                ..Default::default()
+            },
+        );
+    }
+    entries.extend(overlay.items.iter().filter(|i| exists(&i.path)).map(|i| AppEntry {
+        key: item_key(&i.path),
+        name: i.name.clone(),
+        pinned: true,
+        launch: Some(i.path.clone()),
+        icon_source: Some(i.path.clone()),
+        kind: if i.folder { AppKind::Folder } else { AppKind::File },
+        ..Default::default()
+    }));
+    entries
+}
+
+/// Only apps go in groups, and they go on another app or a group.
+pub fn can_group(dragged: &AppEntry, onto: &AppEntry) -> bool {
+    dragged.key != onto.key && dragged.kind == AppKind::App && matches!(onto.kind, AppKind::App | AppKind::Group)
+}
+
+/// A file dropped on an app's icon was aimed at that app, so it isn't kept on the dock.
+pub fn keeps_dropped(what: &Dropped, on_icon: bool) -> bool {
+    matches!(what, Dropped::Program | Dropped::Shortcut) || !on_icon
 }
 
 fn apply(windows_pins: Vec<Pin>, overlay: &Overlay, exists: impl Fn(&str) -> bool) -> Vec<Pin> {
@@ -149,6 +292,40 @@ fn changed(change: impl FnOnce(&mut Overlay)) -> serde_json::Value {
     serde_json::to_value(overlay).unwrap_or_default()
 }
 
+/// The dock's entries with its groups, files and folders.
+pub fn composed(entries: Vec<AppEntry>) -> Vec<AppEntry> {
+    compose(entries, &Overlay::from_saved(crate::store::load(OVERLAY)), |path| Path::new(path).exists())
+}
+
+/// What to save after one app was dragged onto another or onto a group. Apps in a group have to
+/// stay when closed, so they're pinned.
+pub fn grouped(onto: &AppEntry, dragged: &AppEntry) -> serde_json::Value {
+    changed(|o| {
+        for entry in [onto, dragged] {
+            if entry.kind == AppKind::App && !entry.pinned {
+                o.pin(entry);
+            }
+        }
+        o.group(&onto.key, &dragged.key);
+    })
+}
+
+pub fn renamed_group(key: &str, name: &str) -> serde_json::Value {
+    changed(|o| o.rename_group(key, name))
+}
+
+pub fn ungrouped(key: &str) -> serde_json::Value {
+    changed(|o| o.ungroup(key))
+}
+
+pub fn left_group(member: &str) -> serde_json::Value {
+    changed(|o| o.leave_group(member))
+}
+
+pub fn removed_item(key: &str) -> serde_json::Value {
+    changed(|o| o.remove_item(key))
+}
+
 /// What to save after pinning.
 pub fn pin(entry: &AppEntry) -> serde_json::Value {
     changed(|o| o.pin(entry))
@@ -169,13 +346,18 @@ pub fn order() -> Vec<String> {
     Overlay::from_saved(crate::store::load(OVERLAY)).order
 }
 
-/// What to save after a program or shortcut was dropped on the dock; None for anything else.
-/// Call on a thread with COM initialised, as a shortcut has to be read.
-pub fn pin_dropped(path: &str) -> Option<serde_json::Value> {
-    let opens = match dropped(path, |p| Path::new(p).is_dir()) {
+/// What to save after something was dropped on the dock; None if it isn't kept. Call on a thread
+/// with COM initialised, as a shortcut has to be read.
+pub fn pin_dropped(path: &str, on_icon: bool) -> Option<serde_json::Value> {
+    let what = dropped(path, |p| Path::new(p).is_dir());
+    if !keeps_dropped(&what, on_icon) {
+        return None;
+    }
+    let opens = match what {
         Dropped::Program => None,
         Dropped::Shortcut => Some(read_link(Path::new(path))?.target?),
-        Dropped::Folder | Dropped::File => return None,
+        Dropped::Folder => return Some(changed(|o| o.add_item(path, true))),
+        Dropped::File => return Some(changed(|o| o.add_item(path, false))),
     };
     Some(changed(|o| o.pin_program(path, opens.as_deref())))
 }
@@ -245,13 +427,14 @@ pub fn list() -> Vec<Pin> {
 #[cfg(test)]
 mod overlay_tests {
     use super::*;
+    use crate::apps::merge::AppWindow;
 
     fn pin(name: &str, target: &str) -> Pin {
         Pin { name: name.into(), link: format!("{name}.lnk"), target: Some(target.into()), app_id: None }
     }
 
     fn entry(key: &str, name: &str, source: &str) -> AppEntry {
-        AppEntry { key: key.into(), name: name.into(), pinned: false, active: false, windows: Vec::new(), launch: Some(source.into()), icon_source: Some(source.into()) }
+        AppEntry { key: key.into(), name: name.into(), pinned: false, active: false, windows: Vec::new(), launch: Some(source.into()), icon_source: Some(source.into()), ..Default::default() }
     }
 
     const EXISTS: fn(&str) -> bool = |_| true;
@@ -376,6 +559,167 @@ mod overlay_tests {
         assert_eq!(overlay.added[0].key, r"d:\games\game.exe");
         assert_eq!(overlay.added[0].name, "Game");
         assert_eq!(overlay.added[0].source, r"C:\Users\me\Desktop\Game.lnk");
+    }
+
+    fn open_app(key: &str, hwnd: isize, active: bool) -> AppEntry {
+        AppEntry { active, windows: vec![AppWindow { hwnd, title: key.into() }], ..entry(key, key, key) }
+    }
+
+    #[test]
+    fn a_file_or_folder_is_added_once_and_named_after_itself() {
+        let mut overlay = Overlay::default();
+        overlay.add_item(r"C:\Users\me\Notes.txt", false);
+        overlay.add_item(r"C:\Users\me\Notes.txt", false);
+        overlay.add_item(r"C:\Users\me\Work", true);
+        let shown = compose(Vec::new(), &overlay, EXISTS);
+        assert_eq!(keys(&shown), [r"item:c:\users\me\notes.txt", r"item:c:\users\me\work"]);
+        assert_eq!(shown[0].name, "Notes.txt");
+        assert_eq!(shown[0].kind, AppKind::File);
+        assert_eq!(shown[1].kind, AppKind::Folder);
+        assert_eq!(shown[1].launch.as_deref(), Some(r"C:\Users\me\Work"));
+        assert!(shown[0].pinned, "so it can be pulled off the dock");
+    }
+
+    #[test]
+    fn a_file_deleted_elsewhere_leaves_the_dock() {
+        let mut overlay = Overlay::default();
+        overlay.add_item(r"C:\gone.txt", false);
+        assert!(compose(Vec::new(), &overlay, |_| false).is_empty());
+    }
+
+    #[test]
+    fn a_file_can_be_taken_off_the_dock() {
+        let mut overlay = Overlay::default();
+        overlay.add_item(r"C:\a.txt", false);
+        overlay.remove_item(r"item:c:\a.txt");
+        assert!(compose(Vec::new(), &overlay, EXISTS).is_empty());
+    }
+
+    #[test]
+    fn a_group_takes_the_place_of_its_first_app_and_holds_them() {
+        let mut overlay = Overlay::default();
+        overlay.group("b", "d");
+        let shown = compose(named(&["a", "b", "c", "d"]), &overlay, EXISTS);
+        assert_eq!(keys(&shown), ["a", "group:1", "c"]);
+        assert_eq!(shown[1].kind, AppKind::Group);
+        assert_eq!(keys(&shown[1].members), ["b", "d"]);
+        assert!(shown[1].members.iter().all(|m| m.grouped));
+    }
+
+    #[test]
+    fn a_group_shows_when_one_of_its_apps_is_open_or_in_front() {
+        let mut overlay = Overlay::default();
+        overlay.group("a", "b");
+        let shown = compose(vec![entry("a", "a", "a"), open_app("b", 7, true)], &overlay, EXISTS);
+        assert_eq!(shown[0].windows.len(), 1);
+        assert!(shown[0].active);
+    }
+
+    #[test]
+    fn an_app_dragged_onto_a_group_joins_it() {
+        let mut overlay = Overlay::default();
+        overlay.group("a", "b");
+        overlay.group("group:1", "c");
+        let shown = compose(named(&["a", "b", "c"]), &overlay, EXISTS);
+        assert_eq!(keys(&shown), ["group:1"]);
+        assert_eq!(keys(&shown[0].members), ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn each_new_group_gets_its_own_key() {
+        let mut overlay = Overlay::default();
+        overlay.group("a", "b");
+        overlay.group("c", "d");
+        overlay.ungroup("group:1");
+        overlay.group("e", "f");
+        let ids: std::collections::HashSet<_> = overlay.groups.iter().map(|g| g.id.clone()).collect();
+        assert_eq!(ids.len(), 2);
+    }
+
+    #[test]
+    fn a_group_keeps_the_place_of_the_app_it_was_made_on() {
+        let mut overlay = Overlay::default();
+        overlay.set_order(vec!["c".into(), "a".into(), "b".into()]);
+        overlay.group("a", "c");
+        assert_eq!(overlay.order, ["group:1", "b"]);
+    }
+
+    #[test]
+    fn a_group_left_with_one_app_comes_undone() {
+        let mut overlay = Overlay::default();
+        overlay.set_order(vec!["group:1".into(), "z".into()]);
+        overlay.groups.push(Group { id: "1".into(), name: "G".into(), members: vec!["a".into(), "b".into()] });
+        overlay.leave_group("b");
+        assert!(overlay.groups.is_empty());
+        assert_eq!(overlay.order, ["a", "b", "z"], "both go back where it was");
+    }
+
+    #[test]
+    fn leaving_a_larger_group_puts_the_app_just_after_it() {
+        let mut overlay = Overlay::default();
+        overlay.set_order(vec!["group:1".into(), "z".into()]);
+        overlay.groups.push(Group { id: "1".into(), name: "G".into(), members: vec!["a".into(), "b".into(), "c".into()] });
+        overlay.leave_group("b");
+        assert_eq!(overlay.groups[0].members, ["a", "c"]);
+        assert_eq!(overlay.order, ["group:1", "b", "z"]);
+    }
+
+    #[test]
+    fn ungrouping_puts_the_apps_back_where_the_group_was() {
+        let mut overlay = Overlay::default();
+        overlay.set_order(vec!["x".into(), "group:1".into(), "z".into()]);
+        overlay.groups.push(Group { id: "1".into(), name: "G".into(), members: vec!["a".into(), "b".into()] });
+        overlay.ungroup("group:1");
+        assert!(overlay.groups.is_empty());
+        assert_eq!(overlay.order, ["x", "a", "b", "z"]);
+    }
+
+    #[test]
+    fn a_group_with_one_app_still_installed_shows_that_app_alone() {
+        let mut overlay = Overlay::default();
+        overlay.group("a", "b");
+        let shown = compose(named(&["a"]), &overlay, EXISTS);
+        assert_eq!(keys(&shown), ["a"]);
+        assert!(!shown[0].grouped);
+    }
+
+    #[test]
+    fn a_group_can_be_renamed_but_not_to_nothing() {
+        let mut overlay = Overlay::default();
+        overlay.group("a", "b");
+        overlay.rename_group("group:1", "  Work  ");
+        assert_eq!(overlay.groups[0].name, "Work");
+        overlay.rename_group("group:1", "   ");
+        assert_eq!(overlay.groups[0].name, "Work");
+        overlay.rename_group("group:1", &"x".repeat(200));
+        assert_eq!(overlay.groups[0].name.chars().count(), GROUP_NAME_LIMIT);
+    }
+
+    #[test]
+    fn a_file_saved_before_there_were_items_or_groups_still_reads() {
+        let old = Overlay::from_saved(Some(serde_json::json!({ "added": [], "removed": [], "order": ["a"] })));
+        assert!(old.items.is_empty() && old.groups.is_empty());
+        assert_eq!(old.order, ["a"]);
+    }
+
+    #[test]
+    fn a_file_dropped_on_an_apps_icon_was_meant_for_the_app() {
+        assert!(keeps_dropped(&Dropped::File, false));
+        assert!(keeps_dropped(&Dropped::Folder, false));
+        assert!(!keeps_dropped(&Dropped::File, true));
+        assert!(!keeps_dropped(&Dropped::Folder, true));
+        assert!(keeps_dropped(&Dropped::Program, true), "a program is always pinned");
+    }
+
+    #[test]
+    fn only_apps_go_in_groups_and_only_on_an_app_or_a_group() {
+        let of = |key: &str, kind| AppEntry { kind, ..entry(key, key, key) };
+        assert!(can_group(&of("a", AppKind::App), &of("b", AppKind::App)));
+        assert!(can_group(&of("a", AppKind::App), &of("g", AppKind::Group)));
+        assert!(!can_group(&of("a", AppKind::App), &of("a", AppKind::App)));
+        assert!(!can_group(&of("f", AppKind::File), &of("b", AppKind::App)));
+        assert!(!can_group(&of("g", AppKind::Group), &of("b", AppKind::App)));
+        assert!(!can_group(&of("a", AppKind::App), &of("d", AppKind::Folder)));
     }
 
     #[test]

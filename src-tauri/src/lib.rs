@@ -188,6 +188,13 @@ pub fn run() {
             apps::apps_menu_icons,
             apps::apps_reorder,
             apps::apps_unpin,
+            apps::apps_group,
+            apps::apps_group_rename,
+            apps::apps_stack,
+            apps::apps_stack_icons,
+            apps::apps_stack_open,
+            apps::apps_drag_target,
+            apps::apps_drag_raise,
             claude_usage,
             claude_connect,
             diag::diag_note,
@@ -202,11 +209,18 @@ pub fn run() {
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             // Something dragged from Windows over the dock holds it up while auto-hide is on.
-            (WindowEvent::DragDrop(DragDropEvent::Enter { .. } | DragDropEvent::Over { .. }), "dock") => shell::dock::os_drag(true),
-            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => shell::dock::os_drag(false),
+            (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), "dock") => {
+                shell::dock::os_drag(true);
+                let _ = tauri::Emitter::emit(window, "os-drag", Some((position.x, position.y)));
+            }
+            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => {
+                shell::dock::os_drag(false);
+                let _ = tauri::Emitter::emit(window, "os-drag", None::<(f64, f64)>);
+            }
             (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
                 shell::dock::os_drag(false);
                 apps::pin_dropped(window.app_handle().clone(), paths.clone());
+                let _ = tauri::Emitter::emit(window, "os-drag", None::<(f64, f64)>);
             }
             (WindowEvent::Destroyed, _) => shell::windows::on_destroyed(window),
             _ => {}

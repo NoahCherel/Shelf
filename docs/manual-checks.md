@@ -182,6 +182,17 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Desktop:** with Stay up on the desktop on, it stays up while no app is in front.
 - [ ] **Sleep:** after sleep or unlocking, a hidden dock stays hidden until you call it.
 
+## Files, folders and groups
+
+- [ ] **Keeping a file:** a file or a folder dropped on an empty part of the dock stays there, and comes back after a restart.
+- [ ] **On an icon:** a file dropped on an app icon is not kept, and nothing else happens.
+- [ ] **Bringing forward:** a file held over an open app for under a second brings that app to the front.
+- [ ] **Stack:** clicking a folder lists what it holds, folders first; a line opens the right thing.
+- [ ] **Making a group:** an app held over another for under a second lights that one up, and letting go makes a group. A quick drag still only reorders.
+- [ ] **Group card:** clicking a group shows its apps, each opens, and its name can be edited.
+- [ ] **Leaving:** right-clicking an app in a group offers to take it out; a group left with one app comes undone.
+- [ ] **Deleted elsewhere:** a file deleted in File Explorer leaves the dock.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

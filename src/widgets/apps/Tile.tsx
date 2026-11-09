@@ -14,6 +14,10 @@ export interface AppEntry {
   pinned: boolean;
   active: boolean;
   windows: { hwnd: number; title: string }[];
+  /** An app when absent. */
+  kind?: "app" | "file" | "folder" | "group";
+  /** A group's apps. */
+  members?: AppEntry[];
 }
 
 /** Keeps icons where they are as focus changes; new apps go last, closed ones drop out. */
@@ -49,13 +53,37 @@ export function isPulledOff(dy: number, T: number): boolean {
   return Math.abs(dy) > T * PULL_OFF;
 }
 
-export type DragResult = { kind: "reorder"; keys: string[] } | { kind: "unpin"; key: string } | null;
+/** How near the middle of another app, as a share of a tile, counts as being held over it. */
+const HOLD_NEAR = 0.3;
+/** How long an app has to stay over another to make a group: a pause, not a passing drag. */
+const HOLD_MS = 700;
+/** How long something dragged from Windows stays over an app before that app comes to the front. */
+const RAISE_MS = 700;
+
+export function heldOver(dragged: { left: number; width: number }, over: { left: number; width: number }, T: number): boolean {
+  return Math.abs(dragged.left + dragged.width / 2 - (over.left + over.width / 2)) < T * HOLD_NEAR;
+}
+
+/** Only apps go in groups, and they go on another app or a group. */
+export function canGroup(dragged: AppEntry, onto: AppEntry): boolean {
+  const app = (e: AppEntry) => (e.kind ?? "app") === "app";
+  return dragged.key !== onto.key && app(dragged) && (app(onto) || onto.kind === "group");
+}
+
+/** The tile of the dock an element is part of. */
+export function appUnder(element: Element | null): string | null {
+  return element?.closest<HTMLElement>("[data-key]")?.dataset.key ?? null;
+}
+
+export type DragResult = { kind: "reorder"; keys: string[] } | { kind: "unpin"; key: string } | { kind: "group"; onto: string; key: string } | null;
 
 /** What letting go of a dragged app does. Only a pinned app can be pulled off. */
-export function dragOutcome(drag: { active: string; over: string | null; dy: number }, entries: AppEntry[], T: number): DragResult {
+export function dragOutcome(drag: { active: string; over: string | null; dy: number; onto?: string | null }, entries: AppEntry[], T: number): DragResult {
   const dragged = entries.find((e) => e.key === drag.active);
   if (!dragged) return null;
   if (isPulledOff(drag.dy, T)) return dragged.pinned ? { kind: "unpin", key: dragged.key } : null;
+  const onto = entries.find((e) => e.key === drag.onto);
+  if (onto && canGroup(dragged, onto)) return { kind: "group", onto: onto.key, key: dragged.key };
   if (!drag.over || drag.over === drag.active) return null;
   const keys = entries.map((e) => e.key);
   return { kind: "reorder", keys: arrayMove(keys, keys.indexOf(drag.active), keys.indexOf(drag.over)) };
@@ -66,6 +94,9 @@ export function keptInside(dx: number, icon: { left: number; width: number }, bo
   return Math.min(box.right - icon.left - icon.width, Math.max(box.left - icon.left, dx));
 }
 
+/** While an app is held over another, the others stop making room for it. */
+const stayPut = () => null;
+
 function Sortable({ id, disabled, children }: { id: string; disabled: boolean; children: (s: ReturnType<typeof useSortable>) => ReactNode }) {
   return <>{children(useSortable({ id, disabled }))}</>;
 }
@@ -75,6 +106,8 @@ const tileSize = () => parseFloat(getComputedStyle(document.documentElement).get
 const APP_MENU_PREFIX = "__appmenu:";
 const APP_MENU_WIDTH = 300;
 const APP_MENU_HEIGHT = 120;
+const GROUP_PREFIX = "__group:";
+const STACK_PREFIX = "__stack:";
 /** As long as the fold in apps.css. */
 const FOLD_MS = 300;
 const PREVIEW_PAUSE_MS = 350;
@@ -116,6 +149,19 @@ function AppIcon({ entry, preview }: { entry: AppEntry; preview?: boolean }) {
   }, [entry.key, preview]);
   if (src) return <img className="app__icon" src={src} alt="" draggable={false} />;
   return <span className="app__icon app__icon--blank">{entry.name.charAt(0).toUpperCase()}</span>;
+}
+
+/** A group's tile: a few of its apps in miniature. */
+function GroupIcon({ entry, preview }: { entry: AppEntry; preview?: boolean }) {
+  return (
+    <span className="app__icon app__group">
+      {(entry.members ?? []).slice(0, 4).map((member) => (
+        <span className="app__mini" key={member.key}>
+          <AppIcon entry={member} preview={preview} />
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function SearchGlyph() {
@@ -166,7 +212,7 @@ function useAppPreviews(preview?: boolean) {
     if (preview) return;
     const { hoverNames, previews: showPreviews } = useSettings.getState();
     // An open app shows its windows; one that isn't, or with previews off, shows its name.
-    const command = showPreviews && entry.windows.length > 0 ? "preview_show" : hoverNames ? "preview_name" : null;
+    const command = showPreviews && entry.windows.length > 0 && entry.kind !== "group" ? "preview_show" : hoverNames ? "preview_name" : null;
     if (!command) return;
     const r = e.currentTarget.getBoundingClientRect();
     const show = () => {
@@ -185,7 +231,7 @@ function useAppPreviews(preview?: boolean) {
     if (preview) return;
     clearTimeout(timer.current);
     // With several windows the click that follows decides, as it does on Windows.
-    if (entry.windows.length > 1) return;
+    if (entry.windows.length > 1 && entry.kind !== "group") return;
     showing.current = false;
     invoke("preview_hide").catch(() => {});
   };
@@ -201,6 +247,28 @@ function useAppPreviews(preview?: boolean) {
     invoke("preview_show", { key: entry.key, tileX: r.left, tileWidth: r.width }).catch(() => {});
   };
   return { enter, leave, press, toggle };
+}
+
+/** Something dragged from Windows: Rust is told which app it's over, and an app it stays on comes forward. */
+function useOsDrag(preview?: boolean) {
+  useEffect(() => {
+    if (preview) return;
+    let over: string | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = listen<[number, number] | null>("os-drag", (at) => {
+      const scale = window.devicePixelRatio || 1;
+      const key = at ? appUnder(document.elementFromPoint(at[0] / scale, at[1] / scale)) : null;
+      if (key === over) return;
+      over = key;
+      clearTimeout(timer);
+      invoke("apps_drag_target", { key }).catch(() => {});
+      if (key) timer = setTimeout(() => invoke("apps_drag_raise", { key }).catch(() => {}), RAISE_MS);
+    });
+    return () => {
+      clearTimeout(timer);
+      off.then((stop) => stop());
+    };
+  }, [preview]);
 }
 
 /** Apps that have turned up since the dock first loaded, for as long as they stay. */
@@ -273,6 +341,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   useEffect(() => setOrder(null), [fetched]);
   const data = useMemo(() => (order && fetched ? [...fetched].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) : fetched), [fetched, order]);
   const previews = useAppPreviews(preview);
+  useOsDrag(preview);
   const arrived = useArrivals(data, preview);
   const rows = useLeaving(data, preview);
   const present = new Set((data ?? []).map((e) => e.key));
@@ -287,12 +356,42 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
     return activeNodeRect && bounds ? { ...transform, x: keptInside(transform.x, activeNodeRect, bounds) } : transform;
   };
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
-  const onDragMove = (e: DragMoveEvent) => setPulledOff(isPulledOff(e.delta.y, tileSize()) ? String(e.active.id) : null);
+  // The app another is being held over, which steps back under it to show a group would be made.
+  const [onto, setOnto] = useState<string | null>(null);
+  const hold = useRef<{ key: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const stopHolding = () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+    setOnto(null);
+  };
+  useEffect(() => () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+  }, []);
+  const onDragMove = (e: DragMoveEvent) => {
+    const T = tileSize();
+    const off = isPulledOff(e.delta.y, T);
+    setPulledOff(off ? String(e.active.id) : null);
+    const moved = e.active.rect.current.translated;
+    const target = e.over && String(e.over.id) !== String(e.active.id) ? String(e.over.id) : null;
+    const near = !off && target !== null && moved !== null && heldOver(moved, e.over!.rect, T);
+    if (!near) return stopHolding();
+    if (hold.current?.key === target) return;
+    stopHolding();
+    hold.current = { key: target, timer: setTimeout(() => setOnto(target), HOLD_MS) };
+  };
   const onDragEnd = (e: DragEndEvent) => {
     setPulledOff(null);
     dragged.current = true;
-    const result = dragOutcome({ active: String(e.active.id), over: e.over ? String(e.over.id) : null, dy: e.delta.y }, data ?? [], tileSize());
-    if (result?.kind === "reorder") {
+    const result = dragOutcome({ active: String(e.active.id), over: e.over ? String(e.over.id) : null, dy: e.delta.y, onto }, data ?? [], tileSize());
+    stopHolding();
+    if (result?.kind === "group") {
+      invoke("apps_group", { onto: result.onto, dragged: result.key })
+        .then(() => {
+          markReordered();
+          refresh?.();
+        })
+        .catch(() => {});
+    } else if (result?.kind === "reorder") {
       setOrder(result.keys);
       invoke("apps_reorder", { keys: result.keys })
         .then(() => {
@@ -342,12 +441,15 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
       >
         <SearchGlyph />
       </button>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[keepInside]} onDragStart={() => invoke("preview_hide").catch(() => {})} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => setPulledOff(null)}>
-      <SortableContext items={rows.filter((e) => present.has(e.key)).map((e) => e.key)} strategy={horizontalListSortingStrategy}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[keepInside]} onDragStart={() => invoke("preview_hide").catch(() => {})} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={() => {
+        setPulledOff(null);
+        stopHolding();
+      }}>
+      <SortableContext items={rows.filter((e) => present.has(e.key)).map((e) => e.key)} strategy={onto ? stayPut : horizontalListSortingStrategy}>
       {rows.map((entry) =>
         !present.has(entry.key) && !preview ? (
           <span key={entry.key} className="app app--leaving" data-key={entry.key} aria-hidden="true">
-            <AppIcon entry={entry} />
+            {entry.kind === "group" ? <GroupIcon entry={entry} /> : <AppIcon entry={entry} />}
           </span>
         ) : (
         <Sortable key={entry.key} id={entry.key} disabled={!canDrag}>
@@ -358,7 +460,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
           data-key={entry.key}
           data-dragging={sortable.isDragging}
           style={{ transform: sortable.transform ? `translate3d(${sortable.transform.x}px, 0, 0)` : undefined, transition: sortable.transition }}
-          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}${pulledOff === entry.key ? " app--off" : ""}`}
+          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 && entry.kind !== "group" ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}${pulledOff === entry.key ? " app--off" : ""}${onto === entry.key ? " app--onto" : ""}`}
           aria-label={entry.name}
           onMouseEnter={(e) => previews.enter(e, entry)}
           onMouseLeave={previews.leave}
@@ -374,7 +476,11 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
               return;
             }
             if (preview) return;
-            if (entry.windows.length > 1) previews.toggle(e, entry);
+            if (entry.kind === "group" || entry.kind === "folder") {
+              const r = e.currentTarget.getBoundingClientRect();
+              const prefix = entry.kind === "group" ? GROUP_PREFIX : STACK_PREFIX;
+              invoke("open_card", { widgetId: `${prefix}${entry.key}`, tileX: r.left, tileWidth: r.width, width: APP_MENU_WIDTH, height: APP_MENU_HEIGHT }).catch(() => {});
+            } else if (entry.windows.length > 1) previews.toggle(e, entry);
             else invoke("apps_activate", { key: entry.key }).catch(() => {});
           }}
           onContextMenu={(e) => {
@@ -386,7 +492,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
             invoke("open_card", { widgetId: `${APP_MENU_PREFIX}${entry.key}`, tileX: r.left, tileWidth: r.width, width: APP_MENU_WIDTH, height: APP_MENU_HEIGHT }).catch(() => {});
           }}
         >
-          <AppIcon entry={entry} preview={preview} />
+          {entry.kind === "group" ? <GroupIcon entry={entry} preview={preview} /> : <AppIcon entry={entry} preview={preview} />}
           {entry.windows.length > 0 && <span className="app__dot" />}
         </button>
         )}

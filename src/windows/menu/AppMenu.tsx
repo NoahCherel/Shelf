@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { invoke } from "../../core/tauri";
+import { GroupCard } from "./GroupCard";
 import "./app-menu.css";
 
-type Own = "open" | "pin" | "unpin" | "close" | "close-all";
+type Own = "open" | "pin" | "unpin" | "close" | "close-all" | "remove" | "ungroup" | "leave-group";
 
 interface Row {
   /** One of the app's own items, or `jump:<fingerprint>` for a line of a jump list. */
@@ -29,12 +30,12 @@ function Glyph({ id }: { id: Own }) {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" {...lines}>
       <path d="M12.200 2.800l5 5-1.200 1.200-1-.2-3.300 3.300.2 2.700-1.200 1.200-3.500-3.500-4 4m4-4l-3.500-3.500 1.200-1.200 2.700.2 3.300-3.300-.2-1 1.500-1.400Z" />
-      {id === "unpin" && <path d="M3 3l14 14" />}
+      {id !== "pin" && <path d="M3 3l14 14" />}
     </svg>
   );
 }
 
-function AppIcon({ appKey, name }: { appKey: string; name: string }) {
+export function AppIcon({ appKey, name }: { appKey: string; name: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -55,6 +56,7 @@ export function AppMenu({ appKey }: { appKey: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [icons, setIcons] = useState<Map<string, string>>(new Map());
+  const [groupOpen, setGroupOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,6 +77,8 @@ export function AppMenu({ appKey }: { appKey: string }) {
   }, [appKey]);
 
   const choose = (id: Row["id"]) => {
+    // A group has nothing to launch: opening it shows its apps, here.
+    if (id === "open" && appKey.startsWith("group:")) return setGroupOpen(true);
     invoke("apps_menu_choose", { key: appKey, id })
       .catch(() => {})
       .then(() => invoke("close_card").catch(() => {}));
@@ -88,6 +92,7 @@ export function AppMenu({ appKey }: { appKey: string }) {
     all[(at + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
   };
 
+  if (groupOpen) return <GroupCard groupKey={appKey} />;
   if (rows.length === 0) return null;
   return (
     <div className="amenu" role="menu" ref={box} onKeyDown={move}>

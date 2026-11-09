@@ -516,6 +516,7 @@ mod tests {
             windows: handles.iter().map(|h| AppWindow { hwnd: *h, title: String::new() }).collect(),
             launch: None,
             icon_source: None,
+            ..Default::default()
         }
     }
 

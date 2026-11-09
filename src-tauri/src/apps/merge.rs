@@ -26,7 +26,18 @@ pub struct AppWindow {
     pub title: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+/// What a tile on the dock is.
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AppKind {
+    #[default]
+    App,
+    File,
+    Folder,
+    Group,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
 pub struct AppEntry {
     pub key: String,
     pub name: String,
@@ -38,6 +49,13 @@ pub struct AppEntry {
     /// What to ask the shell for an icon: a shortcut, a program or a store app.
     #[serde(skip)]
     pub icon_source: Option<String>,
+    pub kind: AppKind,
+    /// A group's apps. It takes on their windows, so it can show one of them is open.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<AppEntry>,
+    /// This app is inside a group.
+    #[serde(skip)]
+    pub grouped: bool,
 }
 
 #[derive(PartialEq, Debug)]
@@ -92,6 +110,7 @@ pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<Ap
             windows: Vec::new(),
             launch: Some(p.link.clone()),
             icon_source: Some(p.link.clone()),
+            ..Default::default()
         })
         .collect();
 
@@ -118,6 +137,7 @@ pub fn merge(pins: &[Pin], windows: Vec<RawWindow>, foreground: isize) -> Vec<Ap
                     (Some(id), true) => Some(format!(r"shell:AppsFolder\{id}")),
                     _ => Some(w.exe.clone()),
                 },
+                ..Default::default()
             });
             entries.len() - 1
         });
@@ -263,6 +283,7 @@ mod tests {
             launch: Some("x".into()),
             icon_source: None,
             windows: windows.into_iter().map(|hwnd| AppWindow { hwnd, title: String::new() }).collect(),
+            ..Default::default()
         };
         assert_eq!(click_plan(&mk(vec![], false), 0), Click::Launch);
         assert_eq!(click_plan(&mk(vec![7, 8], false), 0), Click::Focus(7));

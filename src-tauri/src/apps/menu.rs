@@ -4,7 +4,7 @@
 use serde::Serialize;
 
 use super::jumplist::{fingerprint, Link};
-use super::merge::AppEntry;
+use super::merge::{AppEntry, AppKind};
 
 /// A click that closes Start arrives this soon after it closed.
 const START_REOPEN_GUARD_MS: u64 = 400;
@@ -16,6 +16,9 @@ pub enum Own {
     Unpin,
     Close,
     CloseAll,
+    Remove,
+    Ungroup,
+    LeaveGroup,
 }
 
 #[derive(Serialize)]
@@ -62,6 +65,16 @@ pub fn items(pinned: bool, windows: usize) -> Vec<Own> {
     list
 }
 
+/// What this tile offers, by what it is.
+pub fn items_for(entry: &AppEntry) -> Vec<Own> {
+    match entry.kind {
+        AppKind::File | AppKind::Folder => vec![Own::Open, Own::Remove],
+        AppKind::Group => vec![Own::Open, Own::Ungroup],
+        AppKind::App if entry.grouped => items(true, entry.windows.len()).into_iter().map(|item| if item == Own::Unpin { Own::LeaveGroup } else { item }).collect(),
+        AppKind::App => items(entry.pinned, entry.windows.len()),
+    }
+}
+
 /// Windows' own words, so the menu reads as it would on the taskbar. `lang` is a Windows language id.
 /// Open is labelled with the app's name instead.
 pub fn label(item: Own, lang: u16) -> &'static str {
@@ -76,6 +89,12 @@ pub fn label(item: Own, lang: u16) -> &'static str {
         (Own::Close, false) => "Close window",
         (Own::CloseAll, true) => "Fermer toutes les fenêtres",
         (Own::CloseAll, false) => "Close all windows",
+        (Own::Remove, true) => "Retirer du dock",
+        (Own::Remove, false) => "Remove from dock",
+        (Own::Ungroup, true) => "Défaire le groupe",
+        (Own::Ungroup, false) => "Ungroup",
+        (Own::LeaveGroup, true) => "Sortir du groupe",
+        (Own::LeaveGroup, false) => "Remove from group",
     }
 }
 
@@ -86,12 +105,15 @@ fn own_id(item: Own) -> &'static str {
         Own::Unpin => "unpin",
         Own::Close => "close",
         Own::CloseAll => "close-all",
+        Own::Remove => "remove",
+        Own::Ungroup => "ungroup",
+        Own::LeaveGroup => "leave-group",
     }
 }
 
 /// Only these, whatever the page asks.
 pub fn own_from(id: &str) -> Option<Own> {
-    [Own::Open, Own::Pin, Own::Unpin, Own::Close, Own::CloseAll].into_iter().find(|item| own_id(*item) == id)
+    [Own::Open, Own::Pin, Own::Unpin, Own::Close, Own::CloseAll, Own::Remove, Own::Ungroup, Own::LeaveGroup].into_iter().find(|item| own_id(*item) == id)
 }
 
 /// `lists` are the jump list's sections, titled and in order.
@@ -108,7 +130,7 @@ pub fn menu_for(entry: &AppEntry, lang: u16, lists: Vec<(String, Vec<Link>)>) ->
                     .collect(),
             })
             .collect(),
-        items: items(entry.pinned, entry.windows.len())
+        items: items_for(entry)
             .into_iter()
             .map(|item| Row { id: own_id(item).to_string(), label: if item == Own::Open { entry.name.clone() } else { label(item, lang).to_string() }, detail: None })
             .collect(),
@@ -127,6 +149,7 @@ pub fn is_start_host(exe: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apps::merge::AppKind;
 
     const FRENCH: u16 = 0x040C;
     const ENGLISH: u16 = 0x0409;
@@ -171,7 +194,31 @@ mod tests {
     }
 
     fn app(pinned: bool) -> AppEntry {
-        AppEntry { key: "firefox".into(), name: "Firefox".into(), pinned, active: false, windows: Vec::new(), launch: None, icon_source: None }
+        AppEntry { key: "firefox".into(), name: "Firefox".into(), pinned, active: false, windows: Vec::new(), launch: None, icon_source: None, ..Default::default() }
+    }
+
+    fn of_kind(kind: AppKind, grouped: bool, windows: usize) -> AppEntry {
+        AppEntry { kind, grouped, windows: (0..windows).map(|i| crate::apps::merge::AppWindow { hwnd: i as isize, title: String::new() }).collect(), ..app(true) }
+    }
+
+    #[test]
+    fn each_kind_of_thing_on_the_dock_offers_what_fits_it() {
+        assert_eq!(items_for(&of_kind(AppKind::File, false, 0)), vec![Own::Open, Own::Remove]);
+        assert_eq!(items_for(&of_kind(AppKind::Folder, false, 0)), vec![Own::Open, Own::Remove]);
+        assert_eq!(items_for(&of_kind(AppKind::Group, false, 2)), vec![Own::Open, Own::Ungroup]);
+        assert_eq!(items_for(&of_kind(AppKind::App, true, 0)), vec![Own::Open, Own::LeaveGroup]);
+        assert_eq!(items_for(&of_kind(AppKind::App, true, 1)), vec![Own::Open, Own::LeaveGroup, Own::Close]);
+        assert_eq!(items_for(&of_kind(AppKind::App, false, 0)), vec![Own::Open, Own::Unpin]);
+    }
+
+    #[test]
+    fn the_new_choices_are_named_and_accepted() {
+        assert_eq!(label(Own::Remove, FRENCH), "Retirer du dock");
+        assert_eq!(label(Own::Ungroup, ENGLISH), "Ungroup");
+        assert_eq!(label(Own::LeaveGroup, FRENCH), "Sortir du groupe");
+        for item in [Own::Remove, Own::Ungroup, Own::LeaveGroup] {
+            assert_eq!(own_from(own_id(item)), Some(item));
+        }
     }
 
     #[test]

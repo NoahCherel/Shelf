@@ -27,6 +27,15 @@ const TALL: [number, number] = [1536, 640];
 const T = `parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--T"))`;
 const appLefts = `[...document.querySelectorAll(".app")].map((a) => a.getBoundingClientRect().left)`;
 
+/** Two apps gathered in a group, a folder and a file, beside the usual apps. */
+function withGroup() {
+  const apps = fakeApps(6, 4);
+  const group = { key: "group:1", name: "Work", pinned: true, active: false, kind: "group", windows: apps[1].windows.concat(apps[2].windows), members: apps.slice(0, 4) };
+  const folder = { key: "item:folder", name: "Documents", pinned: true, active: false, windows: [], kind: "folder" };
+  const file = { key: "item:file", name: "notes.txt", pinned: true, active: false, windows: [], kind: "file" };
+  return [group, ...apps.slice(4), folder, file];
+}
+
 export const scenes: Scene[] = [
   {
     id: "dock-default",
@@ -342,6 +351,33 @@ export const scenes: Scene[] = [
     theme: "dark",
     dock: DOCK,
     backend: { system_status: () => ({ wifi: { ssid: "Home", signal: 90 }, online: true, volume: { percent: 60, muted: false }, battery: { percent: 64, charging: false }, notifications: 3 }) },
+  },
+  {
+    id: "dock-group-and-folder",
+    size: WIDE,
+    wallpaper: "ribbons",
+    theme: "dark",
+    dock: DOCK,
+    backend: { apps_list: withGroup },
+  },
+  { id: "card-group", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__group:group:1", anchor: '[aria-label="Work"]', backend: { apps_list: withGroup } },
+  { id: "card-group-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__group:group:1", anchor: '[aria-label="Work"]', backend: { apps_list: withGroup } },
+  {
+    id: "card-stack",
+    size: TALL,
+    wallpaper: "glow",
+    theme: "dark",
+    dock: DOCK,
+    card: "__stack:item:folder",
+    anchor: '[aria-label="Documents"]',
+    backend: {
+      apps_list: withGroup,
+      apps_stack: () => ({
+        items: ["Factures", "Photos", "Compte rendu de la réunion annuelle du conseil d'administration.docx", "notes.txt", "budget.xlsx"].map((label, i) => ({ id: String(i).padStart(16, "0"), label, folder: i < 2 })),
+        more: true,
+      }),
+      apps_stack_icons: () => [],
+    },
   },
   { id: "card-app-menu", size: TALL, wallpaper: "ribbons", theme: "dark", dock: DOCK, card: "__appmenu:app-0", anchor: '[aria-label="App 0"]' },
   { id: "card-app-menu-light", size: TALL, wallpaper: "pale", theme: "light", dock: DOCK, card: "__appmenu:app-0", anchor: '[aria-label="App 0"]' },

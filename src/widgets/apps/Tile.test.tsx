@@ -4,7 +4,7 @@ import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
 import { useSettings } from "../../core/settings";
 import apps from "./index";
-import { AppsTile, dragOutcome, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
+import { AppsTile, appUnder, canGroup, dragOutcome, heldOver, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
 
@@ -475,5 +475,84 @@ describe("an app dragged past either end of the apps", () => {
   it("moves freely in between", () => {
     expect(keptInside(30, icon, box)).toBe(30);
     expect(keptInside(-50, icon, box)).toBe(-50);
+  });
+});
+
+describe("files, folders and groups", () => {
+  const T = 50;
+  const group: AppEntry = { ...app("group:1"), name: "Work", kind: "group", members: [app("a", true), app("b"), app("c"), app("d"), app("e")], windows: [{ hwnd: 1, title: "w" }] };
+  const folder: AppEntry = { ...app("item:c:\\work"), name: "Work folder", kind: "folder" };
+  const file: AppEntry = { ...app("item:c:\\a.txt"), name: "a.txt", kind: "file" };
+
+  it("an app held over another is grouped with it when let go", () => {
+    expect(dragOutcome({ active: "a", over: "b", dy: 0, onto: "b" }, [app("a"), app("b")], T)).toEqual({ kind: "group", onto: "b", key: "a" });
+  });
+
+  it("only apps go in groups, and only on an app or a group", () => {
+    expect(canGroup(app("a"), app("b"))).toBe(true);
+    expect(canGroup(app("a"), group)).toBe(true);
+    expect(canGroup(app("a"), app("a"))).toBe(false);
+    expect(canGroup(group, app("a"))).toBe(false);
+    expect(canGroup(file, app("a"))).toBe(false);
+    expect(canGroup(app("a"), folder)).toBe(false);
+    expect(dragOutcome({ active: "a", over: "x", dy: 0, onto: "x" }, [app("a"), { ...file, key: "x" }], T)?.kind).toBe("reorder");
+  });
+
+  it("pulling off the dock wins over holding on an app", () => {
+    expect(dragOutcome({ active: "a", over: "b", dy: 100, onto: "b" }, [app("a"), app("b")], T)).toEqual({ kind: "unpin", key: "a" });
+  });
+
+  it("an app counts as held over another only when near its middle", () => {
+    expect(heldOver({ left: 100, width: 48 }, { left: 105, width: 48 }, T)).toBe(true);
+    expect(heldOver({ left: 100, width: 48 }, { left: 130, width: 48 }, T)).toBe(false);
+  });
+
+  it("a group's tile shows four of its apps, a dot, and opens its card", () => {
+    const { container } = render(<AppsTile data={[group]} status="ready" />);
+    expect(container.querySelectorAll(".app__mini").length).toBe(4);
+    expect(container.querySelectorAll(".app__dot").length).toBe(1);
+    mockInvoke.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__group:group:1" }));
+    expect(mockInvoke.mock.calls.map((c) => c[0])).not.toContain("apps_activate");
+  });
+
+  it("a folder opens its stack, and a file opens like an app", () => {
+    render(<AppsTile data={[folder, file]} status="ready" />);
+    fireEvent.click(screen.getByRole("button", { name: "Work folder" }));
+    expect(mockInvoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "__stack:item:c:\\work" }));
+    fireEvent.click(screen.getByRole("button", { name: "a.txt" }));
+    expect(mockInvoke).toHaveBeenCalledWith("apps_activate", { key: "item:c:\\a.txt" });
+  });
+
+  it("finds the app under something dragged from Windows, and nothing elsewhere", () => {
+    const { container } = render(<AppsTile data={[app("code")]} status="ready" />);
+    expect(appUnder(container.querySelector("[data-key] img, [data-key] span"))).toBe("code");
+    expect(appUnder(screen.getByRole("button", { name: "Start" }))).toBeNull();
+    expect(appUnder(null)).toBeNull();
+  });
+
+  it("something from Windows held over an app raises it, and leaving forgets the app", async () => {
+    vi.useFakeTimers();
+    const handlers: Record<string, (p: unknown) => void> = {};
+    vi.mocked(listen).mockImplementation(async (name: string, fn: (p: never) => void) => {
+      handlers[name] = fn as (p: unknown) => void;
+      return () => {};
+    });
+    const { container } = render(<AppsTile data={[app("code", true)]} status="ready" />);
+    await act(async () => {});
+    const tile = container.querySelector("[data-key]")!;
+    const under = vi.fn(() => tile);
+    (document as unknown as { elementFromPoint: unknown }).elementFromPoint = under;
+    mockInvoke.mockClear();
+    handlers["os-drag"]([100, 10]);
+    handlers["os-drag"]([101, 10]);
+    expect(mockInvoke.mock.calls.filter((c) => c[0] === "apps_drag_target")).toEqual([["apps_drag_target", { key: "code" }]]);
+    vi.advanceTimersByTime(1000);
+    expect(mockInvoke).toHaveBeenCalledWith("apps_drag_raise", { key: "code" });
+    handlers["os-drag"](null);
+    expect(mockInvoke).toHaveBeenCalledWith("apps_drag_target", { key: null });
+    vi.useRealTimers();
+    vi.mocked(listen).mockImplementation(async () => () => {});
   });
 });
