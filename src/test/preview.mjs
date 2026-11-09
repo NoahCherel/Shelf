@@ -1,6 +1,7 @@
 // Runs a command against the real app in preview mode, beside the owner's Shelf: a debug build,
 // with its own Vite, its own data and a debug port. Stops only what it started.
-// Usage: node src/test/preview.mjs <command...>   e.g. node src/test/preview.mjs node src/test/see.mjs out.png
+// --clean starts from the default layout instead of a copy of the owner's.
+// Usage: node src/test/preview.mjs [--clean] <command...>   e.g. node src/test/preview.mjs node src/test/see.mjs out.png
 import { spawn, spawnSync } from "node:child_process";
 
 const EXE = "src-tauri/target/debug/shelf.exe";
@@ -19,6 +20,10 @@ async function waitFor(url) {
   throw new Error(`nothing answered at ${url}`);
 }
 
+const args = process.argv.slice(2);
+const clean = args[0] === "--clean";
+if (clean) args.shift();
+
 const built = spawnSync("cargo build", { cwd: "src-tauri", shell: true, stdio: "ignore" });
 if (built.status !== 0) throw new Error("cargo build failed");
 
@@ -30,11 +35,11 @@ try {
     stdio: "ignore",
     windowsHide: true,
     detached: true,
-    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9333" },
+    env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9333", ...(clean ? { SHELF_PREVIEW_CLEAN: "1" } : {}) },
   }).unref();
   await waitFor("http://127.0.0.1:9333/json/list");
   await sleep(4000);
-  const command = process.argv.slice(2).join(" ");
+  const command = args.join(" ");
   exitCode = spawnSync(command, { shell: true, stdio: "inherit" }).status ?? 1;
 } finally {
   spawnSync(EXE, ["--preview", "--quit"], { stdio: "ignore", windowsHide: true });

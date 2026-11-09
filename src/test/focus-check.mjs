@@ -1,28 +1,14 @@
 // Proves the focus mark follows the real foreground window: clicks apps inside the dock's own
 // page, so the real mouse never moves. Usage: node src/test/focus-check.mjs <folder> <app> <app>
+import { Page } from "./cdp.mjs";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [out, ...apps] = process.argv.slice(2);
-const targets = await (await fetch("http://127.0.0.1:9333/json")).json();
-const ws = new WebSocket(targets.find((t) => t.url.includes("w=dock")).webSocketDebuggerUrl);
-await new Promise((resolve) => ws.addEventListener("open", resolve));
+const page = await Page.open("dock");
+const send = async (method, params) => (await page.send(method, params)).result;
+const ws = page.ws;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-let id = 0;
-const send = (method, params = {}) =>
-  new Promise((resolve) => {
-    const mine = ++id;
-    const onMessage = (e) => {
-      const m = JSON.parse(e.data);
-      if (m.id === mine) {
-        ws.removeEventListener("message", onMessage);
-        resolve(m.result);
-      }
-    };
-    ws.addEventListener("message", onMessage);
-    ws.send(JSON.stringify({ id: mine, method, params }));
-  });
 const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true })).result.value;
 const focused = () => evaluate(`[...document.querySelectorAll(".app--active")].map((a) => a.getAttribute("aria-label")).join(",")`);
 
