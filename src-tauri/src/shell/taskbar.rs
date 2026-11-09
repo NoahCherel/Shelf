@@ -27,6 +27,12 @@ pub trait TaskbarApi {
     fn show_windows(&self);
 }
 
+/// A panic on the main thread ends Shelf. One on any other thread only ends that command, and
+/// Shelf carries on with the taskbar still its to manage.
+pub fn panic_ends_shelf(thread: Option<&str>) -> bool {
+    thread == Some("main")
+}
+
 pub struct Taskbar<A> {
     api: A,
     state_file: PathBuf,
@@ -49,7 +55,10 @@ impl<A: TaskbarApi> Taskbar<A> {
             if let Some(dir) = self.state_file.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
-            let _ = std::fs::write(&self.state_file, if self.api.autohide() { "1" } else { "0" });
+            // Without this file a crash couldn't bring the taskbar back, so it isn't hidden at all.
+            if std::fs::write(&self.state_file, if self.api.autohide() { "1" } else { "0" }).is_err() {
+                return;
+            }
         }
         if !self.api.autohide() {
             self.api.set_autohide(true);
@@ -202,6 +211,24 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir.join("taskbar_state.txt")
+    }
+
+    #[test]
+    fn it_wont_hide_the_taskbar_if_it_cant_save_how_to_bring_it_back() {
+        let fake = Fake::default();
+        let blocker = state_path("unwritable");
+        std::fs::write(&blocker, "a file where a folder should be").unwrap();
+        let bar = Taskbar::new(fake.clone(), blocker.join("taskbar_state.txt"));
+        bar.apply(Mode::Hidden);
+        assert!(fake.calls.borrow().is_empty(), "{:?}", fake.calls.borrow());
+        assert_eq!(bar.mode(), Mode::Off);
+    }
+
+    #[test]
+    fn only_a_panic_that_ends_shelf_brings_the_taskbar_back() {
+        assert!(panic_ends_shelf(Some("main")));
+        assert!(!panic_ends_shelf(Some("tokio-runtime-worker")));
+        assert!(!panic_ends_shelf(None), "a command's own thread: Shelf carries on");
     }
 
     #[test]

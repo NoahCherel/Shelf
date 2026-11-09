@@ -101,7 +101,9 @@ pub fn run() {
 
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        preview::restore_taskbar(|| TASKBAR.restore());
+        if shell::taskbar::panic_ends_shelf(std::thread::current().name()) {
+            preview::restore_taskbar(|| TASKBAR.restore());
+        }
         default_hook(info);
     }));
     if preview::current().watchdog {
