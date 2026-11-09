@@ -178,11 +178,6 @@ pub fn categories(bytes: &[u8], read: impl Fn(&[u8]) -> Option<(Option<Link>, us
     out
 }
 
-/// Where each shell link starts in a custom jump list file: just after its CLSID.
-pub fn link_starts(bytes: &[u8]) -> Vec<usize> {
-    bytes.windows(SHELL_LINK_CLSID.len()).enumerate().filter(|(_, w)| *w == SHELL_LINK_CLSID).map(|(i, _)| i + SHELL_LINK_CLSID.len()).collect()
-}
-
 /// Windows keeps one file per app id, and often old ones for the same program: the newest wins.
 pub fn newest<T>(candidates: impl IntoIterator<Item = (T, SystemTime)>) -> Option<T> {
     candidates.into_iter().max_by_key(|(_, when)| *when).map(|(it, _)| it)
@@ -411,7 +406,7 @@ mod native {
 
     /// The DestList stream of an automatic jump list file. Explorer keeps the file open, so a copy is read.
     pub fn dest_list_of(file: &std::path::Path) -> Option<Vec<u8>> {
-        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", std::process::id()));
+        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", super::super::history::unique()));
         std::fs::copy(file, &copy).ok()?;
         let read = || unsafe {
             let storage: IStorage = StgOpenStorage(&HSTRING::from(copy.as_os_str()), None, STGM_READ | STGM_SHARE_EXCLUSIVE, None, 0).ok()?;
@@ -514,16 +509,6 @@ mod tests {
         assert!(mentions(&odd, r"C:\Program Files\Mozilla Firefox\firefox.exe"));
         assert!(!mentions(&bytes, r"C:\Edge\msedge.exe"));
         assert!(!mentions(&bytes, ""));
-    }
-
-    #[test]
-    fn each_shell_link_is_found_just_after_its_clsid() {
-        let mut bytes = vec![9, 9];
-        bytes.extend(SHELL_LINK_CLSID);
-        bytes.extend([1, 2, 3]);
-        bytes.extend(SHELL_LINK_CLSID);
-        assert_eq!(link_starts(&bytes), vec![18, 37]);
-        assert!(link_starts(&[0; 40]).is_empty());
     }
 
     /// A fake link reader: each "link" is one byte naming its title, and takes 4 bytes.

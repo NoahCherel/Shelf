@@ -2,6 +2,7 @@
 //! history, which is never written to, and kept nowhere.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use base64::Engine;
 use rusqlite::{Connection, OpenFlags};
@@ -107,6 +108,11 @@ pub fn chromium_visits(db: &Connection, most: usize) -> rusqlite::Result<Vec<Vis
     rows.collect()
 }
 
+/// A page's address as one argument for its browser: a quote in it couldn't start another.
+pub fn as_argument(url: &str) -> String {
+    format!("\"{}\"", url.replace('"', "%22"))
+}
+
 /// What kind of picture an icon is, from its first bytes.
 pub fn data_url(bytes: &[u8]) -> Option<String> {
     let mime = match bytes {
@@ -132,11 +138,17 @@ fn with_icons(mut visits: Vec<Visit>, icons: &Path, query: &str) -> Vec<Visit> {
     visits
 }
 
+/// A name for a temporary copy, so two menus opening at once can't remove each other's.
+pub fn unique() -> String {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    format!("{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed))
+}
+
 /// Runs `read` on a copy of a database the browser keeps open, with its write-ahead log so the
 /// latest visits are there, then removes the copy.
 fn read_copy<T>(db: &Path, read: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
     let name = db.file_name()?.to_string_lossy().into_owned();
-    let folder = std::env::temp_dir().join(format!("shelf-history-{}", std::process::id()));
+    let folder = std::env::temp_dir().join(format!("shelf-history-{}", unique()));
     std::fs::create_dir_all(&folder).ok()?;
     let copy = folder.join(&name);
     let result = (|| {
@@ -188,6 +200,12 @@ mod tests {
         .unwrap();
         let visits = chromium_visits(&db, 8).unwrap();
         assert_eq!(visits.iter().map(|v| v.title.as_str()).collect::<Vec<_>>(), ["B", "A"]);
+    }
+
+    #[test]
+    fn an_address_is_always_a_single_argument() {
+        assert_eq!(as_argument("https://a.example/"), "\"https://a.example/\"");
+        assert_eq!(as_argument("https://a.example/\" -new-tab \"x"), "\"https://a.example/%22 -new-tab %22x\"");
     }
 
     #[test]

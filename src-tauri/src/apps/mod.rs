@@ -41,6 +41,7 @@ static JUMP_ICONS: Mutex<Option<HashMap<String, Option<String>>>> = Mutex::new(N
 static DRAG_AIM: Mutex<Option<Aim>> = Mutex::new(None);
 /// What's being dragged from Windows.
 static DRAG_PATHS: Mutex<Vec<std::path::PathBuf>> = Mutex::new(Vec::new());
+static DRAG_PINNABLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[derive(Clone, Debug)]
 enum Aim {
@@ -103,7 +104,7 @@ pub fn bring_forward(raw: isize) {
     windows::focus(raw);
 }
 
-/// A program's icon by its path, from the same cache as the apps themselves.
+/// The icon of a program, file or folder by its path, from the same cache as the apps themselves.
 pub fn icon_of_exe(exe: String) -> Result<Option<String>, String> {
     let _one = ONE_LOOKUP.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(known) = ICONS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&exe)) {
@@ -214,15 +215,7 @@ pub fn apps_stack(key: String) -> Result<stack::Stack, String> {
 #[tauri::command(async)]
 pub fn apps_stack_icons(key: String) -> Result<Vec<(String, String)>, String> {
     let (found, _) = stack::read(&folder_of(&key)?);
-    on_com_thread(move || {
-        found
-            .iter()
-            .filter_map(|f| {
-                let icon = icons::icon(&f.path)?;
-                Some((jumplist::fingerprint(&stack::link_of(f)), icon))
-            })
-            .collect()
-    })
+    Ok(found.iter().filter_map(|f| Some((jumplist::fingerprint(&stack::link_of(f)), icon_of_exe(f.path.clone()).ok()??))).collect())
 }
 
 /// A line of a folder runs only if it's still there when read again.
@@ -244,20 +237,23 @@ pub fn apps_drag_target(key: Option<String>, index: Option<usize>) {
     *DRAG_AIM.lock().unwrap_or_else(|e| e.into_inner()) = key.map(Aim::Open).or(index.map(Aim::Place));
 }
 
-/// A drag from Windows has come onto the dock. True if it would be pinned wherever it's dropped.
+/// A drag from Windows has come onto the dock. Whether it's only programs is decided here, once:
+/// asking the disk on every move would stall the drag on a slow drive.
 pub fn drag_entered(paths: &[std::path::PathBuf]) {
+    let pinnable = paths.iter().all(|p| matches!(pins::dropped(&p.to_string_lossy(), |d| std::path::Path::new(d).is_dir()), pins::Dropped::Program | pins::Dropped::Shortcut));
+    DRAG_PINNABLE.store(pinnable, std::sync::atomic::Ordering::Relaxed);
     *DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()) = paths.to_vec();
 }
 
 pub fn drag_is_pinnable() -> bool {
-    DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).iter().all(|p| matches!(pins::dropped(&p.to_string_lossy(), |d| std::path::Path::new(d).is_dir()), pins::Dropped::Program | pins::Dropped::Shortcut))
+    DRAG_PINNABLE.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// The picture of what's being dragged, for the place the dock opens for it.
 #[tauri::command(async)]
 pub fn apps_drag_icon() -> Result<Option<String>, String> {
     let Some(first) = DRAG_PATHS.lock().unwrap_or_else(|e| e.into_inner()).first().cloned() else { return Ok(None) };
-    on_com_thread(move || icons::icon(&first.to_string_lossy()))
+    icon_of_exe(first.to_string_lossy().into_owned())
 }
 
 /// Opens what was dropped on an app's icon with that app.
@@ -317,17 +313,10 @@ pub fn pin_dropped(app: AppHandle, paths: Vec<std::path::PathBuf>) {
     });
 }
 
-fn is_browser(exe: &str) -> bool {
-    let name = exe.rsplit(['\\', '/']).next().unwrap_or(exe).to_lowercase();
-    ["firefox.exe", "chrome.exe", "msedge.exe", "brave.exe", "opera.exe", "vivaldi.exe"].contains(&name.as_str())
-}
-
 fn looks_like_path(key: &str) -> bool {
     key.contains('\\') || key.contains('/') || key.ends_with(".exe")
 }
 
-/// The jump lists Windows keeps for this app: File Explorer's quick access, a program's tasks, and the
-/// recent files of an app with an id of its own. Call on a COM thread.
 /// The pages a browser visited last, each opening in that browser.
 fn history_of(exe: &str) -> Vec<jumplist::Link> {
     let Some(browser) = history::browser_for(exe) else { return Vec::new() };
@@ -336,7 +325,7 @@ fn history_of(exe: &str) -> Vec<jumplist::Link> {
         .map(|visit| jumplist::Link {
             title: visit.title,
             path: exe.to_string(),
-            args: format!("\"{}\"", visit.url),
+            args: history::as_argument(&visit.url),
             icon: visit.icon.unwrap_or_else(|| exe.to_string()),
             detail: visit.url,
         })
@@ -345,7 +334,8 @@ fn history_of(exe: &str) -> Vec<jumplist::Link> {
 
 const HISTORY_LINES: usize = 8;
 
-/// In Windows' order: the program's own categories, its recent files, then its tasks. A browser
+/// The jump lists Windows keeps for this app, in its order: the program's own categories, its recent
+/// files, then its tasks; or File Explorer's quick access. Call on a COM thread. A browser
 /// shows the pages it visited last first, instead of the sites it reckons most visited.
 fn jump_lists(entry: &AppEntry, lang: u16) -> Vec<(String, Vec<jumplist::Link>)> {
     use jumplist::{section_title, Category, Kind};
@@ -365,7 +355,7 @@ fn jump_lists(entry: &AppEntry, lang: u16) -> Vec<(String, Vec<jumplist::Link>)>
     let recent = app_id.map(jumplist::recent).unwrap_or_default();
     // A browser's own categories are its most visited sites, by its own reckoning: the owner wants
     // what's recent instead.
-    let browser = program.as_deref().is_some_and(is_browser);
+    let browser = program.as_deref().is_some_and(|exe| history::browser_for(exe).is_some());
     let mut out: Vec<(String, Vec<jumplist::Link>)> = own
         .iter()
         .filter_map(|(c, links)| match c {
