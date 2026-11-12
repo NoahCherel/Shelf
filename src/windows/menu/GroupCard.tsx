@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { invoke } from "../../core/tauri";
 import type { AppEntry } from "../../widgets/apps/Tile";
-import { AppIcon, AppMenu } from "./AppMenu";
+import { AppIcon } from "./AppIcon";
 import "./dock-cards.css";
 
 const close = () => invoke("close_card").catch(() => {});
 
 /** The apps of a group, under a name that can be edited. */
-export function GroupCard({ groupKey }: { groupKey: string }) {
+export function GroupCard({ groupKey, onMenu }: { groupKey: string; onMenu: (appKey: string) => void }) {
   const [group, setGroup] = useState<AppEntry | null>(null);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
   const saved = useRef("");
 
   useEffect(() => {
@@ -34,7 +33,6 @@ export function GroupCard({ groupKey }: { groupKey: string }) {
     if (e.key === "Enter") e.currentTarget.blur();
   };
 
-  if (menuFor) return <AppMenu appKey={menuFor} />;
   if (!group) return null;
   return (
     <div className="amenu dcard-group">
@@ -54,7 +52,7 @@ export function GroupCard({ groupKey }: { groupKey: string }) {
             }}
             onContextMenu={(e) => {
               e.preventDefault();
-              setMenuFor(member.key);
+              onMenu(member.key);
             }}
           >
             <span className="dcard-group__icon">

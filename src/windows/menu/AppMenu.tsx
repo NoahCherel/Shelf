@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { invoke } from "../../core/tauri";
-import { GroupCard } from "./GroupCard";
+import { AppIcon } from "./AppIcon";
 import "./app-menu.css";
 
 type Own = "open" | "pin" | "unpin" | "close" | "close-all" | "remove" | "ungroup" | "leave-group";
@@ -35,28 +35,11 @@ function Glyph({ id }: { id: Own }) {
   );
 }
 
-export function AppIcon({ appKey, name }: { appKey: string; name: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    Promise.resolve(invoke<string | null>("apps_icon", { key: appKey })).then(
-      (icon) => live && setSrc(icon ?? null),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [appKey]);
-  if (src) return <img src={src} alt="" draggable={false} />;
-  return <span className="amenu__blank" aria-hidden="true">{name.charAt(0).toUpperCase()}</span>;
-}
-
 /** What a Windows taskbar button offers, looking as it does there. Windows' language comes from Rust. */
-export function AppMenu({ appKey }: { appKey: string }) {
+export function AppMenu({ appKey, onOpenGroup }: { appKey: string; onOpenGroup?: () => void }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [icons, setIcons] = useState<Map<string, string>>(new Map());
-  const [groupOpen, setGroupOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,7 +61,7 @@ export function AppMenu({ appKey }: { appKey: string }) {
 
   const choose = (id: Row["id"]) => {
     // A group has nothing to launch: opening it shows its apps, here.
-    if (id === "open" && appKey.startsWith("group:")) return setGroupOpen(true);
+    if (id === "open" && appKey.startsWith("group:") && onOpenGroup) return onOpenGroup();
     invoke("apps_menu_choose", { key: appKey, id })
       .catch(() => {})
       .then(() => invoke("close_card").catch(() => {}));
@@ -92,7 +75,6 @@ export function AppMenu({ appKey }: { appKey: string }) {
     all[(at + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
   };
 
-  if (groupOpen) return <GroupCard groupKey={appKey} />;
   if (rows.length === 0) return null;
   return (
     <div className="amenu" role="menu" ref={box} onKeyDown={move}>

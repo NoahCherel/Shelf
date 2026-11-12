@@ -8,7 +8,7 @@ import { SettingsLink } from "../../design/parts/SettingsLink";
 import { Slider } from "../../design/parts/Slider";
 import { quickProvider, type ToggleKind } from "../../widgets/_providers/quick";
 import { statusProvider } from "../../widgets/_providers/status";
-import { goToPanel, statusChanged } from "../index";
+import { goToPanel, statusChanged } from "../open";
 import { VolumeRow } from "../sound/VolumeRow";
 import "./quick.css";
 

@@ -2,7 +2,7 @@ import { CARD } from "../../core/names";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
-import { byId } from "../../core/registry";
+import { byId } from "../../core/byId";
 import { useLayout } from "../../core/layout";
 import { arrange, fractionAt } from "./arrange";
 import { useSettings, type SettingsData } from "../../core/settings";
@@ -12,7 +12,7 @@ import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { GlassLayer } from "../../design/glass/GlassLayer";
 import { usesGlass } from "../../design/theme";
-import { openPanel } from "../../panels";
+import { openPanel } from "../../panels/open";
 import "./dock.css";
 
 const DEFAULT_CARD_WIDTH = 340;

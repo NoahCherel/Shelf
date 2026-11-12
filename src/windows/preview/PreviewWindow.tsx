@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { AppIcon } from "../menu/AppIcon";
 import { invoke, listen } from "../../core/tauri";
 import "./preview.css";
 
@@ -15,22 +16,6 @@ export interface Shown {
   hint?: boolean;
   slotWidth: number;
   windows: ShownWindow[];
-}
-
-function AppIcon({ appKey, name }: { appKey: string; name: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    Promise.resolve(invoke<string | null>("apps_icon", { key: appKey })).then(
-      (icon) => live && setSrc(icon ?? null),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [appKey]);
-  if (src) return <img className="pv__icon" src={src} alt="" draggable={false} />;
-  return <span className="pv__icon pv__icon--blank">{name.charAt(0).toUpperCase()}</span>;
 }
 
 const PEEK_PAUSE_MS = 250;
@@ -142,7 +127,7 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
             </div>
             {/* Windows may have no picture of a window minimized since it started, so the icon waits underneath. */}
             <div className="pv__frame" data-hwnd={window.hwnd}>
-              {window.minimized && <AppIcon appKey={shown.key} name={shown.name} />}
+              {window.minimized && <AppIcon appKey={shown.key} name={shown.name} className="pv__icon" blankClassName="pv__icon pv__icon--blank" />}
             </div>
           </div>
         );
@@ -169,7 +154,7 @@ export function PreviewWindow() {
     return (
       <div className="pv-name">
         <span className="pv-name__row">
-          {shown.key && shown.name !== shown.key && shown.hint && <AppIcon appKey={shown.key} name={shown.name} />}
+          {shown.key && shown.name !== shown.key && shown.hint && <AppIcon appKey={shown.key} name={shown.name} className="pv__icon" blankClassName="pv__icon pv__icon--blank" />}
           {shown.name}
         </span>
       </div>

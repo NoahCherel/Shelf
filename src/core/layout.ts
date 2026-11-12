@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { setDockIds } from "./dockIds";
 import { STORE } from "./names";
 import { invoke, listen } from "./tauri";
-import { isPinId } from "./pinWidget";
+import { isPinId } from "./pinId";
 import { widgets } from "./registry";
 
 export const DEFAULT_LAYOUT = ["claude-plan-usage", "apps", "github-activity", "system-status", "clock-and-weather"];

@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CARD } from "../../core/names";
 import { refresh } from "../../core/provider";
-import { byId } from "../../core/registry";
+import { byId } from "../../core/byId";
 import { invoke, listen } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
 import { panels, type PanelId } from "../../panels";
-import { AppMenu } from "../menu/AppMenu";
-import { GroupCard } from "../menu/GroupCard";
+import { DockMenu } from "../menu/DockMenu";
 import { StackCard } from "../menu/StackCard";
 import { dockMenuItems, Menu } from "../menu/Menu";
 import "./card-window.css";
@@ -86,7 +85,7 @@ export function CardContent({ id, n }: { id: string; n: number }) {
     return (
       <div className="card-window">
         <Fitted key={n}>
-          <AppMenu appKey={id.slice(CARD.appMenu.length)} />
+          <DockMenu start={{ menu: id.slice(CARD.appMenu.length) }} />
         </Fitted>
       </div>
     );
@@ -95,7 +94,7 @@ export function CardContent({ id, n }: { id: string; n: number }) {
     return (
       <div className="card-window">
         <Fitted key={n}>
-          {id.startsWith(CARD.group) ? <GroupCard groupKey={id.slice(CARD.group.length)} /> : <StackCard folderKey={id.slice(CARD.stack.length)} />}
+          {id.startsWith(CARD.group) ? <DockMenu start={{ group: id.slice(CARD.group.length) }} /> : <StackCard folderKey={id.slice(CARD.stack.length)} />}
         </Fitted>
       </div>
     );

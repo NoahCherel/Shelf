@@ -6,7 +6,7 @@ import { Card } from "../../design/parts/Card";
 import { SettingsLink } from "../../design/parts/SettingsLink";
 import { signalBars, statusProvider } from "../../widgets/_providers/status";
 import { wifiProvider, type WifiNetwork } from "../../widgets/_providers/wifi";
-import { statusChanged } from "../index";
+import { statusChanged } from "../open";
 import "./wifi.css";
 
 const SCAN_EVERY_MS = 10_000;

@@ -6,7 +6,7 @@ import { CARD, STORE } from "../../core/names";
 import { usePicker } from "../../core/shell";
 import { validStartImage } from "../../core/startImage";
 import { invoke, listen } from "../../core/tauri";
-import { openPanel } from "../../panels";
+import { openPanel } from "../../panels/open";
 import type { TileProps } from "../../core/widget";
 import "./apps.css";
 

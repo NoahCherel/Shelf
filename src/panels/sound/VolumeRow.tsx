@@ -5,7 +5,7 @@ import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import { Slider } from "../../design/parts/Slider";
 import { audioProvider } from "../../widgets/_providers/audio";
-import { statusChanged } from "../index";
+import { statusChanged } from "../open";
 import "./sound.css";
 
 function Speaker({ muted, level }: { muted: boolean; level: number }) {
