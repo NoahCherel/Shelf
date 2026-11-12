@@ -1,7 +1,7 @@
 import { CARD } from "../core/names";
 import { invoke } from "../core/tauri";
 import { refresh } from "../core/provider";
-import { statusProvider } from "../widgets/_providers/status";
+import { statusProvider } from "../providers/status";
 
 export type PanelId = "sound" | "wifi" | "bluetooth" | "quick" | "search" | "notifications";
 

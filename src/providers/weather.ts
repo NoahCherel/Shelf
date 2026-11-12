@@ -1,7 +1,7 @@
-import { runNow } from "../../core/provider";
-import { useSettings } from "../../core/settings";
-import { useProvider } from "../../core/useProvider";
-import type { Provider, ProviderError } from "../../core/widget";
+import { runNow } from "../core/provider";
+import { useSettings } from "../core/settings";
+import { useProvider } from "../core/useProvider";
+import type { Provider, ProviderError } from "../core/widget";
 import { ensureOk, httpGet } from "./http";
 
 interface WeatherDay {

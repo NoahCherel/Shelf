@@ -1,8 +1,8 @@
 import { beforeEach, vi } from "vitest";
-import { invoke } from "../../core/tauri";
+import { invoke } from "../core/tauri";
 import { compactMoney, money, shortMoney, stripeProvider, summarize } from "./stripe";
 
-vi.mock("../../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+vi.mock("../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
 const mockInvoke = vi.mocked(invoke);
 const DAY = 86_400;

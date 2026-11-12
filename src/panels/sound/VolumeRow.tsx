@@ -4,7 +4,7 @@ import { refresh } from "../../core/provider";
 import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import { Slider } from "../../design/parts/Slider";
-import { audioProvider } from "../../widgets/_providers/audio";
+import { audioProvider } from "../../providers/audio";
 import { statusChanged } from "../open";
 import "./sound.css";
 

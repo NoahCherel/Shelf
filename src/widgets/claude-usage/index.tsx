@@ -1,7 +1,7 @@
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Bar } from "../../design/parts/Bar";
 import { Tile } from "../../design/parts/Tile";
-import { CLAUDE_SAMPLE, claudeProvider, durationText, type ClaudeData } from "../_providers/claude";
+import { CLAUDE_SAMPLE, claudeProvider, durationText, type ClaudeData } from "../../providers/claude";
 import { ClaudeCard, claudeMenu } from "../_shared/ClaudeCard";
 import { ClaudeLogo } from "../_shared/ClaudeLogo";
 import "./claude-usage.css";

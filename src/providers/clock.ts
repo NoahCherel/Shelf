@@ -1,4 +1,4 @@
-import type { Provider } from "../../core/widget";
+import type { Provider } from "../core/widget";
 
 const LOCALE = "en-GB";
 

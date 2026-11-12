@@ -1,5 +1,5 @@
-import { invoke } from "../../core/tauri";
-import type { Provider, ProviderError } from "../../core/widget";
+import { invoke } from "../core/tauri";
+import type { Provider, ProviderError } from "../core/widget";
 import { httpGet, type HttpRequest, type HttpResponse } from "./http";
 
 export const STRIPE_SECRET = "stripe";

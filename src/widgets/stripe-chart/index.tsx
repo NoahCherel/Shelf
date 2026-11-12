@@ -1,7 +1,7 @@
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Sparkline } from "../../design/parts/Sparkline";
 import { Tile } from "../../design/parts/Tile";
-import { compactMoney, STRIPE_SAMPLE, stripeProvider, type StripeData } from "../_providers/stripe";
+import { compactMoney, STRIPE_SAMPLE, stripeProvider, type StripeData } from "../../providers/stripe";
 import { StripeCard, StripeLogo, stripeMenu } from "../_shared/StripeCard";
 import "./stripe-chart.css";
 

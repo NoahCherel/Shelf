@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import usage from "./index";
 import plan from "../claude-plan-usage/index";
 import { invoke } from "../../core/tauri";
-import type { ClaudeData } from "../_providers/claude";
+import type { ClaudeData } from "../../providers/claude";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 

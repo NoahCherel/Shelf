@@ -5,7 +5,7 @@ import chart from "../stripe-chart/index";
 import github from "../github-activity/index";
 import { invoke } from "../../core/tauri";
 import { defaults, useSettings } from "../../core/settings";
-import type { StripeData } from "../_providers/stripe";
+import type { StripeData } from "../../providers/stripe";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 

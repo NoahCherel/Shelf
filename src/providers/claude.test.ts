@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, vi } from "vitest";
-import { invoke } from "../../core/tauri";
+import { invoke } from "../core/tauri";
 import { claudeProvider, durationText, pace, resetDayText, toWindow, WEEK_MS, SESSION_MS } from "./claude";
 
-vi.mock("../../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+vi.mock("../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
 const NOW = 1_000_000_000;
 

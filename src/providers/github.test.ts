@@ -1,9 +1,9 @@
 import { beforeEach, vi } from "vitest";
-import { invoke } from "../../core/tauri";
-import { defaults, useSettings } from "../../core/settings";
+import { invoke } from "../core/tauri";
+import { defaults, useSettings } from "../core/settings";
 import { contributionStats, fetchContributions, githubProvider, gridCells, parseContributions, GRID_DAYS } from "./github";
 
-vi.mock("../../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+vi.mock("../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
 const mockInvoke = vi.mocked(invoke);
 

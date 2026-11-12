@@ -1,7 +1,7 @@
 import { useSettings } from "../../core/settings";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
-import { clockProvider, dateParts, timeParts } from "../_providers/clock";
+import { clockProvider, dateParts, timeParts } from "../../providers/clock";
 import { DateCard } from "../_shared/DateCard";
 import "./clock.css";
 

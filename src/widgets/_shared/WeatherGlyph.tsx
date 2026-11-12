@@ -1,4 +1,4 @@
-import { weatherKind, type WeatherKind } from "../_providers/weather";
+import { weatherKind, type WeatherKind } from "../../providers/weather";
 
 const CLOUD = "M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.6 4.5 4.5 0 0 0 7 18.5Z";
 

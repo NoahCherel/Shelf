@@ -5,7 +5,7 @@ import { Card } from "../../design/parts/Card";
 import { ConnectCard } from "../../design/parts/ConnectCard";
 import { Row } from "../../design/parts/Row";
 import { Tile } from "../../design/parts/Tile";
-import { contributionStats, fetchContributions, githubProvider, gridCells, localDateKey, type GithubData } from "../_providers/github";
+import { contributionStats, fetchContributions, githubProvider, gridCells, localDateKey, type GithubData } from "../../providers/github";
 import "./github-activity.css";
 
 function GithubLogo() {

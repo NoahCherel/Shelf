@@ -1,8 +1,8 @@
 import { useSettings } from "../../core/settings";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
-import { dateParts, minuteProvider, timeParts } from "../_providers/clock";
-import { useWeather, type Weather } from "../_providers/weather";
+import { dateParts, minuteProvider, timeParts } from "../../providers/clock";
+import { useWeather, type Weather } from "../../providers/weather";
 import { DateCard } from "../_shared/DateCard";
 import { WeatherGlyph } from "../_shared/WeatherGlyph";
 import "./today.css";
