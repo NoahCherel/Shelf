@@ -2,7 +2,7 @@
 
 pub mod capture;
 
-use std::ffi::c_void;
+use crate::util::lock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -88,7 +88,7 @@ impl Backend for RealCapture {
         let notify = Box::new(move || {
             let _ = app.emit_to("dock", "glass-frame", ());
         });
-        let session = capture::start(HWND(hwnd.0 as *mut c_void), origin, notify).map_err(|e| e.to_string())?;
+        let session = capture::start(HWND(hwnd.0), origin, notify).map_err(|e| e.to_string())?;
         self.session = Some(session);
         Ok(())
     }
@@ -110,13 +110,13 @@ fn glass(app: &AppHandle) -> &'static Mutex<Glass<RealCapture>> {
 #[tauri::command(async)]
 pub fn glass_start(app: AppHandle) -> Result<(), String> {
     ACTIVE.store(true, Ordering::Relaxed);
-    glass(&app).lock().unwrap_or_else(|e| e.into_inner()).want(true)
+    lock(glass(&app)).want(true)
 }
 
 #[tauri::command(async)]
 pub fn glass_stop(app: AppHandle) -> Result<(), String> {
     ACTIVE.store(false, Ordering::Relaxed);
-    glass(&app).lock().unwrap_or_else(|e| e.into_inner()).want(false)
+    lock(glass(&app)).want(false)
 }
 
 /// Collects the newest frame; empty when there's none waiting.
@@ -126,16 +126,16 @@ pub fn glass_frame() -> Response {
 }
 
 pub fn shell_changed(app: &AppHandle, fullscreen: bool, locked: bool) {
-    glass(app).lock().unwrap_or_else(|e| e.into_inner()).shell(fullscreen, locked);
+    lock(glass(app)).shell(fullscreen, locked);
 }
 
 pub fn dock_hidden(app: &AppHandle, hidden: bool) {
-    glass(app).lock().unwrap_or_else(|e| e.into_inner()).hidden(hidden);
+    lock(glass(app)).hidden(hidden);
 }
 
 /// Monitors changed or the PC woke: the old session may be stale.
 pub fn restart(app: &AppHandle) {
-    glass(app).lock().unwrap_or_else(|e| e.into_inner()).restart();
+    lock(glass(app)).restart();
 }
 
 /// The dock moved or changed size.

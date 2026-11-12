@@ -1,7 +1,7 @@
 import { emit, invoke, listen } from "./tauri";
 import type { Provider, ProviderError, Status } from "./widget";
 
-export type { Provider, ProviderError, Status } from "./widget";
+export type { Provider } from "./widget";
 
 const MIN_RETRY_MS = 60_000;
 

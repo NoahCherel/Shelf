@@ -21,7 +21,8 @@ function ToggleRow({ row }: { row: Extract<RowDef, { kind: "toggle" }> }) {
     const flip = () => {
       const next = !external;
       setExternal(next);
-      source.write(next).then(() => source.read()).then((on) => setExternal(Boolean(on)), () => {});
+      // Read back either way: if the write was refused, the switch must not keep saying it worked.
+      source.write(next).catch(() => {}).then(() => source.read()).then((on) => setExternal(Boolean(on)), () => {});
     };
     return <Switch label={row.label} on={external} onFlip={flip} />;
   }

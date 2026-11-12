@@ -1,3 +1,4 @@
+import { STORE } from "./names";
 import { create } from "zustand";
 import { invoke, listen } from "./tauri";
 import { STYLES, type ClearMaterial, type StyleName } from "../design/theme";
@@ -42,10 +43,10 @@ export interface SettingsData {
   github: { user: string };
 }
 
-export const SIZE_MIN = 40;
-export const SIZE_MAX = 62;
-export const GAP_MAX = 24;
-export const SPACING_MAX = 24;
+const SIZE_MIN = 40;
+const SIZE_MAX = 62;
+const GAP_MAX = 24;
+const SPACING_MAX = 24;
 
 export function defaults(): SettingsData {
   return {
@@ -127,10 +128,10 @@ export const useSettings = create<Settings>((set, get) => ({
   ...defaults(),
   update(patch) {
     set(patch);
-    invoke("store_save", { name: "settings", value: { version: VERSION, ...dataOf(get()) } }).catch(() => {});
+    invoke("store_save", { name: STORE.settings, value: { version: VERSION, ...dataOf(get()) } }).catch(() => {});
   },
   async load() {
-    const saved = await invoke("store_load", { name: "settings" }).catch(() => null);
+    const saved = await invoke("store_load", { name: STORE.settings }).catch(() => null);
     set(sanitize(saved));
   },
 }));
@@ -139,6 +140,6 @@ export const useSettings = create<Settings>((set, get) => ({
 export async function syncSettings(): Promise<void> {
   await useSettings.getState().load();
   listen<string>("store-changed", (name) => {
-    if (name === "settings") useSettings.getState().load();
+    if (name === STORE.settings) useSettings.getState().load();
   });
 }

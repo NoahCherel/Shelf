@@ -66,10 +66,6 @@ pub fn recent() -> Vec<String> {
     recent_shortcuts(found).into_iter().map(|name| folder.join(name).to_string_lossy().into_owned()).collect()
 }
 
-pub fn file_name(path: &str) -> &str {
-    path.rsplit('\\').next().unwrap_or(path)
-}
-
 pub fn folder_of(path: &str) -> &str {
     path.rsplit_once('\\').map_or("", |(parent, _)| parent.rsplit('\\').next().unwrap_or(parent))
 }

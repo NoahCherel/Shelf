@@ -1,3 +1,4 @@
+import { CARD } from "../core/names";
 import type { FC } from "react";
 import { invoke } from "../core/tauri";
 import { refresh } from "../core/provider";
@@ -27,8 +28,8 @@ export const panels: Record<PanelId, PanelDef> = {
 
 const FIRST_HEIGHT = 300;
 
-export function panelCardId(id: PanelId): string {
-  return `__panel:${id}`;
+function panelCardId(id: PanelId): string {
+  return `${CARD.panel}${id}`;
 }
 
 /** Opens a panel centred over the thing that was clicked. */

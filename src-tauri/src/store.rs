@@ -5,6 +5,10 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
 
+/// The saved files Rust reads as well as the pages.
+pub const LAYOUT: &str = "layout";
+pub const SETTINGS: &str = "settings";
+
 pub fn app_dir() -> PathBuf {
     let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
     Path::new(&base).join(crate::preview::current().data_folder)

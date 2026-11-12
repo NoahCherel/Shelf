@@ -1,6 +1,7 @@
 //! Hides the Windows taskbar and guarantees it comes back. The original setting
 //! is saved to a file first, so it can be restored even after a crash.
 
+use crate::util::lock;
 use std::mem::size_of;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
@@ -27,6 +28,12 @@ pub trait TaskbarApi {
     fn show_windows(&self);
 }
 
+/// A panic on the main thread ends Shelf. One on any other thread only ends that command, and
+/// Shelf carries on with the taskbar still its to manage.
+pub fn panic_ends_shelf(thread: Option<&str>) -> bool {
+    thread == Some("main")
+}
+
 pub struct Taskbar<A> {
     api: A,
     state_file: PathBuf,
@@ -39,17 +46,20 @@ impl<A: TaskbarApi> Taskbar<A> {
     }
 
     pub fn mode(&self) -> Mode {
-        *self.mode.lock().unwrap_or_else(|e| e.into_inner())
+        *lock(&self.mode)
     }
 
     pub fn apply(&self, next: Mode) {
-        let mut mode = self.mode.lock().unwrap_or_else(|e| e.into_inner());
+        let mut mode = lock(&self.mode);
         // An existing file means a crashed run; what it holds is the real original.
         if !self.state_file.exists() {
             if let Some(dir) = self.state_file.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
-            let _ = std::fs::write(&self.state_file, if self.api.autohide() { "1" } else { "0" });
+            // Without this file a crash couldn't bring the taskbar back, so it isn't hidden at all.
+            if std::fs::write(&self.state_file, if self.api.autohide() { "1" } else { "0" }).is_err() {
+                return;
+            }
         }
         if !self.api.autohide() {
             self.api.set_autohide(true);
@@ -64,7 +74,7 @@ impl<A: TaskbarApi> Taskbar<A> {
     /// Explorer shows the taskbar again after an auto-hide change or its own
     /// restart, so this is called periodically rather than hiding it just once.
     pub fn keep(&self) {
-        let mode = self.mode.lock().unwrap_or_else(|e| e.into_inner());
+        let mode = lock(&self.mode);
         if *mode == Mode::Hidden {
             self.api.hide_windows();
         }
@@ -72,7 +82,7 @@ impl<A: TaskbarApi> Taskbar<A> {
 
     pub fn restore(&self) {
         // Held until the end so keep() can't undo this mid-restore.
-        let mut mode = self.mode.lock().unwrap_or_else(|e| e.into_inner());
+        let mut mode = lock(&self.mode);
         *mode = Mode::Off;
         // No state file means there is nothing to undo (e.g. a second restore after
         // the panic hook ran); don't guess and overwrite the user's auto-hide setting.
@@ -202,6 +212,24 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir.join("taskbar_state.txt")
+    }
+
+    #[test]
+    fn it_wont_hide_the_taskbar_if_it_cant_save_how_to_bring_it_back() {
+        let fake = Fake::default();
+        let blocker = state_path("unwritable");
+        std::fs::write(&blocker, "a file where a folder should be").unwrap();
+        let bar = Taskbar::new(fake.clone(), blocker.join("taskbar_state.txt"));
+        bar.apply(Mode::Hidden);
+        assert!(fake.calls.borrow().is_empty(), "{:?}", fake.calls.borrow());
+        assert_eq!(bar.mode(), Mode::Off);
+    }
+
+    #[test]
+    fn only_a_panic_that_ends_shelf_brings_the_taskbar_back() {
+        assert!(panic_ends_shelf(Some("main")));
+        assert!(!panic_ends_shelf(Some("tokio-runtime-worker")));
+        assert!(!panic_ends_shelf(None), "a command's own thread: Shelf carries on");
     }
 
     #[test]

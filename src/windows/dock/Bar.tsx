@@ -1,3 +1,4 @@
+import { CARD } from "../../core/names";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
@@ -295,7 +296,7 @@ function openMenu(e: MouseEvent<HTMLDivElement>) {
   e.preventDefault();
   const slot = (e.target as HTMLElement).closest<HTMLElement>("[data-widget-id]");
   invoke("open_card", {
-    widgetId: `__menu:${slot?.dataset.widgetId ?? ""}`,
+    widgetId: `${CARD.menu}${slot?.dataset.widgetId ?? ""}`,
     tileX: e.clientX,
     tileWidth: 0,
     width: MENU_WIDTH,

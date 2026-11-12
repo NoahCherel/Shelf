@@ -2,6 +2,7 @@
 //! opens that grid with Windows' own keys and moves it above the dock's chevron. Passing clicks on
 //! to other apps by hand can make them crash, and this never touches them.
 
+use crate::util::lock;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -111,7 +112,7 @@ fn watch_until_closed(bar: isize, previous: isize) {
         while grid().is_some() {
             std::thread::sleep(CLOSE_POLL);
         }
-        *CLOSED_AT.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+        *lock(&CLOSED_AT) = Some(Instant::now());
         // Windows hands focus to the taskbar a moment after the grid has gone.
         std::thread::sleep(CLOSE_POLL);
         if should_give_focus_back(foreground(), bar, previous) {
@@ -139,7 +140,7 @@ pub fn close_grid() {
 #[tauri::command(async)]
 pub fn tray_toggle(app: AppHandle, tile_x: f64, tile_width: f64) -> Result<(), String> {
     crate::preview::guard()?;
-    let since_closed = CLOSED_AT.lock().unwrap_or_else(|e| e.into_inner()).map(|at| at.elapsed().as_millis() as u64);
+    let since_closed = lock(&CLOSED_AT).map(|at| at.elapsed().as_millis() as u64);
     let open = grid();
     match next_step(open.is_some(), since_closed) {
         Step::Nothing => Ok(()),

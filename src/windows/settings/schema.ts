@@ -2,7 +2,7 @@ import { invoke } from "../../core/tauri";
 import { useSettings, type SettingsData } from "../../core/settings";
 
 /** A value kept outside the settings file, like Windows' own startup list. */
-export interface External<V> {
+interface External<V> {
   read: () => Promise<V>;
   write: (value: V) => Promise<unknown>;
 }
@@ -44,8 +44,8 @@ type Options<T> = Omit<T, "key" | "kind">;
 export const section = (title: string | undefined, rows: RowDef[]): SectionDef => ({ title, rows });
 export const toggle = (key: string, o: Options<Extract<RowDef, { kind: "toggle" }>>): RowDef => ({ kind: "toggle", key, ...o });
 export const slider = (key: string, o: Options<Extract<RowDef, { kind: "slider" }>>): RowDef => ({ kind: "slider", key, ...o });
-export const choice = (key: string, o: Options<Extract<RowDef, { kind: "choice" }>>): RowDef => ({ kind: "choice", key, ...o });
-export const text = (key: string, o: Options<Extract<RowDef, { kind: "text" }>>): RowDef => ({ kind: "text", key, ...o });
+const choice = (key: string, o: Options<Extract<RowDef, { kind: "choice" }>>): RowDef => ({ kind: "choice", key, ...o });
+const text = (key: string, o: Options<Extract<RowDef, { kind: "text" }>>): RowDef => ({ kind: "text", key, ...o });
 
 /** The Apple system palette (G-09). */
 export const ACCENTS = [

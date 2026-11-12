@@ -1,5 +1,6 @@
 //! The Wi-Fi card's list and connections. The Windows calls sit behind `Wlan`, so tests never touch the adapter.
 
+use crate::util::lock;
 use std::ffi::c_void;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
@@ -23,6 +24,7 @@ use windows::Win32::NetworkManagement::WiFi::{
 const ACCESS_DENIED: u32 = 5;
 const WAIT_FOR_RESULT: Duration = Duration::from_secs(20);
 const TIMED_OUT: u32 = u32::MAX;
+#[cfg(test)]
 const KEY_MISMATCH: u32 = WLAN_REASON_CODE_KEY_MISMATCH;
 /// Long enough to reopen the card and see how it went, short enough not to linger tomorrow.
 const ATTEMPT_LIFE_MS: u64 = 120_000;
@@ -212,20 +214,21 @@ impl Default for Attempts {
 
 impl Attempts {
     fn current(&self, now: u64) -> Option<Attempt> {
-        let held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let held = lock(&self.0);
         held.as_ref().filter(|(_, at)| now.saturating_sub(*at) < ATTEMPT_LIFE_MS).map(|(attempt, _)| attempt.clone())
     }
 
     fn begin(&self, id: &str, now: u64) -> Result<(), String> {
-        if self.current(now).is_some_and(|a| a.state == "connecting") {
+        let mut held = lock(&self.0);
+        if held.as_ref().is_some_and(|(attempt, at)| now.saturating_sub(*at) < ATTEMPT_LIFE_MS && attempt.state == "connecting") {
             return Err("Still connecting to another network.".into());
         }
-        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some((Attempt { id: id.to_string(), state: "connecting", error: None }, now));
+        *held = Some((Attempt { id: id.to_string(), state: "connecting", error: None }, now));
         Ok(())
     }
 
     fn finish(&self, result: Result<(), String>, now: u64) {
-        let mut held = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut held = lock(&self.0);
         match result {
             Ok(()) => *held = None,
             Err(error) => {
@@ -239,7 +242,7 @@ impl Attempts {
     }
 
     fn clear(&self) {
-        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *lock(&self.0) = None;
     }
 }
 
@@ -655,6 +658,26 @@ mod tests {
         assert!(connect_network(&wlan, &network_id(b"New"), Some("goodpassword".into())).is_err());
         assert!(wlan.connected.borrow().is_empty());
         assert!(wlan.deleted.borrow().is_empty());
+    }
+
+    #[test]
+    fn only_one_connection_can_start_at_a_time() {
+        for _ in 0..200 {
+            let attempts = Attempts::default();
+            let started = std::sync::atomic::AtomicUsize::new(0);
+            let gate = std::sync::Barrier::new(8);
+            std::thread::scope(|scope| {
+                for _ in 0..8 {
+                    scope.spawn(|| {
+                        gate.wait();
+                        if attempts.begin("AA", 0).is_ok() {
+                            started.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        }
+                    });
+                }
+            });
+            assert_eq!(started.into_inner(), 1);
+        }
     }
 
     #[test]

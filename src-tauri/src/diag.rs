@@ -31,7 +31,11 @@ fn program_in_front() -> String {
         return format!("shelf {}", label.unwrap_or_else(|| "(not a window of its own)".into()));
     }
     let exe = crate::apps::exe_of_pid(pid);
-    exe.rsplit(['\\', '/']).next().unwrap_or(&exe).to_string()
+    crate::util::file_name(&exe).to_string()
+}
+
+pub fn enabled() -> bool {
+    *ON
 }
 
 /// Notes one thing Shelf did. Cheap and silent when off.

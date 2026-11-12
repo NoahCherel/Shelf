@@ -1,5 +1,6 @@
 //! Open top-level windows, the same set the taskbar would show.
 
+use crate::util::lock;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::mem::size_of;
@@ -39,7 +40,20 @@ static HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static START_OPEN: AtomicBool = AtomicBool::new(false);
 static START_CLOSED: Mutex<Option<Instant>> = Mutex::new(None);
 /// A window's program and app id don't change, and reading them isn't free.
-static KNOWN: Mutex<Option<HashMap<isize, (String, Option<String>, Option<String>)>>> = Mutex::new(None);
+static KNOWN: Mutex<Option<HashMap<isize, Known>>> = Mutex::new(None);
+
+#[derive(Clone)]
+struct Known {
+    pid: u32,
+    exe: String,
+    id: Option<String>,
+    description: Option<String>,
+}
+
+/// What's known about a window, unless its number has since gone to another process's window.
+fn remembered(known: &HashMap<isize, Known>, raw: isize, pid: u32) -> Option<&Known> {
+    known.get(&raw).filter(|k| k.pid == pid)
+}
 
 fn hwnd(raw: isize) -> HWND {
     HWND(raw as *mut c_void)
@@ -77,7 +91,7 @@ unsafe extern "system" fn on_foreground(
     let start = !h.is_invalid() && is_start_host(&exe_path(window_pid(h)));
     let was_open = START_OPEN.swap(start, Ordering::Relaxed);
     if was_open && !start {
-        *START_CLOSED.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+        *lock(&START_CLOSED) = Some(Instant::now());
     }
     if let Some(app) = HANDLE.get() {
         if was_open != start {
@@ -212,7 +226,7 @@ pub fn list() -> Vec<RawWindow> {
     unsafe {
         let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut Vec<HWND> as isize));
     }
-    let mut guard = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = lock(&KNOWN);
     let old = guard.take().unwrap_or_default();
     let mut known = HashMap::new();
     let out = handles
@@ -220,13 +234,14 @@ pub fn list() -> Vec<RawWindow> {
         .filter(|h| is_app_window(*h))
         .map(|h| {
             let raw = h.0 as isize;
-            let (exe, id, description) = old.get(&raw).cloned().unwrap_or_else(|| {
-                let exe = exe_path(window_pid(h));
+            let pid = window_pid(h);
+            let info = remembered(&old, raw, pid).cloned().unwrap_or_else(|| {
+                let exe = exe_path(pid);
                 let description = useful_description(file_description(&exe));
-                (exe, app_id(h), description)
+                Known { pid, exe, id: app_id(h), description }
             });
-            known.insert(raw, (exe.clone(), id.clone(), description.clone()));
-            RawWindow { description, hwnd: raw, title: window_title(h), exe, app_id: id }
+            known.insert(raw, info.clone());
+            RawWindow { description: info.description, hwnd: raw, title: window_title(h), exe: info.exe, app_id: info.id }
         })
         .collect();
     *guard = Some(known);
@@ -266,7 +281,7 @@ pub fn start_is_open() -> bool {
 }
 
 pub fn ms_since_start_closed() -> Option<u64> {
-    START_CLOSED.lock().unwrap_or_else(|e| e.into_inner()).map(|at| at.elapsed().as_millis() as u64)
+    lock(&START_CLOSED).map(|at| at.elapsed().as_millis() as u64)
 }
 
 pub fn focus(raw: isize) {
@@ -306,4 +321,18 @@ pub fn minimize(raw: isize) {
         let _ = ShowWindow(hwnd(raw), SW_MINIMIZE);
     }
     LAST_FOREGROUND.store(0, Ordering::Relaxed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_window_number_used_again_by_another_process_is_a_new_window() {
+        let mut known = HashMap::new();
+        known.insert(5isize, Known { pid: 10, exe: "a.exe".into(), id: None, description: None });
+        assert_eq!(remembered(&known, 5, 10).map(|k| k.exe.as_str()), Some("a.exe"));
+        assert!(remembered(&known, 5, 11).is_none());
+        assert!(remembered(&known, 6, 10).is_none());
+    }
 }

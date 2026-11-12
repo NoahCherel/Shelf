@@ -50,7 +50,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   return shader;
 }
 
-export function createPainter(canvas: HTMLCanvasElement): Painter | null {
+function createPainter(canvas: HTMLCanvasElement): Painter | null {
   const gl = canvas.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false });
   if (!gl) return null;
   const program = gl.createProgram()!;

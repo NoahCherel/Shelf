@@ -75,10 +75,14 @@ pub fn restore_taskbar(restore: impl FnOnce()) {
 }
 
 /// Pictures should show what the owner sees. Keys and cached account data stay behind.
-fn seed(real: &Path, copy: &Path) {
+fn seed(real: &Path, copy: &Path, clean: bool) {
     let _ = std::fs::create_dir_all(copy);
     for name in ["layout.json", "settings.json"] {
-        let _ = std::fs::copy(real.join(name), copy.join(name));
+        if clean {
+            let _ = std::fs::remove_file(copy.join(name));
+        } else {
+            let _ = std::fs::copy(real.join(name), copy.join(name));
+        }
     }
 }
 
@@ -88,7 +92,9 @@ pub fn turn_on() {
     let settings = current();
     if let Ok(appdata) = std::env::var("APPDATA") {
         let appdata = Path::new(&appdata);
-        seed(&appdata.join("Shelf").join("data"), &appdata.join(settings.data_folder).join("data"));
+        // The end-to-end checks need the default layout, and this way they leave the owner's Shelf running.
+        let clean = std::env::var_os("SHELF_PREVIEW_CLEAN").is_some();
+        seed(&appdata.join("Shelf").join("data"), &appdata.join(settings.data_folder).join("data"), clean);
     }
     // WebView2 refuses a second instance on one folder with different arguments, like a debug port.
     if let (Some(folder), Ok(local)) = (settings.webview_folder, std::env::var("LOCALAPPDATA")) {
@@ -158,7 +164,7 @@ mod tests {
         std::fs::write(real.join("layout.json"), "L").unwrap();
         std::fs::write(real.join("settings.json"), "S").unwrap();
         std::fs::write(real.join("cache-stripe.json"), "secret-ish").unwrap();
-        seed(&real, &copy);
+        seed(&real, &copy, false);
         assert_eq!(std::fs::read_to_string(copy.join("layout.json")).unwrap(), "L");
         assert_eq!(std::fs::read_to_string(copy.join("settings.json")).unwrap(), "S");
         assert!(!copy.join("cache-stripe.json").exists(), "only those two");
@@ -166,7 +172,19 @@ mod tests {
 
     #[test]
     fn seeding_with_nothing_saved_is_fine() {
-        seed(&temp_dir("none"), &temp_dir("none-copy"));
+        seed(&temp_dir("none"), &temp_dir("none-copy"), false);
+    }
+
+    #[test]
+    fn a_clean_preview_starts_from_the_defaults_and_leaves_the_real_data_alone() {
+        let (real, copy) = (temp_dir("clean-real"), temp_dir("clean-copy"));
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::create_dir_all(&copy).unwrap();
+        std::fs::write(real.join("layout.json"), "real").unwrap();
+        std::fs::write(copy.join("layout.json"), "old").unwrap();
+        seed(&real, &copy, true);
+        assert!(!copy.join("layout.json").exists());
+        assert_eq!(std::fs::read_to_string(real.join("layout.json")).unwrap(), "real");
     }
 
     /// One guard per command that changes the machine, read from the source so a new

@@ -1,7 +1,7 @@
 //! The dock window: where it sits, and how it reacts to the shell. Decisions live
 //! in `react`, which is pure; `run_action` is the only part that touches Windows.
 
-use std::ffi::c_void;
+use crate::util::lock;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Mutex, OnceLock};
@@ -242,7 +242,7 @@ static EVENTS: OnceLock<Sender<ShellEvent>> = OnceLock::new();
 static TASKBAR_CREATED: OnceLock<u32> = OnceLock::new();
 
 fn layout() -> DockLayout {
-    *LAYOUT.lock().unwrap_or_else(|e| e.into_inner())
+    *lock(&LAYOUT)
 }
 
 fn monitor_rect(dock: &WebviewWindow) -> Option<(Rect, f64)> {
@@ -253,7 +253,7 @@ fn monitor_rect(dock: &WebviewWindow) -> Option<(Rect, f64)> {
 
 fn place(dock: &WebviewWindow) {
     let Some((monitor, scale)) = monitor_rect(dock) else { return };
-    *MONITOR.lock().unwrap_or_else(|e| e.into_inner()) = Some((monitor, scale));
+    *lock(&MONITOR) = Some((monitor, scale));
     let l = layout();
     let r = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along);
     let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
@@ -336,7 +336,7 @@ fn watch(app: AppHandle, rx: std::sync::mpsc::Receiver<ShellEvent>) {
 /// Moves the window between its place and just past the edge, then hides it or settles it.
 fn run_slide(app: &AppHandle, slide: Slide) {
     let Some(dock) = app.get_webview_window("dock") else { return };
-    let Some((monitor, scale)) = *MONITOR.lock().unwrap_or_else(|e| e.into_inner()) else { return };
+    let Some((monitor, scale)) = *lock(&MONITOR) else { return };
     let mine = SLIDES.fetch_add(1, Ordering::SeqCst) + 1;
     AWAY.store(true, Ordering::Relaxed);
     let l = layout();
@@ -373,7 +373,7 @@ fn run_slide(app: &AppHandle, slide: Slide) {
 fn seen_now(app: &AppHandle) -> Option<Seen> {
     use windows::Win32::Foundation::POINT;
     use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
-    let (monitor, scale) = (*MONITOR.lock().unwrap_or_else(|e| e.into_inner()))?;
+    let (monitor, scale) = (*lock(&MONITOR))?;
     let l = layout();
     let rest = dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along);
     let mut p = POINT::default();
@@ -418,14 +418,14 @@ fn watch_pointer(app: AppHandle, tx: Sender<ShellEvent>) {
 
 fn apply_taskbar() {
     if crate::preview::current().touch_taskbar {
-        let chosen = *CHOSEN_TASKBAR.lock().unwrap_or_else(|e| e.into_inner());
+        let chosen = *lock(&CHOSEN_TASKBAR);
         TASKBAR.apply(taskbar_mode_for(chosen, AUTO_HIDE.load(Ordering::Relaxed)));
     }
 }
 
 /// The taskbar setting, from Settings. Auto-hide may still keep it hidden.
 pub fn choose_taskbar_mode(mode: Mode) {
-    *CHOSEN_TASKBAR.lock().unwrap_or_else(|e| e.into_inner()) = mode;
+    *lock(&CHOSEN_TASKBAR) = mode;
     apply_taskbar();
 }
 
@@ -480,13 +480,13 @@ fn saved_layout(settings: Option<&serde_json::Value>) -> DockLayout {
 /// Hides the taskbar, reserves the edge and shows the dock. Runs on the main thread.
 pub fn start(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let settings = crate::store::load("settings");
+    let settings = crate::store::load(crate::store::SETTINGS);
     let (auto_hide, show_on_desktop) = saved_behaviour(settings.as_ref());
     AUTO_HIDE.store(auto_hide, Ordering::Relaxed);
     SHOW_ON_DESKTOP.store(show_on_desktop, Ordering::Relaxed);
-    *CHOSEN_TASKBAR.lock().unwrap_or_else(|e| e.into_inner()) = saved_taskbar_mode(settings.as_ref());
+    *lock(&CHOSEN_TASKBAR) = saved_taskbar_mode(settings.as_ref());
     apply_taskbar();
-    *LAYOUT.lock().unwrap_or_else(|e| e.into_inner()) = saved_layout(settings.as_ref());
+    *lock(&LAYOUT) = saved_layout(settings.as_ref());
 
     let hwnd = dock.hwnd()?;
     DOCK_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
@@ -496,10 +496,10 @@ pub fn start(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let _ = TASKBAR_CREATED.set(unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) });
     unsafe {
         // Clicking the dock mustn't take focus from your app, as with the real taskbar.
-        let style = GetWindowLongPtrW(HWND(hwnd.0 as *mut c_void), GWL_EXSTYLE);
-        SetWindowLongPtrW(HWND(hwnd.0 as *mut c_void), GWL_EXSTYLE, style | WS_EX_NOACTIVATE.0 as isize);
-        let _ = SetWindowSubclass(HWND(hwnd.0 as *mut c_void), Some(on_message), 1, 0);
-        let _ = WTSRegisterSessionNotification(HWND(hwnd.0 as *mut c_void), NOTIFY_FOR_THIS_SESSION);
+        let style = GetWindowLongPtrW(HWND(hwnd.0), GWL_EXSTYLE);
+        SetWindowLongPtrW(HWND(hwnd.0), GWL_EXSTYLE, style | WS_EX_NOACTIVATE.0 as isize);
+        let _ = SetWindowSubclass(HWND(hwnd.0), Some(on_message), 1, 0);
+        let _ = WTSRegisterSessionNotification(HWND(hwnd.0), NOTIFY_FOR_THIS_SESSION);
     }
 
     register_appbar(&dock);
@@ -540,7 +540,7 @@ pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: boo
     let edge = Edge::from_name(Some(&edge));
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let edge_changed = {
-        let mut current = LAYOUT.lock().unwrap_or_else(|e| e.into_inner());
+        let mut current = lock(&LAYOUT);
         let changed = current.bar != bar || current.gap != gap || current.float != float || current.edge != edge;
         *current = DockLayout { width, bar, gap, float, edge, along };
         changed

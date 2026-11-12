@@ -45,13 +45,14 @@ pub struct AppMenu {
 
 const JUMP: &str = "jump:";
 
+/// The id of a jump list's line, which is all the page ever sends back.
+pub fn jump_id(link: &Link) -> String {
+    format!("{JUMP}{}", fingerprint(link))
+}
+
 /// A choice from a jump list is a fingerprint and nothing else: anything else is refused.
 pub fn jump_from(id: &str) -> Option<&str> {
     id.strip_prefix(JUMP).filter(|print| print.len() == 16 && print.bytes().all(|b| b.is_ascii_hexdigit()))
-}
-
-fn file_name(path: &str) -> &str {
-    path.rsplit(['\\', '/']).next().unwrap_or(path)
 }
 
 /// In Windows' order: the app, its pin, then closing what's open.
@@ -78,7 +79,7 @@ pub fn items_for(entry: &AppEntry) -> Vec<Own> {
 /// Windows' own words, so the menu reads as it would on the taskbar. `lang` is a Windows language id.
 /// Open is labelled with the app's name instead.
 pub fn label(item: Own, lang: u16) -> &'static str {
-    let french = lang & 0x3FF == 0x0C;
+    let french = crate::util::is_french(lang);
     match (item, french) {
         (Own::Open, _) => "",
         (Own::Pin, true) => "Épingler à la barre des tâches",
@@ -126,7 +127,7 @@ pub fn menu_for(entry: &AppEntry, lang: u16, lists: Vec<(String, Vec<Link>)>) ->
                 title,
                 items: links
                     .iter()
-                    .map(|l| Row { id: format!("{JUMP}{}", fingerprint(l)), label: l.title.clone(), detail: Some(l.detail.clone()).filter(|d| !d.is_empty()) })
+                    .map(|l| Row { id: jump_id(l), label: l.title.clone(), detail: Some(l.detail.clone()).filter(|d| !d.is_empty()) })
                     .collect(),
             })
             .collect(),
@@ -139,7 +140,7 @@ pub fn menu_for(entry: &AppEntry, lang: u16, lists: Vec<(String, Vec<Link>)>) ->
 
 /// The bubble above the dock during a drag, in Windows' language. Only these, whatever the page asks.
 pub fn hint_text(what: &str, lang: u16, name: &str) -> Option<String> {
-    let french = lang & 0x3FF == 0x0C;
+    let french = crate::util::is_french(lang);
     match (what, french) {
         ("add", true) => Some("Ajouter au dock".to_string()),
         ("add", false) => Some("Add to dock".to_string()),
@@ -155,7 +156,7 @@ pub fn should_press_start(open_now: bool, since_closed_ms: Option<u64>) -> bool 
 }
 
 pub fn is_start_host(exe: &str) -> bool {
-    let name = file_name(exe);
+    let name = crate::util::file_name(exe);
     name.eq_ignore_ascii_case("SearchHost.exe") || name.eq_ignore_ascii_case("StartMenuExperienceHost.exe")
 }
 

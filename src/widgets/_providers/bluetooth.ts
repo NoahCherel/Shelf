@@ -2,7 +2,7 @@ import { invoke } from "../../core/tauri";
 import type { Provider } from "../../core/widget";
 import type { RadioInfo } from "./quick";
 
-export interface BluetoothDevice {
+interface BluetoothDevice {
   id: string;
   name: string;
   connected: boolean;

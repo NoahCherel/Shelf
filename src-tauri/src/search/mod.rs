@@ -4,6 +4,7 @@
 mod apps;
 mod files;
 
+use crate::util::lock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
@@ -13,7 +14,8 @@ use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-use crate::apps::{icon_of_exe, on_com_thread};
+use crate::apps::icon_of_exe;
+use crate::util::on_com_thread;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct SearchItem {
@@ -69,7 +71,7 @@ fn web_url(query: &str) -> String {
 
 fn read_apps() -> Result<Vec<SearchItem>, String> {
     let found = on_com_thread(apps::list)??;
-    let mut known = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut known = lock(&KNOWN);
     let items: Vec<SearchItem> = found
         .into_iter()
         .map(|(name, parsing)| {
@@ -78,13 +80,13 @@ fn read_apps() -> Result<Vec<SearchItem>, String> {
             item
         })
         .collect();
-    *APPS.lock().unwrap_or_else(|e| e.into_inner()) = Some(items.clone());
+    *lock(&APPS) = Some(items.clone());
     Ok(items)
 }
 
 /// An app's name from the list: None until the list is known, then None inside if it isn't on it.
 pub fn listed_name(parsing: &str) -> Option<Option<String>> {
-    let apps = APPS.lock().unwrap_or_else(|e| e.into_inner());
+    let apps = lock(&APPS);
     let list = apps.as_ref().filter(|l| !l.is_empty())?;
     let id = format!("app:{parsing}");
     Some(list.iter().find(|a| a.id.eq_ignore_ascii_case(&id)).map(|a| a.name.clone()))
@@ -104,7 +106,7 @@ pub fn refresh_apps() {
 /// What's known at once, with a fresh list on its way for next time.
 #[tauri::command(async)]
 pub fn search_apps() -> Result<Vec<SearchItem>, String> {
-    let cached = APPS.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let cached = lock(&APPS).clone();
     match cached {
         Some(items) => {
             refresh_apps();
@@ -118,13 +120,13 @@ pub fn search_apps() -> Result<Vec<SearchItem>, String> {
 pub fn search_files(query: String, ticket: u64) -> Result<Vec<SearchItem>, String> {
     TICKETS.issue(ticket);
     let found = on_com_thread(move || files::find(&query, || TICKETS.is_current(ticket)))??;
-    let mut known = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut known = lock(&KNOWN);
     Ok(found
         .into_iter()
         .map(|path| {
             let item = SearchItem {
                 id: format!("file:{path}"),
-                name: files::file_name(&path).to_string(),
+                name: crate::util::file_name(&path).to_string(),
                 kind: "file",
                 detail: Some(files::folder_of(&path).to_string()),
             };
@@ -137,11 +139,11 @@ pub fn search_files(query: String, ticket: u64) -> Result<Vec<SearchItem>, Strin
 /// Nothing is stored for this: it's Windows' own list of what was opened.
 #[tauri::command(async)]
 pub fn search_recent_files() -> Vec<SearchItem> {
-    let mut known = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    let mut known = lock(&KNOWN);
     files::recent()
         .into_iter()
         .map(|path| {
-            let item = SearchItem { id: format!("file:{path}"), name: files::recent_name(files::file_name(&path)).to_string(), kind: "file", detail: None };
+            let item = SearchItem { id: format!("file:{path}"), name: files::recent_name(crate::util::file_name(&path)).to_string(), kind: "file", detail: None };
             known.remember(&item, &path);
             item
         })
@@ -151,7 +153,7 @@ pub fn search_recent_files() -> Vec<SearchItem> {
 #[tauri::command(async)]
 pub fn search_forget_file(id: String) -> Result<(), String> {
     crate::preview::guard()?;
-    let target = KNOWN.lock().unwrap_or_else(|e| e.into_inner()).target(&id).ok_or("unknown item")?;
+    let target = lock(&KNOWN).target(&id).ok_or("unknown item")?;
     files::forget(&target)
 }
 
@@ -164,7 +166,7 @@ fn shell_open(target: &str) {
 #[tauri::command(async)]
 pub fn search_open(id: String) -> Result<(), String> {
     crate::preview::guard()?;
-    let target = KNOWN.lock().unwrap_or_else(|e| e.into_inner()).target(&id).ok_or("unknown item")?;
+    let target = lock(&KNOWN).target(&id).ok_or("unknown item")?;
     shell_open(&target);
     Ok(())
 }
@@ -178,7 +180,7 @@ pub fn search_web(query: String) -> Result<(), String> {
 
 #[tauri::command(async)]
 pub fn search_icon(id: String) -> Option<String> {
-    let target = KNOWN.lock().unwrap_or_else(|e| e.into_inner()).target(&id)?;
+    let target = lock(&KNOWN).target(&id)?;
     icon_of_exe(target).ok().flatten()
 }
 

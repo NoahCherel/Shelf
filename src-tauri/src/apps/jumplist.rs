@@ -77,7 +77,7 @@ pub fn find<'a>(links: &'a [Link], print: &str) -> Option<&'a Link> {
 
 /// Windows' own words for each section, so the menu reads as it does on the taskbar.
 pub fn section_title(kind: Kind, lang: u16) -> &'static str {
-    let french = lang & 0x3FF == 0x0C;
+    let french = crate::util::is_french(lang);
     match (kind, french) {
         (Kind::Tasks, true) => "Tâches",
         (Kind::Tasks, false) => "Tasks",
@@ -96,9 +96,9 @@ pub fn mentions(bytes: &[u8], exe: &str) -> bool {
     if wanted.is_empty() {
         return false;
     }
-    let text: Vec<u16> = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
+    let text: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
     // Links can sit at an odd offset, so the other alignment is searched too.
-    let odd: Vec<u16> = bytes.get(1..).unwrap_or(&[]).chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
+    let odd: Vec<u16> = bytes.get(1..).unwrap_or(&[]).as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).map(|u| char::from_u32(u as u32).map_or(u, |c| c.to_lowercase().next().unwrap_or(c) as u16)).collect();
     [text, odd].iter().any(|t| t.windows(wanted.len()).any(|w| w == wanted.as_slice()))
 }
 
@@ -132,7 +132,7 @@ pub fn categories(bytes: &[u8], read: impl Fn(&[u8]) -> Option<(Option<Link>, us
                 let Some(len) = bytes.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize) else { break };
                 at += 2;
                 let Some(raw) = bytes.get(at..at + len * 2) else { break };
-                let name = String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
+                let name = String::from_utf16_lossy(&raw.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
                 at += len * 2;
                 let Some(n) = u32_at(bytes, at) else { break };
                 at += 4;
@@ -231,11 +231,11 @@ pub fn dest_list(bytes: &[u8]) -> Vec<Recent> {
         let Some(pin) = bytes.get(at + pin_at..at + pin_at + 4).map(|b| i32::from_le_bytes(b.try_into().unwrap())) else { break };
         let Some(len) = bytes.get(at + len_at..at + len_at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize) else { break };
         let Some(raw) = bytes.get(at + len_at + 2..at + len_at + 2 + len * 2) else { break };
-        let path = String::from_utf16_lossy(&raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
+        let path = String::from_utf16_lossy(&raw.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<_>>());
         out.push(Recent { path, when, pinned: pin >= 0 });
         at += len_at + 2 + len * 2 + 4;
     }
-    out.sort_by(|a, b| b.when.cmp(&a.when));
+    out.sort_by_key(|r| std::cmp::Reverse(r.when));
     out
 }
 
@@ -244,7 +244,7 @@ pub fn name_of(path: &str) -> &str {
     if path.starts_with("http://") || path.starts_with("https://") {
         return path;
     }
-    path.rsplit(['\\', '/']).next().unwrap_or(path)
+    crate::util::file_name(path)
 }
 
 fn recent_folder() -> PathBuf {
@@ -406,7 +406,7 @@ mod native {
 
     /// The DestList stream of an automatic jump list file. Explorer keeps the file open, so a copy is read.
     pub fn dest_list_of(file: &std::path::Path) -> Option<Vec<u8>> {
-        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", super::super::history::unique()));
+        let copy = std::env::temp_dir().join(format!("shelf-jumplist-{}.tmp", crate::util::unique_temp_name()));
         std::fs::copy(file, &copy).ok()?;
         let read = || unsafe {
             let storage: IStorage = StgOpenStorage(&HSTRING::from(copy.as_os_str()), None, STGM_READ | STGM_SHARE_EXCLUSIVE, None, 0).ok()?;

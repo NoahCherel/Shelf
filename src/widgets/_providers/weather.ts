@@ -4,7 +4,7 @@ import { useProvider } from "../../core/useProvider";
 import type { Provider, ProviderError } from "../../core/widget";
 import { ensureOk, httpGet } from "./http";
 
-export interface WeatherDay {
+interface WeatherDay {
   date: string;
   code: number;
   max: number;

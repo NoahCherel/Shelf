@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { setDockIds } from "./dockIds";
+import { STORE } from "./names";
 import { invoke, listen } from "./tauri";
 import { isPinId } from "./pinWidget";
 import { widgets } from "./registry";
@@ -35,7 +36,7 @@ function knownPositions(raw: unknown, ids: string[]): Record<string, number> {
 }
 
 function save(ids: string[], positions: Record<string, number>) {
-  invoke("store_save", { name: "layout", value: { version: VERSION, ids, positions } }).catch(() => {});
+  invoke("store_save", { name: STORE.layout, value: { version: VERSION, ids, positions } }).catch(() => {});
 }
 
 export const useLayout = create<Layout>((set, get) => {
@@ -65,7 +66,7 @@ export const useLayout = create<Layout>((set, get) => {
       change(known(order), { ...get().positions, [id]: Math.min(1, Math.max(0, at)) });
     },
     async load() {
-      const saved = (await invoke("store_load", { name: "layout" }).catch(() => null)) as { ids?: unknown; version?: number; positions?: unknown } | null;
+      const saved = (await invoke("store_load", { name: STORE.layout }).catch(() => null)) as { ids?: unknown; version?: number; positions?: unknown } | null;
       // A missing or broken file gets the default; ids that no longer exist just drop out.
       if (!Array.isArray(saved?.ids)) {
         set({ ids: known(DEFAULT_LAYOUT), positions: {} });
@@ -84,6 +85,6 @@ useLayout.subscribe((layout) => setDockIds(layout.ids));
 export function syncLayout(): void {
   useLayout.getState().load();
   listen<string>("store-changed", (name) => {
-    if (name === "layout") useLayout.getState().load();
+    if (name === STORE.layout) useLayout.getState().load();
   });
 }

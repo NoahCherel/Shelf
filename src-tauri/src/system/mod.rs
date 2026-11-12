@@ -11,6 +11,7 @@ pub mod toggles;
 pub mod tray;
 pub mod wifi;
 
+use crate::util::lock;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -60,9 +61,14 @@ fn battery() -> Option<Battery> {
     Some(Battery { percent: s.BatteryLifePercent, charging: s.ACLineStatus == 1 })
 }
 
+/// A 0 to 1 volume as a whole percentage.
+fn percent(scalar: f32) -> u32 {
+    (scalar.clamp(0.0, 1.0) * 100.0).round() as u32
+}
+
 #[tauri::command(async)]
 pub fn system_stats(monitor: State<'_, Mutex<SysMonitor>>) -> SysStats {
-    let mut monitor = monitor.lock().unwrap();
+    let mut monitor = lock(&monitor);
     // CPU usage is measured between two refreshes, so back-to-back calls
     // from several windows would report garbage like 100%.
     if monitor.cpu_refreshed.elapsed() >= CPU_REFRESH_INTERVAL {

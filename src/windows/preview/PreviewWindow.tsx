@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { invoke, listen } from "../../core/tauri";
 import "./preview.css";
 
-export interface ShownWindow {
+interface ShownWindow {
   hwnd: number;
   title: string;
   minimized: boolean;

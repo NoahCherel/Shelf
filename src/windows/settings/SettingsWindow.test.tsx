@@ -24,6 +24,19 @@ beforeEach(() => {
   useSettings.setState({ ...defaults() });
 });
 
+it("a switch Windows refuses goes back to what Windows says", async () => {
+  mockInvoke.mockImplementation(async (cmd) => {
+    if (cmd === "autostart_set") throw new Error("refused");
+    return false;
+  });
+  const row = toggle("launchAtStartup", { label: "Launch", tip: "x", external: { read: () => invoke<boolean>("autostart_get"), write: (on) => invoke("autostart_set", { on }) } });
+  render(<Section section={section(undefined, [row])} />);
+  await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("autostart_get"));
+  fireEvent.click(screen.getByRole("switch", { name: "Launch" }));
+  await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("autostart_set", { on: true }));
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Launch" }).getAttribute("aria-checked")).toBe("false"));
+});
+
 it("has the Mac-style sidebar sections", () => {
   render(<SettingsWindow />);
   for (const name of ["Appearance", "Dock", "General", "About"]) expect(screen.getByRole("button", { name })).toBeTruthy();
