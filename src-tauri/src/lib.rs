@@ -62,6 +62,16 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 }
 
 /// Starts the companion that restores the taskbar if this process is killed.
+/// Something open that the dock stays up for while auto-hide is on.
+fn keeps_dock_up(app: &AppHandle) -> bool {
+    shell::card::is_open()
+        || apps::previews::is_showing()
+        || system::tray::grid_open()
+        || apps::start_is_open()
+        || app.get_webview_window("picker").is_some()
+        || app.get_webview_window("settings").is_some()
+}
+
 fn spawn_taskbar_watch() {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -245,7 +255,7 @@ pub fn run() {
             diag::remember(app.handle());
             search::refresh_apps();
             apps::previews::prepare(app.handle())?;
-            shell::dock::start(app.handle())?;
+            shell::dock::start(app.handle(), keeps_dock_up)?;
             apps::watch_foreground(app.handle());
             build_tray(app.handle())?;
             shell::listen_for_quit(app.handle().clone());
