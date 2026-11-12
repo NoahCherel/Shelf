@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppEntry } from "../widgets/apps/Tile";
+import type { AppEntry } from "../widgets/apps/entry";
 import { useLayout } from "./layout";
 import { parsePin, type Pinned } from "./pinId";
 import { invoke } from "./tauri";

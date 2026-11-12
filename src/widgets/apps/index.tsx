@@ -1,6 +1,7 @@
 import { invoke } from "../../core/tauri";
 import { defineWidget } from "../../core/widget";
-import { AppsTile, stableOrder, takeReordered, type AppEntry } from "./Tile";
+import { stableOrder, takeReordered, type AppEntry } from "./entry";
+import { AppsTile } from "./Tile";
 
 const sampleEntry = (name: string, open: boolean): AppEntry => ({
   key: `sample-${name}`,

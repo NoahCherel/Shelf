@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { invoke } from "../../core/tauri";
-import type { AppEntry } from "../../widgets/apps/Tile";
+import type { AppEntry } from "../../widgets/apps/entry";
 import { AppIcon } from "./AppIcon";
 import "./dock-cards.css";
 
