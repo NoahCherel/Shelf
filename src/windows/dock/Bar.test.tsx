@@ -1,6 +1,7 @@
 import { beforeEach, vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react";
-import { DockBar, edgeAt, reportSize } from "./Bar";
+import { DockBar, reportSize } from "./Bar";
+import { edgeAt } from "./useEdgeDrag";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
 

@@ -1,10 +1,10 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import type { AppEntry } from "./entry";
 
+export { DRAG_DISTANCE } from "../../core/gestures";
+
 /** Pulled further off the dock than this share of a tile, a pinned app is unpinned. */
 const PULL_OFF = 0.9;
-/** A press that moves less than this is a click. */
-export const DRAG_DISTANCE = 6;
 
 export function isPulledOff(dy: number, T: number): boolean {
   return Math.abs(dy) > T * PULL_OFF;
