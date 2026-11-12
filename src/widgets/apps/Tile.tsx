@@ -11,7 +11,7 @@ import { BUBBLE_STEP, DRAG_DISTANCE, dragOutcome, heldOver, HOLD_MS, isPulledOff
 import { markReordered, type AppEntry } from "./entry";
 import { AppIcon, GroupIcon, SearchGlyph, StartLogo, useStartImage } from "./icons";
 import { useAppPreviews } from "./useAppPreviews";
-import { useArrivals, useLeaving } from "./useComeAndGo";
+import { useComeAndGo } from "../../core/useComeAndGo";
 import { useOsDrag } from "./useOsDrag";
 import "./apps.css";
 
@@ -36,8 +36,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   const startImage = useStartImage(preview);
   const box = useRef<HTMLDivElement>(null);
   const osDrag = useOsDrag(box, data, preview);
-  const arrived = useArrivals(data, preview);
-  const rows = useLeaving(data, preview);
+  const { rows, arrived } = useComeAndGo(data, (e) => e.key, undefined, preview);
   const present = new Set((data ?? []).map((e) => e.key));
   const pickerOpen = usePicker((s) => s.open);
   const lockDock = useSettings((s) => s.lockDock);

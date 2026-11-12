@@ -1,3 +1,4 @@
+import { useComeAndGo } from "../../core/useComeAndGo";
 import { CARD } from "../../core/names";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -102,69 +103,6 @@ function useInView(el: HTMLElement | null): boolean {
 }
 
 /** As long as the fold in dock.css. */
-const FOLD_MS = 300;
-
-/**
- * Widgets added since the dock first showed its own, which open up, and widgets just removed, kept
- * where they were for the moment they take to fold away.
- */
-function useComeAndGo(ids: string[], row: React.RefObject<HTMLDivElement | null>) {
-  const [, redraw] = useState(0);
-  const known = useRef<string[] | null>(null);
-  const arrived = useRef(new Set<string>());
-  const leaving = useRef(new Map<string, { index: number; width: number }>());
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-
-  if (ids.length && known.current !== ids) {
-    const before = known.current;
-    if (before) {
-      for (const id of ids) if (!before.includes(id)) arrived.current.add(id);
-      before.forEach((id, index) => {
-        if (ids.includes(id) || leaving.current.has(id)) return;
-        const width = row.current?.querySelector(`[data-widget-id="${id}"]`)?.getBoundingClientRect().width ?? 0;
-        leaving.current.set(id, { index, width });
-      });
-    }
-    for (const id of ids) leaving.current.delete(id);
-    for (const id of arrived.current) if (!ids.includes(id)) arrived.current.delete(id);
-    known.current = ids;
-  }
-
-  useEffect(() => {
-    for (const [id, timer] of timers.current) {
-      if (!leaving.current.has(id)) {
-        clearTimeout(timer);
-        timers.current.delete(id);
-      }
-    }
-    for (const id of leaving.current.keys()) {
-      if (timers.current.has(id)) continue;
-      timers.current.set(
-        id,
-        setTimeout(() => {
-          timers.current.delete(id);
-          leaving.current.delete(id);
-          redraw((n) => n + 1);
-        }, FOLD_MS),
-      );
-    }
-  });
-
-  useEffect(() => {
-    const running = timers.current;
-    return () => {
-      running.forEach(clearTimeout);
-      running.clear();
-    };
-  }, []);
-
-  const rows = [...ids];
-  [...leaving.current.entries()]
-    .sort((a, b) => a[1].index - b[1].index)
-    .forEach(([id, { index }]) => rows.splice(Math.min(index, rows.length), 0, id));
-  return { rows, arrived: arrived.current, leaving: leaving.current };
-}
-
 /** On a full-width dock: where the slot sits, and how to start moving it. */
 interface Free {
   left: number;
@@ -427,7 +365,7 @@ export function DockBar() {
   const floatOverWindows = useSettings((s) => s.floatOverWindows);
   const bar = useRef<HTMLDivElement>(null);
   const placed = useFreePlacement(full, ids, lockDock && !pickerOpen);
-  const coming = useComeAndGo(ids, placed.row);
+  const coming = useComeAndGo(ids.length ? ids : null, (id) => id, (id) => placed.row.current?.querySelector(`[data-widget-id="${id}"]`)?.getBoundingClientRect().width ?? 0);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
 
   // Keeps the window exactly as wide as the bar. The bar sizes itself to its content,
