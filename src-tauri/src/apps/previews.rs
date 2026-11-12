@@ -271,12 +271,20 @@ fn name_width(name: &str) -> f64 {
 
 /// The app's name in a bubble above its icon, as Windows shows for an app with no window open, or
 /// for any app when previews are turned off. It uses the previews' window, shown with no windows.
-/// Sizes the bubble and puts it over a tile. Gives the dock's rectangle and the bubble's.
-fn place_bubble(app: &AppHandle, window: &tauri::WebviewWindow, width: f64, tile_x: f64, tile_width: f64) -> Result<Option<(Rect, Rect)>, String> {
+/// Sizes the preview window and puts it over a tile. `size` gets the screen's width and gives the
+/// window's, both in logical px. Gives the dock's rectangle and the window's.
+fn place_over_tile(
+    app: &AppHandle,
+    window: &tauri::WebviewWindow,
+    size: impl FnOnce(f64) -> (f64, f64),
+    tile_x: f64,
+    tile_width: f64,
+) -> Result<Option<(Rect, Rect)>, String> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let run = || -> tauri::Result<Option<(Rect, Rect)>> {
         let Some(m) = dock.primary_monitor()? else { return Ok(None) };
         let scale = m.scale_factor();
+        let (width, height) = size(m.size().width as f64 / scale);
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
         let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
@@ -284,7 +292,7 @@ fn place_bubble(app: &AppHandle, window: &tauri::WebviewWindow, width: f64, tile
             tile,
             dock_rect,
             Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
-            ((width * scale).round() as i32, (NAME_HEIGHT * scale).round() as i32),
+            ((width * scale).round() as i32, (height * scale).round() as i32),
             (DOCK_GAP * scale).round() as i32,
         );
         window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
@@ -308,7 +316,7 @@ pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f
     let text = super::menu::hint_text(&what, lang, &name).ok_or("unknown bubble")?;
     let window = preview_window(&app)?;
     let picture = if key.is_some() { HINT_ICON_WIDTH } else { 0.0 };
-    if place_bubble(&app, &window, name_width(&text) + picture, tile_x, tile_width)?.is_none() {
+    if place_over_tile(&app, &window, |_| (name_width(&text) + picture, NAME_HEIGHT), tile_x, tile_width)?.is_none() {
         return Ok(());
     }
     *lock(&SHOWN) = Some(format!("hint:{what}"));
@@ -331,7 +339,7 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
         return hide(&app);
     };
     let window = preview_window(&app)?;
-    let Some((dock_rect, strip)) = place_bubble(&app, &window, name_width(&entry.name), tile_x, tile_width)? else { return Ok(()) };
+    let Some((dock_rect, strip)) = place_over_tile(&app, &window, |_| (name_width(&entry.name), NAME_HEIGHT), tile_x, tile_width)? else { return Ok(()) };
     if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
         return Ok(());
     }
@@ -383,40 +391,24 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     let Some(entry) = entries.iter().find(|e| e.key == key).filter(|e| !e.windows.is_empty()) else {
         return hide(&app);
     };
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let window = preview_window(&app)?;
-    let run = || -> tauri::Result<Option<(Shown, Rect, Rect)>> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
-        let scale = m.scale_factor();
-        let screen = m.size().width as f64 / scale;
-        let count = entry.windows.len().min(most_that_fit(screen));
-        let slot = slot_width(count, screen);
-        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
-        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
-        let r = card_rect(
-            tile,
-            dock_rect,
-            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
-            ((strip_width(count, slot) * scale).round() as i32, (HEIGHT * scale).round() as i32),
-            (DOCK_GAP * scale).round() as i32,
-        );
-        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
-        window.set_position(PhysicalPosition::new(r.x, r.y))?;
-        let strip = Rect { x: r.x, y: r.y, w: r.w, h: r.h };
-        let shown = Shown {
-            hint: false,
-            key: key.clone(),
-            name: entry.name.clone(),
-            slot_width: slot,
-            windows: entry.windows[..count]
-                .iter()
-                .map(|w| ShownWindow { hwnd: w.hwnd, title: w.title.clone(), minimized: windows::is_minimized(w.hwnd) })
-                .collect(),
-        };
-        Ok(Some((shown, dock_rect, strip)))
+    let (mut count, mut slot) = (0, 0.0);
+    let fit = |screen: f64| {
+        count = entry.windows.len().min(most_that_fit(screen));
+        slot = slot_width(count, screen);
+        (strip_width(count, slot), HEIGHT)
     };
-    let Some((shown, dock_rect, strip)) = run().map_err(|e| e.to_string())? else { return Ok(()) };
+    let Some((dock_rect, strip)) = place_over_tile(&app, &window, fit, tile_x, tile_width)? else { return Ok(()) };
+    let shown = Shown {
+        hint: false,
+        key: key.clone(),
+        name: entry.name.clone(),
+        slot_width: slot,
+        windows: entry.windows[..count]
+            .iter()
+            .map(|w| ShownWindow { hwnd: w.hwnd, title: w.title.clone(), minimized: windows::is_minimized(w.hwnd) })
+            .collect(),
+    };
     // The pointer may have moved on while the windows were being listed, or a menu opened.
     if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
         return Ok(());
