@@ -1,5 +1,5 @@
-import { invoke } from "../../core/tauri";
-import type { Provider } from "../../core/widget";
+import { invoke } from "../core/tauri";
+import type { Provider } from "../core/widget";
 
 export interface StatusData {
   wifi: { ssid: string; signal: number } | null;

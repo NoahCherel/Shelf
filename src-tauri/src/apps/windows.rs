@@ -26,7 +26,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_EX_TOOLWINDOW,
 };
 
-use super::menu::is_start_host;
 use super::merge::{title_from_utf16, RawWindow, useful_description};
 
 pub const APP_ID_KEY: PROPERTYKEY =
@@ -38,6 +37,9 @@ const VT_LPWSTR: u16 = 31;
 static LAST_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
 static HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static START_OPEN: AtomicBool = AtomicBool::new(false);
+/// A click that closes Start arrives this soon after it closed.
+const START_REOPEN_GUARD_MS: u64 = 400;
+
 static START_CLOSED: Mutex<Option<Instant>> = Mutex::new(None);
 /// A window's program and app id don't change, and reading them isn't free.
 static KNOWN: Mutex<Option<HashMap<isize, Known>>> = Mutex::new(None);
@@ -323,9 +325,34 @@ pub fn minimize(raw: isize) {
     LAST_FOREGROUND.store(0, Ordering::Relaxed);
 }
 
+/// Opens Start unless this very click just closed it, as the real button does.
+pub fn should_press_start(open_now: bool, since_closed_ms: Option<u64>) -> bool {
+    open_now || !since_closed_ms.is_some_and(|ms| ms < START_REOPEN_GUARD_MS)
+}
+
+fn is_start_host(exe: &str) -> bool {
+    let name = crate::util::file_name(exe);
+    name.eq_ignore_ascii_case("SearchHost.exe") || name.eq_ignore_ascii_case("StartMenuExperienceHost.exe")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pressing_start_toggles_it_like_the_real_button() {
+        assert!(should_press_start(false, None), "closed: opens");
+        assert!(should_press_start(true, None), "open: the key closes it");
+        assert!(!should_press_start(false, Some(120)), "this very click just closed it: stay closed");
+        assert!(should_press_start(false, Some(2000)), "closed a while ago: opens");
+    }
+
+    #[test]
+    fn start_is_recognised_by_its_host() {
+        assert!(is_start_host(r"C:\Windows\SystemApps\X\SearchHost.exe"));
+        assert!(is_start_host(r"C:\Windows\SystemApps\X\StartMenuExperienceHost.exe"));
+        assert!(!is_start_host(r"C:\Program Files\Mozilla Firefox\firefox.exe"));
+    }
 
     #[test]
     fn a_window_number_used_again_by_another_process_is_a_new_window() {

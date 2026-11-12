@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { invoke } from "../../core/tauri";
 import { setDockIds } from "../../core/dockIds";
 import widget from "./index";
-import type { StatusData } from "../_providers/status";
-import { signalBars } from "../_providers/status";
+import type { StatusData } from "../../providers/status";
+import { signalBars } from "../../providers/status";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 

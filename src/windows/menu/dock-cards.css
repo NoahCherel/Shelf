@@ -1,8 +1,6 @@
 /* What a group or a folder on the dock opens: the same Windows look as an app's menu. */
 .dcard-group {
   width: 300px;
-  gap: 8px;
-  padding: 10px;
 }
 
 .dcard-group__name {

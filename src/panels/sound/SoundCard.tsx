@@ -6,7 +6,7 @@ import { useProvider } from "../../core/useProvider";
 import { Card } from "../../design/parts/Card";
 import { SettingsLink } from "../../design/parts/SettingsLink";
 import { Slider } from "../../design/parts/Slider";
-import { audioProvider, type AudioApp } from "../../widgets/_providers/audio";
+import { audioProvider, type AudioApp } from "../../providers/audio";
 import { VolumeRow } from "./VolumeRow";
 import "./sound.css";
 

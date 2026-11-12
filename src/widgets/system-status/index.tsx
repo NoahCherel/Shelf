@@ -1,10 +1,10 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { invoke } from "../../core/tauri";
 import { useDockIds } from "../../core/dockIds";
-import { openPanel, statusChanged, type PanelId } from "../../panels";
+import { openPanel, statusChanged, type PanelId } from "../../panels/open";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
-import { signalBars, statusProvider, type StatusData } from "../_providers/status";
+import { signalBars, statusProvider, type StatusData } from "../../providers/status";
 import "./system-status.css";
 
 const PART = 0.56;

@@ -6,9 +6,6 @@ use serde::Serialize;
 use super::jumplist::{fingerprint, Link};
 use super::merge::{AppEntry, AppKind};
 
-/// A click that closes Start arrives this soon after it closed.
-const START_REOPEN_GUARD_MS: u64 = 400;
-
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Own {
     Open,
@@ -151,15 +148,6 @@ pub fn hint_text(what: &str, lang: u16, name: &str) -> Option<String> {
     }
 }
 
-pub fn should_press_start(open_now: bool, since_closed_ms: Option<u64>) -> bool {
-    open_now || !since_closed_ms.is_some_and(|ms| ms < START_REOPEN_GUARD_MS)
-}
-
-pub fn is_start_host(exe: &str) -> bool {
-    let name = crate::util::file_name(exe);
-    name.eq_ignore_ascii_case("SearchHost.exe") || name.eq_ignore_ascii_case("StartMenuExperienceHost.exe")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,20 +258,5 @@ mod tests {
         let source = include_str!("menu.rs");
         let code = &source[..source.find("#[cfg(test)]").unwrap()];
         assert!(!code.contains("TerminateProcess"));
-    }
-
-    #[test]
-    fn pressing_start_toggles_it_like_the_real_button() {
-        assert!(should_press_start(false, None), "closed: opens");
-        assert!(should_press_start(true, None), "open: the key closes it");
-        assert!(!should_press_start(false, Some(120)), "this very click just closed it: stay closed");
-        assert!(should_press_start(false, Some(2000)), "closed a while ago: opens");
-    }
-
-    #[test]
-    fn start_is_recognised_by_its_host() {
-        assert!(is_start_host(r"C:\Windows\SystemApps\X\SearchHost.exe"));
-        assert!(is_start_host(r"C:\Windows\SystemApps\X\StartMenuExperienceHost.exe"));
-        assert!(!is_start_host(r"C:\Program Files\Mozilla Firefox\firefox.exe"));
     }
 }

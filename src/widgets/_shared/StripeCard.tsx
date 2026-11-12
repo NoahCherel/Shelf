@@ -6,7 +6,7 @@ import { Card } from "../../design/parts/Card";
 import { ConnectCard } from "../../design/parts/ConnectCard";
 import { Row } from "../../design/parts/Row";
 import { Sparkline } from "../../design/parts/Sparkline";
-import { fetchStripe, money, STRIPE_SECRET, stripeProvider, type StripeData } from "../_providers/stripe";
+import { fetchStripe, money, STRIPE_SECRET, stripeProvider, type StripeData } from "../../providers/stripe";
 import "./stripe.css";
 
 export function StripeLogo() {

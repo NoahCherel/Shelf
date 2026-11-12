@@ -3,8 +3,8 @@ import { useSettings } from "../../core/settings";
 import { useProvider } from "../../core/useProvider";
 import type { TileProps } from "../../core/widget";
 import { Card } from "../../design/parts/Card";
-import { buildMonth } from "../_providers/clock";
-import { weatherProvider } from "../_providers/weather";
+import { buildMonth } from "../../providers/clock";
+import { weatherProvider } from "../../providers/weather";
 import { WeatherGlyph } from "./WeatherGlyph";
 import "./date-card.css";
 

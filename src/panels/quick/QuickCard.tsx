@@ -6,9 +6,9 @@ import { useProvider } from "../../core/useProvider";
 import { Card } from "../../design/parts/Card";
 import { SettingsLink } from "../../design/parts/SettingsLink";
 import { Slider } from "../../design/parts/Slider";
-import { quickProvider, type ToggleKind } from "../../widgets/_providers/quick";
-import { statusProvider } from "../../widgets/_providers/status";
-import { goToPanel, statusChanged } from "../index";
+import { quickProvider, type ToggleKind } from "../../providers/quick";
+import { statusProvider } from "../../providers/status";
+import { goToPanel, statusChanged } from "../open";
 import { VolumeRow } from "../sound/VolumeRow";
 import "./quick.css";
 

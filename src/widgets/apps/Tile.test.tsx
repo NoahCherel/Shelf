@@ -4,7 +4,9 @@ import { invoke, listen } from "../../core/tauri";
 import { widthOf } from "../../core/widget";
 import { useSettings } from "../../core/settings";
 import apps from "./index";
-import { AppsTile, canGroup, dragOutcome, dropAim, heldOver, isPulledOff, keptInside, markReordered, stableOrder, type AppEntry } from "./Tile";
+import { canGroup, dragOutcome, dropAim, heldOver, isPulledOff, keptInside } from "./drag";
+import { markReordered, stableOrder, type AppEntry } from "./entry";
+import { AppsTile } from "./Tile";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}) }));
 

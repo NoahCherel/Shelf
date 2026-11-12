@@ -1,6 +1,7 @@
 import { beforeEach, vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react";
-import { DockBar, edgeAt, reportSize } from "./Bar";
+import { DockBar, reportSize } from "./Bar";
+import { edgeAt } from "./useEdgeDrag";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
 
@@ -63,7 +64,7 @@ it("skips an id with no widget instead of breaking", () => {
 
 it("a widget can open a panel instead of a card of its own", async () => {
   const { invoke } = await import("../../core/tauri");
-  const { byId } = await import("../../core/registry");
+  const { byId } = await import("../../core/byId");
   (byId("clock") as { panel?: unknown }).panel = "quick";
   const { container } = render(<DockBar />);
   vi.mocked(invoke).mockClear();
@@ -74,7 +75,7 @@ it("a widget can open a panel instead of a card of its own", async () => {
 
 it("opens a card over its tile on click, only for widgets that have one", async () => {
   const { invoke } = await import("../../core/tauri");
-  const { byId } = await import("../../core/registry");
+  const { byId } = await import("../../core/byId");
   (byId("clock") as { Card?: unknown }).Card = () => null;
   const { container } = render(<DockBar />);
   const [clock, apps] = slots(container);

@@ -4,8 +4,8 @@ import { invoke } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import { Card } from "../../design/parts/Card";
 import { SettingsLink } from "../../design/parts/SettingsLink";
-import { notificationsProvider, type NotificationRow } from "../../widgets/_providers/notifications";
-import { statusChanged } from "../index";
+import { notificationsProvider, type NotificationRow } from "../../providers/notifications";
+import { statusChanged } from "../open";
 import "./notifications.css";
 
 const MINUTE = 60_000;

@@ -1,5 +1,5 @@
-import { invoke } from "../../core/tauri";
-import type { Provider } from "../../core/widget";
+import { invoke } from "../core/tauri";
+import type { Provider } from "../core/widget";
 
 type WifiAuth = "open" | "wpa2" | "wpa3" | "enterprise" | "other";
 

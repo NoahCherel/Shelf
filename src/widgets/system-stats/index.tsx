@@ -1,7 +1,7 @@
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Ring } from "../../design/parts/Ring";
 import { Tile } from "../../design/parts/Tile";
-import { systemProvider, type SystemData } from "../_providers/system";
+import { systemProvider, type SystemData } from "../../providers/system";
 import "./system-stats.css";
 
 function Gauge({ value, label }: { value: number | undefined; label: string }) {

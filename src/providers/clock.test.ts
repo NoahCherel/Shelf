@@ -36,7 +36,7 @@ describe("buildMonth", () => {
   });
 });
 
-vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+vi.mock("../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
 describe("weather", () => {
   const body = {

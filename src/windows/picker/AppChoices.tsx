@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLayout } from "../../core/layout";
-import { pinId } from "../../core/pinWidget";
+import { pinId } from "../../core/pinId";
 import { invoke } from "../../core/tauri";
 
 interface App {

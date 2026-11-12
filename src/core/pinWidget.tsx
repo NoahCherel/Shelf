@@ -1,28 +1,12 @@
 import { useEffect, useState } from "react";
-import type { AppEntry } from "../widgets/apps/Tile";
+import type { AppEntry } from "../widgets/apps/entry";
 import { useLayout } from "./layout";
+import { parsePin, type Pinned } from "./pinId";
 import { invoke } from "./tauri";
 import { defineWidget, type Provider, type TileProps, type WidgetDef } from "./widget";
 
-const PREFIX = "pin:";
 /** How often a tile checks that what it opens still exists. */
 const CHECK_MS = 60_000;
-
-type Pinned = { kind: "app" | "folder"; target: string };
-
-/** A widget's id says what it opens. Forward slashes, as a backslash breaks the selectors ids go in. */
-export function pinId(kind: Pinned["kind"], target: string): string {
-  return `${PREFIX}${kind}:${target.replace(/\\/g, "/")}`;
-}
-
-export function parsePin(id: string): Pinned | null {
-  const found = /^pin:(app|folder):(.+)$/.exec(id);
-  return found ? { kind: found[1] as Pinned["kind"], target: found[2] } : null;
-}
-
-export function isPinId(id: string): boolean {
-  return parsePin(id) !== null;
-}
 
 /** The dock's entry for this app: by its id, or by its program for one listed under a known folder. */
 export function appFor(target: string, entries: AppEntry[]): AppEntry | undefined {

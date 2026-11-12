@@ -5,7 +5,7 @@ import { useProvider } from "../../core/useProvider";
 import { Card } from "../../design/parts/Card";
 import { SettingsLink } from "../../design/parts/SettingsLink";
 import { Switch } from "../../design/parts/Switch";
-import { bluetoothProvider } from "../../widgets/_providers/bluetooth";
+import { bluetoothProvider } from "../../providers/bluetooth";
 import "./bluetooth.css";
 
 const SETTINGS_PAGE = "bluetooth";

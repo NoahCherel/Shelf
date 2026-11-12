@@ -1,7 +1,7 @@
 // Limits come only from what Claude Code hands its status line. Claude's own login
 // is never read: Anthropic's terms keep those tokens for Claude Code and its apps.
-import { invoke } from "../../core/tauri";
-import type { Provider } from "../../core/widget";
+import { invoke } from "../core/tauri";
+import type { Provider } from "../core/widget";
 
 export const SESSION_MS = 5 * 3_600_000;
 export const WEEK_MS = 7 * 86_400_000;

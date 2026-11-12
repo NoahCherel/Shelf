@@ -1,6 +1,6 @@
-import { runNow } from "../../core/provider";
-import { useSettings } from "../../core/settings";
-import type { Provider, ProviderError } from "../../core/widget";
+import { runNow } from "../core/provider";
+import { useSettings } from "../core/settings";
+import type { Provider, ProviderError } from "../core/widget";
 import { httpGet } from "./http";
 
 export interface ContributionDay {

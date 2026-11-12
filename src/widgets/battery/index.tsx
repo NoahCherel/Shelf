@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { defineWidget, type TileProps } from "../../core/widget";
 import { Tile } from "../../design/parts/Tile";
-import { systemProvider, type SystemData } from "../_providers/system";
+import { systemProvider, type SystemData } from "../../providers/system";
 import "./battery.css";
 
 const LOW = 20;

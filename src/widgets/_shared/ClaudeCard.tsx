@@ -5,7 +5,7 @@ import type { TileProps } from "../../core/widget";
 import { Bar } from "../../design/parts/Bar";
 import { Card } from "../../design/parts/Card";
 import { Row } from "../../design/parts/Row";
-import { claudeProvider, durationText, pace, resetDayText, SESSION_MS, WEEK_MS, type ClaudeData, type LimitWindow } from "../_providers/claude";
+import { claudeProvider, durationText, pace, resetDayText, SESSION_MS, WEEK_MS, type ClaudeData, type LimitWindow } from "../../providers/claude";
 import { ClaudeLogo } from "./ClaudeLogo";
 
 const HOW = "Shelf reads the limits Claude Code hands its status line, and never your Claude login. They update while Claude Code is running.";

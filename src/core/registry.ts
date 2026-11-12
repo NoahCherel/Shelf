@@ -1,4 +1,3 @@
-import { pinWidget } from "./pinWidget";
 import type { Category, WidgetDef } from "./widget";
 
 type Modules = Record<string, { default?: WidgetDef }>;
@@ -22,9 +21,6 @@ export const widgets: WidgetDef[] = collect(
   import.meta.env.MODE,
 );
 
-export function byId(id: string): WidgetDef | undefined {
-  return widgets.find((w) => w.id === id) ?? pinWidget(id, widgets.find((w) => w.id === "apps")?.provider);
-}
 
 export function byCategory(list: WidgetDef[] = widgets): Map<Category, WidgetDef[]> {
   const groups = new Map<Category, WidgetDef[]>();

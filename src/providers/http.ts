@@ -1,5 +1,5 @@
-import { invoke } from "../../core/tauri";
-import type { ProviderError } from "../../core/widget";
+import { invoke } from "../core/tauri";
+import type { ProviderError } from "../core/widget";
 
 export interface HttpRequest {
   url: string;
