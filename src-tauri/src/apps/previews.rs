@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Webview
 
 use super::merge::AppEntry;
 use super::{current, windows};
-use crate::shell::card::{card_rect, Span};
+use crate::shell::card::{card_rect, dock_on_screen, Span, DOCK_GAP};
 use crate::shell::dock::Rect;
 
 const SLOT: f64 = 220.0;
@@ -35,7 +35,6 @@ const HEIGHT: f64 = 170.0;
 const NAME_HEIGHT: f64 = 32.0;
 pub const NAME_MIN_WIDTH: f64 = 48.0;
 pub const NAME_MAX_WIDTH: f64 = 320.0;
-const DOCK_GAP: f64 = 8.0;
 /// Long enough to cross from the icon to the strip, even slowly.
 const LEAVE_GRACE: Duration = Duration::from_millis(400);
 const POINTER_CHECK: Duration = Duration::from_millis(300);
@@ -280,26 +279,19 @@ fn place_over_tile(
     tile_x: f64,
     tile_width: f64,
 ) -> Result<Option<(Rect, Rect)>, String> {
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let run = || -> tauri::Result<Option<(Rect, Rect)>> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
-        let scale = m.scale_factor();
-        let (width, height) = size(m.size().width as f64 / scale);
-        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        let tile = Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
-        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
-        let r = card_rect(
-            tile,
-            dock_rect,
-            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
-            ((width * scale).round() as i32, (height * scale).round() as i32),
-            (DOCK_GAP * scale).round() as i32,
-        );
-        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
-        window.set_position(PhysicalPosition::new(r.x, r.y))?;
-        Ok(Some((dock_rect, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
-    };
-    run().map_err(|e| e.to_string())
+    let Some(on) = dock_on_screen(app)? else { return Ok(None) };
+    let scale = on.scale;
+    let (width, height) = size(on.monitor.w as f64 / scale);
+    let r = card_rect(
+        Span::of_tile(&on, tile_x, tile_width),
+        on.dock,
+        on.monitor,
+        ((width * scale).round() as i32, (height * scale).round() as i32),
+        (DOCK_GAP * scale).round() as i32,
+    );
+    window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
+    window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+    Ok(Some((on.dock, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
 }
 
 /// Room for the picture beside a bubble's words.
