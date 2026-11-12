@@ -266,6 +266,7 @@ pub fn run() {
 
     app.run(|_, event| {
         if let RunEvent::Exit = event {
+            system::tray::close_grid();
             shell::dock::stop();
         }
     });

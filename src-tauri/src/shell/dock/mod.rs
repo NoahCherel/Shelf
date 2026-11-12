@@ -345,7 +345,6 @@ pub fn set_dock_behaviour(app: AppHandle, auto_hide: bool, show_on_desktop: bool
 }
 
 pub fn stop() {
-    crate::system::tray::close_grid();
     let raw = DOCK.hwnd.load(Ordering::Relaxed);
     if raw != 0 {
         appbar::unregister(raw);
