@@ -6,7 +6,7 @@ use crate::util::lock;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::UI::Input::KeyboardAndMouse::{VK_B, VK_ESCAPE, VK_LWIN, VK_RETURN};
@@ -16,8 +16,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use super::tap_keys;
 use crate::apps::take_foreground_raw;
-use crate::shell::card::{card_rect, Span};
-use crate::shell::dock::Rect;
+use crate::shell::card::{card_rect, dock_on_screen, Span, DOCK_GAP};
 
 /// A click that closes the grid arrives this soon after it closed.
 const REOPEN_GUARD_MS: u64 = 300;
@@ -25,7 +24,6 @@ const FOCUS_WAIT: Duration = Duration::from_millis(800);
 const OPEN_WAIT: Duration = Duration::from_millis(1500);
 const POLL: Duration = Duration::from_millis(15);
 const CLOSE_POLL: Duration = Duration::from_millis(60);
-const DOCK_GAP: f64 = 8.0;
 
 static CLOSED_AT: Mutex<Option<Instant>> = Mutex::new(None);
 
@@ -85,19 +83,8 @@ fn wait_for<T>(limit: Duration, mut found: impl FnMut() -> Option<T>) -> Option<
 
 /// Above the chevron, as a card sits above its tile.
 fn place(app: &AppHandle, flyout: HWND, tile_x: f64, tile_width: f64) -> Result<(), String> {
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let run = || -> tauri::Result<Option<(Span, Rect, Rect, i32)>> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
-        let scale = m.scale_factor();
-        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        Ok(Some((
-            Span { x: pos.x + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 },
-            Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 },
-            Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
-            (DOCK_GAP * scale).round() as i32,
-        )))
-    };
-    let Some((tile, dock_rect, monitor, gap)) = run().map_err(|e| e.to_string())? else { return Ok(()) };
+    let Some(on) = dock_on_screen(app)? else { return Ok(()) };
+    let (tile, dock_rect, monitor, gap) = (Span::of_tile(&on, tile_x, tile_width), on.dock, on.monitor, (DOCK_GAP * on.scale).round() as i32);
     unsafe {
         let mut now = RECT::default();
         GetWindowRect(flyout, &mut now).map_err(|e| e.to_string())?;

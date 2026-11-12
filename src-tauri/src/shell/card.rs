@@ -43,6 +43,39 @@ pub struct Span {
     pub w: i32,
 }
 
+impl Span {
+    /// A tile the page measured in its own logical px, on the screen.
+    pub fn of_tile(on: &DockOnScreen, tile_x: f64, tile_width: f64) -> Span {
+        Span { x: on.dock.x + (tile_x * on.scale).round() as i32, w: (tile_width * on.scale).round() as i32 }
+    }
+}
+
+/// Space left between the dock and what opens over it, in logical px.
+pub const DOCK_GAP: f64 = 8.0;
+
+/// Where the dock window is, on which monitor, at what scale: what every window opening over a tile
+/// is placed from.
+#[derive(Clone, Copy)]
+pub struct DockOnScreen {
+    pub dock: Rect,
+    pub monitor: Rect,
+    pub scale: f64,
+}
+
+pub fn dock_on_screen(app: &AppHandle) -> Result<Option<DockOnScreen>, String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let read = || -> tauri::Result<Option<DockOnScreen>> {
+        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
+        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
+        Ok(Some(DockOnScreen {
+            dock: Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 },
+            monitor: Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
+            scale: m.scale_factor(),
+        }))
+    };
+    read().map_err(|e| e.to_string())
+}
+
 /// Centred on the tile, on the screen side of the dock, kept on the monitor. On a
 /// screen too small for it, the card gets shorter rather than running off the edge.
 pub fn card_rect(tile: Span, dock: Rect, monitor: Rect, size: (i32, i32), margin: i32) -> Rect {
@@ -164,38 +197,23 @@ fn hide_card(app: &AppHandle) -> Result<(), String> {
 
 /// Sizes and moves the card for `logical` px, relative to the remembered tile.
 fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
-    let (card, dock) = (card_window(app)?, app.get_webview_window("dock").ok_or("dock window missing")?);
-    let run = || -> tauri::Result<()> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(()) };
-        let scale = m.scale_factor();
-        let monitor = Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 };
-        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
-        let tile = *lock(&TILE);
-        let margin = (MARGIN * scale).round() as i32;
-        let height = limit_height(logical.1, room_for_card(dock_rect, monitor, margin, scale));
-        let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
-        let r = card_rect(tile, dock_rect, monitor, wanted, margin);
-        card.set_size(PhysicalSize::new(r.w as u32, r.h as u32))?;
-        card.set_position(PhysicalPosition::new(r.x, r.y))
-    };
-    run().map_err(|e| e.to_string())
+    let card = card_window(app)?;
+    let Some(DockOnScreen { dock, monitor, scale }) = dock_on_screen(app)? else { return Ok(()) };
+    let tile = *lock(&TILE);
+    let margin = (MARGIN * scale).round() as i32;
+    let height = limit_height(logical.1, room_for_card(dock, monitor, margin, scale));
+    let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
+    let r = card_rect(tile, dock, monitor, wanted, margin);
+    card.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
+    card.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())
 }
 
 /// How tall a card may be here, so its body can scroll inside that rather than being cut off.
 #[tauri::command]
 pub fn card_room(app: AppHandle) -> Result<f64, String> {
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let run = || -> tauri::Result<f64> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(MAX_HEIGHT) };
-        let scale = m.scale_factor();
-        let monitor = Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 };
-        let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        let dock_rect = Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 };
-        let margin = (MARGIN * scale).round() as i32;
-        Ok(limit_height(f64::MAX, room_for_card(dock_rect, monitor, margin, scale)))
-    };
-    run().map_err(|e| e.to_string())
+    let Some(DockOnScreen { dock, monitor, scale }) = dock_on_screen(&app)? else { return Ok(MAX_HEIGHT) };
+    let margin = (MARGIN * scale).round() as i32;
+    Ok(limit_height(f64::MAX, room_for_card(dock, monitor, margin, scale)))
 }
 
 /// Tile position is logical px inside the dock window.
