@@ -15,7 +15,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VIRTUAL_KEY, VK_DOWN, VK_ESCAPE, VK_LEFT, VK_LSHIFT, VK_LWIN, VK_RETURN, VK_RIGHT, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, SetWindowsHookExW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    CallNextHookEx, GetMessageW, SetWindowsHookExW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
 use super::events;
@@ -77,6 +77,15 @@ impl KeyNav {
         } else {
             self.release(key)
         }
+    }
+
+    /// Forgets which keys are held, as when the session locks: Windows then lets them go where the
+    /// hook can't see it, and a Win thought held would turn every T typed afterwards into Win+T.
+    pub fn forget_held(&mut self) {
+        self.win = false;
+        self.shift = false;
+        self.t_since_win = false;
+        self.held.clear();
     }
 
     /// Ends navigation from outside: a click elsewhere, a game, a locked screen.
@@ -156,6 +165,42 @@ static EVENTS: OnceLock<Sender<NavEvent>> = OnceLock::new();
 /// No key has this code: pressed before Win is let go, it stops Windows opening Start.
 const MASK: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
+/// Left alone this long, navigation ends: if the dock never answered, arrows go back to the apps.
+pub const NAV_IDLE_MS: u64 = 8_000;
+
+pub fn timed_out(last_ms: u64, now_ms: u64) -> bool {
+    now_ms.saturating_sub(last_ms) >= NAV_IDLE_MS
+}
+
+/// A button pressed anywhere ends navigation, however short the press.
+fn ends_navigation(msg: u32) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN, WM_XBUTTONDOWN};
+    matches!(msg, WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN)
+}
+
+/// Win+T is the dock's only with nothing fullscreen, on the dock's screen or in front.
+fn win_t_allowed(locked: bool, dock_fullscreen: bool, front_fullscreen: bool) -> bool {
+    !(locked || dock_fullscreen || front_fullscreen)
+}
+
+static STARTED: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
+/// When navigation last did something, in ms since Shelf started.
+static LAST_NAV: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    STARTED.elapsed().as_millis() as u64
+}
+
+/// Navigation that went quiet, as when the dock has no Apps widget to answer it.
+pub fn idle_too_long() -> bool {
+    timed_out(LAST_NAV.load(Ordering::Relaxed), now_ms())
+}
+
+fn win_physically_down() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    [VK_LWIN, VK_RWIN].into_iter().any(|k| unsafe { GetAsyncKeyState(k.0 as i32) } < 0)
+}
+
 fn key_of(vk: u32) -> Key {
     match VIRTUAL_KEY(vk as u16) {
         VK_LWIN | VK_RWIN => Key::Win,
@@ -179,14 +224,23 @@ unsafe extern "system" fn on_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> L
         // Keys Shelf sends itself, as for Start's quick menu, are none of this.
         if (info.flags & LLKHF_INJECTED).0 == 0 {
             let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
-            let dock_on = !events::FULLSCREEN.load(Ordering::Relaxed) && !events::LOCKED.load(Ordering::Relaxed);
+            let key = key_of(info.vkCode);
+            // Only a T needs to know: the fullscreen check reads the window in front, so it isn't made per key.
+            let is_t = key == Key::T && down;
+            let dock_on = is_t
+                && win_t_allowed(events::LOCKED.load(Ordering::Relaxed), events::FULLSCREEN.load(Ordering::Relaxed), events::front_is_fullscreen());
             let verdict = {
                 let mut nav = lock(&NAV);
-                let verdict = nav.on_key(key_of(info.vkCode), down, dock_on);
+                // A Win whose release went unseen, as when the session locked, isn't held any more.
+                if is_t && !win_physically_down() {
+                    nav.forget_held();
+                }
+                let verdict = nav.on_key(key, down, dock_on);
                 NAVIGATING.store(nav.navigating(), Ordering::Relaxed);
                 verdict
             };
             if let (Some(event), Some(tx)) = (verdict.event, EVENTS.get()) {
+                LAST_NAV.store(now_ms(), Ordering::Relaxed);
                 let _ = tx.send(event);
             }
             if verdict.mask {
@@ -196,6 +250,14 @@ unsafe extern "system" fn on_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> L
                 return LRESULT(1);
             }
         }
+    }
+    CallNextHookEx(None, code, wparam, lparam)
+}
+
+/// A click anywhere ends Win+T, however short: polling the buttons could miss a touchpad tap.
+unsafe extern "system" fn on_mouse(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code == HC_ACTION as i32 && NAVIGATING.load(Ordering::Relaxed) && ends_navigation(wparam.0 as u32) {
+        cancel();
     }
     CallNextHookEx(None, code, wparam, lparam)
 }
@@ -221,6 +283,10 @@ pub fn start(app: &AppHandle) {
             crate::diag::note("the keyboard hook for Win+T could not be installed");
             return;
         }
+        // It only looks at an atomic until Win+T is on, so the pointer isn't slowed.
+        if SetWindowsHookExW(WH_MOUSE_LL, Some(on_mouse), module.map(Into::into), 0).is_err() {
+            crate::diag::note("the mouse hook that ends Win+T could not be installed");
+        }
         // A low-level hook is called through this thread's message loop.
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {}
@@ -240,6 +306,11 @@ pub fn cancel() {
     }
 }
 
+/// The session locked: keys let go there never reach the hook.
+pub fn forget_held() {
+    lock(&NAV).forget_held();
+}
+
 /// The page has nothing to walk through, as when no app is open.
 #[tauri::command]
 pub fn keynav_end() {
@@ -250,6 +321,37 @@ pub fn keynav_end() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn locking_forgets_keys_held_when_it_happened() {
+        let mut nav = KeyNav::default();
+        nav.on_key(Key::Win, true, true); // Win+L: Win's release happens where the hook can't see it
+        nav.forget_held();
+        assert_eq!(nav.on_key(Key::T, true, true), Verdict::default(), "a plain t reaches the app");
+    }
+
+    #[test]
+    fn any_mouse_button_ends_navigation() {
+        use windows::Win32::UI::WindowsAndMessaging::{WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_XBUTTONDOWN};
+        for msg in [WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_XBUTTONDOWN] {
+            assert!(ends_navigation(msg), "{msg}");
+        }
+        assert!(!ends_navigation(WM_MOUSEMOVE) && !ends_navigation(WM_LBUTTONUP));
+    }
+
+    #[test]
+    fn win_t_is_left_to_windows_over_any_fullscreen_app() {
+        assert!(win_t_allowed(false, false, false));
+        assert!(!win_t_allowed(true, false, false), "locked");
+        assert!(!win_t_allowed(false, true, false), "a game over the dock");
+        assert!(!win_t_allowed(false, false, true), "a game on another screen, in front");
+    }
+
+    #[test]
+    fn navigation_left_alone_ends_by_itself() {
+        assert!(!timed_out(1000, 1000 + NAV_IDLE_MS - 1));
+        assert!(timed_out(1000, 1000 + NAV_IDLE_MS));
+    }
 
     /// Presses and releases `key`, giving what the press did.
     fn tap(nav: &mut KeyNav, key: Key) -> Verdict {

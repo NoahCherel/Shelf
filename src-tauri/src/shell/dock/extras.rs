@@ -22,11 +22,23 @@ pub struct Extra {
     pub width: f64,
     /// Hidden under a fullscreen app on its screen.
     pub hidden: bool,
-    /// The monitor its edge was last reserved on.
-    pub reserved_on: Option<Rect>,
+    /// The monitor its edge was last reserved on, and the strip.
+    pub reserved_on: Option<Strip>,
 }
 
 static EXTRAS: Mutex<Vec<Extra>> = Mutex::new(Vec::new());
+
+/// Extras don't slide away with auto-hide, so they keep their edge: windows mustn't run under them.
+fn extra_reserves(layout: DockLayout, scale: f64) -> Option<i32> {
+    reserved_with(layout, scale, false)
+}
+
+/// Explorer may have lost every strip: each is set again next time.
+pub fn forget_reserved() {
+    for e in lock(&EXTRAS).iter_mut() {
+        e.reserved_on = None;
+    }
+}
 
 /// The screens with a dock on them: the main dock's, and each extra's.
 pub fn docked_monitors(main: Rect) -> Vec<Rect> {
@@ -130,20 +142,24 @@ fn close(app: &AppHandle, label: &str) {
     }
 }
 
-fn place(app: &AppHandle, e: &Extra) -> Option<Rect> {
+fn place(app: &AppHandle, e: &Extra) -> Option<Strip> {
     let window = app.get_webview_window(&e.label)?;
     let l = DockLayout { width: e.width, ..layout() };
     let _ = crate::shell::windows::put(&window, resting_on(e.monitor, e.scale, l));
     if !crate::preview::current().reserve_edge {
         return None;
     }
-    match reserved_with(l, e.scale, DOCK.auto_hide.load(Ordering::Relaxed)) {
+    match extra_reserves(l, e.scale) {
         Some(h) => {
-            if e.reserved_on.is_some_and(|was| was != e.monitor) {
+            let strip = (e.monitor, reserved_rect(e.monitor, h, l.edge));
+            if !reserve_again(e.reserved_on, strip) {
+                return e.reserved_on;
+            }
+            if e.reserved_on.is_some_and(|(was, _)| was != e.monitor) {
                 appbar::unregister(e.hwnd);
             }
-            appbar::register(e.hwnd, reserved_rect(e.monitor, h, l.edge), l.edge);
-            Some(e.monitor)
+            appbar::register(e.hwnd, strip.1, l.edge);
+            Some(strip)
         }
         None => {
             appbar::unregister(e.hwnd);
@@ -193,5 +209,17 @@ pub fn tick(app: &AppHandle, trackers: &mut HashMap<String, events::FullscreenTr
         if let Some(e) = lock(&EXTRAS).iter_mut().find(|e| e.label == label) {
             e.hidden = fullscreen;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_extra_dock_keeps_its_edge_with_auto_hide_on() {
+        let docked = DockLayout { float: false, ..FIRST_LAYOUT };
+        assert!(extra_reserves(docked, 1.0).is_some());
+        assert!(extra_reserves(FIRST_LAYOUT, 1.0).is_none(), "floating still reserves nothing");
     }
 }

@@ -69,7 +69,7 @@ struct Shared {
     /// With Follow: the screen the pointer last asked for.
     followed: Mutex<Option<String>>,
     /// The monitor the edge was last reserved on, so a move to another one drops the old strip.
-    appbar_on: Mutex<Option<Rect>>,
+    appbar_on: Mutex<Option<Strip>>,
     hwnd: AtomicIsize,
     events: OnceLock<Sender<ShellEvent>>,
     taskbar_created: OnceLock<u32>,
@@ -174,12 +174,16 @@ fn register_appbar(dock: &WebviewWindow) {
     let mut on = lock(&DOCK.appbar_on);
     match reserved_with(l, scale, DOCK.auto_hide.load(Ordering::Relaxed)) {
         Some(h) => {
+            let strip = reserved_rect(m, h, l.edge);
+            if !reserve_again(*on, (m, strip)) {
+                return;
+            }
             // Setting a new position on another monitor leaves the old strip reserved.
-            if on.is_some_and(|was| was != m) {
+            if on.is_some_and(|(was, _)| was != m) {
                 appbar::unregister(raw);
             }
-            appbar::register(raw, reserved_rect(m, h, l.edge), l.edge);
-            *on = Some(m);
+            appbar::register(raw, strip, l.edge);
+            *on = Some((m, strip));
             super::boot::note_reserved();
         }
         None => {
@@ -192,6 +196,11 @@ fn register_appbar(dock: &WebviewWindow) {
 fn run_action(app: &AppHandle, action: Action) {
     if action == Action::KeepTaskbar {
         TASKBAR.keep();
+        return;
+    }
+    if action == Action::ForgetAppbar {
+        *lock(&DOCK.appbar_on) = None;
+        extras::forget_reserved();
         return;
     }
     if action == Action::ReadDisplays {
@@ -220,7 +229,7 @@ fn run_action(app: &AppHandle, action: Action) {
             glass::dock_hidden(app, status.autohidden);
             let _ = app.emit("shell-changed", status);
         }
-        Action::KeepTaskbar | Action::ReadDisplays => {}
+        Action::KeepTaskbar | Action::ReadDisplays | Action::ForgetAppbar => {}
     }
 }
 
@@ -246,6 +255,9 @@ fn watch(app: AppHandle, rx: std::sync::mpsc::Receiver<ShellEvent>) {
         events::AUTOHIDDEN.store(state.autohidden, Ordering::Relaxed);
         if state.fullscreen || state.locked {
             super::keys::cancel();
+        }
+        if state.locked {
+            super::keys::forget_held();
         }
         for action in actions {
             run_action(&app, action);
@@ -327,11 +339,6 @@ fn followed_to(follow: &mut Follow, now: u64) -> Option<String> {
     follow.decide((p.x, p.y), &displays, &current, layout().edge, now)
 }
 
-fn mouse_pressed() -> bool {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
-    [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].into_iter().any(|b| unsafe { GetAsyncKeyState(b.0 as i32) } < 0)
-}
-
 fn following() -> bool {
     *lock(&DOCK.display_mode) == DisplayMode::Follow
 }
@@ -360,8 +367,8 @@ fn watch_pointer(app: AppHandle, tx: Sender<ShellEvent>) {
                 return;
             }
         }
-        // During Win+T a click anywhere ends it, so arrows go back to the app in front.
-        if super::keys::navigating() && mouse_pressed() {
+        // Win+T the dock never answered ends by itself, so arrows go back to the app in front.
+        if super::keys::navigating() && super::keys::idle_too_long() {
             super::keys::cancel();
         }
         let on = DOCK.auto_hide.load(Ordering::Relaxed) || following() || super::keys::navigating();
@@ -450,6 +457,10 @@ pub fn start(app: &AppHandle, busy: fn(&AppHandle) -> bool) -> Result<(), Box<dy
     std::thread::spawn(move || watch(handle, rx));
     let handle = app.clone();
     std::thread::spawn(move || watch_pointer(handle, pointer_tx));
+    // Reads the screens once more off the main thread, which also opens the extra docks of All screens.
+    if let Some(tx) = DOCK.events.get() {
+        let _ = tx.send(ShellEvent::DisplayChange);
+    }
     Ok(())
 }
 

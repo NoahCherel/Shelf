@@ -239,7 +239,9 @@ Only in your own build: the preview doesn't watch the keyboard, so it can run be
 - [ ] **Start stays shut:** letting go of Win after Win+T doesn't open Start. Win alone, pressed and let go during the walk, opens Start and ends the walk.
 - [ ] **Windows:** Tab shows the app's windows above it, with the chosen one outlined; Shift+Tab goes back; Enter brings that window forward. With one window, Enter brings it forward.
 - [ ] **Leaving it:** Escape ends it. So does a click anywhere: then arrows in an editor move its cursor as usual. Typing a letter ends it too, and the letter reaches the app.
-- [ ] **Not during a game:** with a game in fullscreen, Win+T does whatever Windows does, and nothing happens on the dock.
+- [ ] **Not during a game:** with a game in fullscreen, on any screen, Win+T does whatever Windows does, and nothing happens on the dock.
+- [ ] **After locking:** Win+L, unlock, then type "test" in Notepad: all four letters arrive.
+- [ ] **Left alone:** Win+T, then touch nothing: after 8 seconds the arrows go back to the app in front.
 - [ ] **Limit:** an open app kept inside a group isn't reached by Win+T.
 
 ## A day of use

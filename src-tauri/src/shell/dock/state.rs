@@ -23,6 +23,8 @@ pub enum ShellEvent {
 pub enum Action {
     /// Asks Windows for its screens again: they may have changed.
     ReadDisplays,
+    /// Forgets what was reserved, so it's reserved again even if unchanged: Explorer may have lost it.
+    ForgetAppbar,
     KeepTaskbar,
     RegisterAppbar,
     PlaceDock,
@@ -56,10 +58,10 @@ pub fn fullscreen_now(fg: Foreground, previous_still_covers: bool) -> bool {
 pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
     use Action::*;
     match event {
-        ShellEvent::TaskbarCreated => vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock],
+        ShellEvent::TaskbarCreated => vec![ReadDisplays, KeepTaskbar, ForgetAppbar, RegisterAppbar, PlaceDock],
         ShellEvent::DisplayChange => vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass],
         ShellEvent::Resume => {
-            let mut actions = vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass];
+            let mut actions = vec![ReadDisplays, KeepTaskbar, ForgetAppbar, RegisterAppbar, PlaceDock, RestartGlass];
             if !state.fullscreen && !state.autohidden {
                 actions.push(ShowDock);
             }
@@ -71,7 +73,7 @@ pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
         }
         ShellEvent::Unlock => {
             state.locked = false;
-            vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass, Announce]
+            vec![ReadDisplays, KeepTaskbar, ForgetAppbar, RegisterAppbar, PlaceDock, RestartGlass, Announce]
         }
         ShellEvent::Tick { fullscreen } => {
             let mut actions = vec![KeepTaskbar];
@@ -105,6 +107,18 @@ pub fn taskbar_mode_for(chosen: Mode, auto_hide: bool) -> Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explorer_restarting_reserves_the_edge_again() {
+        for event in [ShellEvent::TaskbarCreated, ShellEvent::Resume, ShellEvent::Unlock] {
+            let actions = react(event, &mut DockState { locked: true, ..Default::default() });
+            let forget = actions.iter().position(|a| *a == Action::ForgetAppbar).unwrap_or(usize::MAX);
+            let register = actions.iter().position(|a| *a == Action::RegisterAppbar).unwrap();
+            assert!(forget < register, "{event:?}");
+        }
+        // A strip moving is news to the other docks: reserving again on it would answer in turn.
+        assert!(!react(ShellEvent::DisplayChange, &mut DockState::default()).contains(&Action::ForgetAppbar));
+    }
     use crate::shell::taskbar::tests::{docked, state_path, Fake};
     use crate::shell::taskbar::{Mode, TaskbarApi};
 

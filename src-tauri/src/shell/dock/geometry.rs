@@ -67,6 +67,15 @@ pub fn settle(window: Rect, monitor: Rect) -> (Edge, f64) {
     (edge, along)
 }
 
+/// A monitor and the strip reserved on it.
+pub type Strip = (Rect, (i32, i32, i32, i32));
+
+/// Setting a strip makes Windows tell every other appbar, and each dock answers by setting its own:
+/// so a strip is only set again when it changed, or two docks would wake each other forever.
+pub fn reserve_again(last: Option<Strip>, now: Strip) -> bool {
+    last != Some(now)
+}
+
 /// The strip of the screen to keep clear (left, top, right, bottom).
 pub fn reserved_rect(monitor: Rect, height: i32, edge: Edge) -> (i32, i32, i32, i32) {
     let (left, right) = (monitor.x, monitor.x + monitor.w);
@@ -103,6 +112,14 @@ pub fn reserved_with(layout: DockLayout, scale: f64, auto_hide: bool) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_same_strip_is_not_reserved_again() {
+        let strip = (FHD, (0, 1003, 1920, 1080));
+        assert!(reserve_again(None, strip));
+        assert!(!reserve_again(Some(strip), strip));
+        assert!(reserve_again(Some(strip), (FHD, (0, 0, 1920, 77))), "moved to the top");
+    }
 
     const FHD: Rect = Rect { x: 0, y: 0, w: 1920, h: 1080 };
 
