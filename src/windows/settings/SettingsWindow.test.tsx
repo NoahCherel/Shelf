@@ -207,3 +207,29 @@ describe("the screen the dock sits on", () => {
     expect((await picker()).closest("fieldset")?.disabled).toBe(true);
   });
 });
+
+describe("the accent that follows the album art", () => {
+  const accents = () => within(screen.getByRole("radiogroup", { name: "Accent" }));
+
+  it("picking Album art follows the cover", () => {
+    render(<SettingsWindow />);
+    fireEvent.click(accents().getByRole("radio", { name: "Album art" }));
+    expect(useSettings.getState().accent).toBe("album");
+    expect(mockInvoke).toHaveBeenCalledWith("album_accent_follow", { on: true });
+  });
+
+  it("picking a colour stops following", () => {
+    useSettings.setState({ accent: "album" });
+    render(<SettingsWindow />);
+    fireEvent.click(accents().getByRole("radio", { name: "Blue" }));
+    expect(useSettings.getState().accent).toBe(ACCENTS[0].color);
+    expect(mockInvoke).toHaveBeenCalledWith("album_accent_follow", { on: false });
+  });
+
+  it("album art is not taken for an own colour", () => {
+    useSettings.setState({ accent: "album" });
+    render(<SettingsWindow />);
+    expect(accents().getByRole("radio", { name: "Album art" }).getAttribute("aria-checked")).toBe("true");
+    expect((accents().getByLabelText("Your own colour") as HTMLInputElement).value).toBe(ACCENTS[0].color);
+  });
+});

@@ -108,7 +108,7 @@ export const SCHEMA: PageDef[] = [
             { value: "light", label: "Light" },
           ],
         }),
-        { kind: "accent", key: "accent", label: "Accent", tip: "Used for switches, rings, the open-app dots and highlights." },
+        { kind: "accent", key: "accent", label: "Accent", tip: "Used for switches, rings, the open-app dots and highlights. Album art follows the cover of what's playing." },
       ]),
     ],
   },

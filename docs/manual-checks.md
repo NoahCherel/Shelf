@@ -219,6 +219,12 @@ These need a real pointer, and closing or switching real windows.
 
 - [ ] **How soon the edge is reserved (F-023):** turn Float over windows off, run `setx SHELF_DIAG 1` once, restart Windows, then open `diag.log` beside Shelf's data. Its "edge reserved" line gives three numbers: sign-in to Shelf starting, starting to setup, setup to reserving. The correction depends on which one is long; send me the line. Then `setx SHELF_DIAG ""` turns the trace off again.
 
+## Album art accent
+
+- [ ] **Follow the cover:** Settings › Appearance › Accent › the record swatch (Album art). Play something with a cover in Spotify or the browser: switches, rings and the open-app dots take a colour from it within two seconds, and change with the track.
+- [ ] **No colour to take:** a black and white cover, or nothing playing, gives the default blue rather than a grey.
+- [ ] **The swatch itself:** does the record read as "album art" beside the colour wheel of your own colour?
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

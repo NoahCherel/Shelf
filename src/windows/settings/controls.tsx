@@ -92,6 +92,14 @@ function TextRow({ row }: { row: Extract<RowDef, { kind: "text" }> }) {
 function AccentRow({ row }: { row: RowDef }) {
   const [value, save] = useValue<string | null>(row.key);
   const current = value ?? ACCENTS[0].color;
+  const following = current === "album";
+  // Following the cover is done by Rust, which only does it while asked to.
+  const pick = (next: string) => {
+    if (following !== (next === "album")) void invoke("album_accent_follow", { on: next === "album" }).catch(() => {});
+    save(next);
+  };
+  // Only a colour of the owner's own shows on its swatch: not one of the nine, not the album's.
+  const own = !following && !ACCENTS.some((a) => a.color === current) ? current : null;
   return (
     <div className="accents" role="radiogroup" aria-label={row.label}>
       {ACCENTS.map((accent) => (
@@ -103,11 +111,20 @@ function AccentRow({ row }: { row: RowDef }) {
           aria-checked={current === accent.color}
           className={current === accent.color ? "accent accent--on" : "accent"}
           style={{ background: accent.color }}
-          onClick={() => save(accent.color)}
+          onClick={() => pick(accent.color)}
         />
       ))}
-      <label className="accent accent--own" title="Your own colour" style={{ background: ACCENTS.some((a) => a.color === current) ? undefined : current }}>
-        <input type="color" aria-label="Your own colour" value={current} onChange={(e) => save(e.target.value)} />
+      <button
+        type="button"
+        role="radio"
+        aria-label="Album art"
+        title="Follows the cover of what's playing"
+        aria-checked={following}
+        className={following ? "accent accent--album accent--on" : "accent accent--album"}
+        onClick={() => pick("album")}
+      />
+      <label className="accent accent--own" title="Your own colour" style={{ background: own ?? undefined }}>
+        <input type="color" aria-label="Your own colour" value={own ?? ACCENTS[0].color} onChange={(e) => pick(e.target.value)} />
       </label>
     </div>
   );

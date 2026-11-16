@@ -140,3 +140,8 @@ it("falls back to one screen on the main display", () => {
   expect(defaults().display).toBe("single");
   expect(defaults().displayMonitor).toBeNull();
 });
+
+it("keeps album as an accent", () => {
+  expect(sanitize({ accent: "album" }).accent).toBe("album");
+  expect(sanitize({ accent: "Album" }).accent).toBeNull();
+});

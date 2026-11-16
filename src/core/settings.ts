@@ -10,6 +10,7 @@ export interface SettingsData {
   /** What Clear's widgets are made of, with no bar behind them. */
   clearMaterial: ClearMaterial;
   theme: "auto" | "dark" | "light";
+  /** A colour, "album" to follow the cover of what's playing, or null for the default. */
   accent: string | null;
   size: number;
   hour24: boolean;
@@ -97,7 +98,7 @@ export function sanitize(raw: unknown): SettingsData {
     style: oneOf(raw.style, STYLES, d.style),
     clearMaterial: oneOf(raw.clearMaterial, ["black", "white", "frosted"] as const, d.clearMaterial),
     theme: oneOf(raw.theme, ["auto", "dark", "light"] as const, d.theme),
-    accent: typeof raw.accent === "string" && /^#[0-9a-f]{6}$/i.test(raw.accent) ? raw.accent : null,
+    accent: raw.accent === "album" || (typeof raw.accent === "string" && /^#[0-9a-f]{6}$/i.test(raw.accent)) ? raw.accent : null,
     size: typeof raw.size === "number" && Number.isFinite(raw.size) ? Math.min(SIZE_MAX, Math.max(SIZE_MIN, raw.size)) : d.size,
     hour24: bool(raw.hour24, d.hour24),
     seconds: bool(raw.seconds, d.seconds),

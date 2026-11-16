@@ -184,6 +184,11 @@
   background: conic-gradient(#ff453a, #ff9f0a, #ffd60a, #30d158, #64d2ff, #0a84ff, #bf5af2, #ff375f, #ff453a);
 }
 
+/* A record, so it doesn't read as the own-colour wheel beside it. */
+.accent--album {
+  background: radial-gradient(circle, #d1d1d6 0 14%, #1c1c1e 16% 38%, #3a3a3c 40% 44%, #1c1c1e 46% 68%, #3a3a3c 70% 74%, #1c1c1e 76%);
+}
+
 .accent--own input {
   position: absolute;
   inset: 0;
