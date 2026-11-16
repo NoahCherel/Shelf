@@ -1,12 +1,14 @@
 //! The dock window: where it sits, and how it reacts to the shell. Decisions live
 //! in `react`, which is pure; `run_action` is the only part that touches Windows.
 
+mod follow;
 mod geometry;
 mod saved;
 mod state;
 
 pub use geometry::*;
 pub use state::*;
+use follow::Follow;
 use saved::{saved_behaviour, saved_display, saved_layout, saved_taskbar_mode};
 
 use crate::util::lock;
@@ -286,10 +288,41 @@ fn seen_now(app: &AppHandle) -> Option<Seen> {
 }
 
 /// Samples often while auto-hide is on, and rests while it's off.
+/// With Follow: the screen whose edge the pointer has been held at, if it isn't the dock's own.
+/// Never during a game, a locked session or a drag.
+fn followed_to(follow: &mut Follow, now: u64) -> Option<String> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let busy = DOCK.moving.load(Ordering::Relaxed) || DOCK.os_drag.load(Ordering::Relaxed);
+    if busy || events::FULLSCREEN.load(Ordering::Relaxed) || events::LOCKED.load(Ordering::Relaxed) {
+        return None;
+    }
+    let mut p = POINT::default();
+    unsafe { GetCursorPos(&mut p) }.ok()?;
+    // A copy, so no lock is held while the others are taken.
+    let displays = lock(&DOCK.displays).clone();
+    let current = target(&displays)?.id.clone();
+    follow.decide((p.x, p.y), &displays, &current, layout().edge, now)
+}
+
+fn following() -> bool {
+    *lock(&DOCK.display_mode) == DisplayMode::Follow
+}
+
 fn watch_pointer(app: AppHandle, tx: Sender<ShellEvent>) {
     let mut auto = AutoHide::default();
+    let mut follow = Follow::default();
     let started = Instant::now();
     loop {
+        if following() {
+            if let Some(id) = followed_to(&mut follow, started.elapsed().as_millis() as u64) {
+                *lock(&DOCK.followed) = Some(id);
+                // Moving screens is what a display change already does: reserve, place, glass, taskbar.
+                if tx.send(ShellEvent::DisplayChange).is_err() {
+                    return;
+                }
+            }
+        }
         let slide = if DOCK.auto_hide.load(Ordering::Relaxed) {
             seen_now(&app).and_then(|seen| auto.decide(seen, DOCK.show_on_desktop.load(Ordering::Relaxed), started.elapsed().as_millis() as u64))
         } else {
@@ -300,7 +333,7 @@ fn watch_pointer(app: AppHandle, tx: Sender<ShellEvent>) {
                 return;
             }
         }
-        let on = DOCK.auto_hide.load(Ordering::Relaxed);
+        let on = DOCK.auto_hide.load(Ordering::Relaxed) || following();
         std::thread::sleep(Duration::from_millis(if on { 60 } else { 250 }));
     }
 }
