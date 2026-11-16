@@ -135,6 +135,8 @@ fn read_displays(app: &AppHandle) {
 fn place(dock: &WebviewWindow) {
     let Some((monitor, scale)) = target_monitor() else { return };
     *lock(&DOCK.monitor) = Some((monitor, scale));
+    // Before the early return, so the taskbar follows a dock that's slid away too.
+    TASKBAR.set_docked(vec![monitor]);
     let r = resting_rect(monitor, scale);
     if DOCK.moving.load(Ordering::Relaxed) || DOCK.away.load(Ordering::Relaxed) {
         let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
@@ -355,6 +357,10 @@ pub fn start(app: &AppHandle, busy: fn(&AppHandle) -> bool) -> Result<(), Box<dy
     *lock(&DOCK.display_mode) = mode;
     *lock(&DOCK.chosen_display) = chosen;
     *lock(&DOCK.displays) = displays::list();
+    // Known before the taskbar is first hidden, so the screen with the dock is the one that loses it.
+    if let Some((monitor, _)) = target_monitor() {
+        TASKBAR.set_docked(vec![monitor]);
+    }
     apply_taskbar();
     *lock(&DOCK.layout) = saved_layout(settings.as_ref(), layout());
 

@@ -2,12 +2,15 @@
 //! is saved to a file first, so it can be restored even after a crash.
 
 use crate::util::lock;
+
+use super::dock::Rect;
 use std::mem::size_of;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::System::Threading::{OpenProcess, WaitForSingleObject, INFINITE, PROCESS_SYNCHRONIZE};
 use windows::Win32::UI::Shell::{SHAppBarMessage, ABM_GETSTATE, ABM_SETSTATE, ABS_ALWAYSONTOP, ABS_AUTOHIDE, APPBARDATA};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -21,11 +24,24 @@ pub enum Mode {
     Autohide,
 }
 
+/// One of Windows' taskbars, and the monitor it's on.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Bar {
+    pub id: isize,
+    pub monitor: Rect,
+}
+
 pub trait TaskbarApi {
     fn autohide(&self) -> bool;
     fn set_autohide(&self, on: bool);
-    fn hide_windows(&self);
-    fn show_windows(&self);
+    fn bars(&self) -> Vec<Bar>;
+    fn set_shown(&self, id: isize, shown: bool);
+}
+
+/// Hidden takes the taskbar away only from screens with a dock. Elsewhere it stays, and as Windows'
+/// auto-hide setting is the same for every screen, it slides away there by itself.
+pub fn shown(mode: Mode, bar_monitor: Rect, docked: &[Rect]) -> bool {
+    mode != Mode::Hidden || !docked.contains(&bar_monitor)
 }
 
 /// A panic on the main thread ends Shelf. One on any other thread only ends that command, and
@@ -38,11 +54,13 @@ pub struct Taskbar<A> {
     api: A,
     state_file: PathBuf,
     mode: Mutex<Mode>,
+    /// The monitors with a dock on them.
+    docked: Mutex<Vec<Rect>>,
 }
 
 impl<A: TaskbarApi> Taskbar<A> {
     pub fn new(api: A, state_file: PathBuf) -> Self {
-        Self { api, state_file, mode: Mutex::new(Mode::Off) }
+        Self { api, state_file, mode: Mutex::new(Mode::Off), docked: Mutex::new(Vec::new()) }
     }
 
     pub fn mode(&self) -> Mode {
@@ -65,9 +83,29 @@ impl<A: TaskbarApi> Taskbar<A> {
             self.api.set_autohide(true);
         }
         *mode = next;
-        match next {
-            Mode::Hidden => self.api.hide_windows(),
-            _ => self.api.show_windows(),
+        self.show_as(next);
+    }
+
+    fn show_as(&self, mode: Mode) {
+        let docked = lock(&self.docked).clone();
+        for bar in self.api.bars() {
+            self.api.set_shown(bar.id, shown(mode, bar.monitor, &docked));
+        }
+    }
+
+    /// The dock moved to other monitors, or the monitors changed.
+    pub fn set_docked(&self, monitors: Vec<Rect>) {
+        {
+            let mut docked = lock(&self.docked);
+            // Called at every placement: showing or hiding Windows' taskbar each time would make it flicker.
+            if *docked == monitors {
+                return;
+            }
+            *docked = monitors;
+        }
+        let mode = *lock(&self.mode);
+        if mode != Mode::Off {
+            self.show_as(mode);
         }
     }
 
@@ -76,7 +114,12 @@ impl<A: TaskbarApi> Taskbar<A> {
     pub fn keep(&self) {
         let mode = lock(&self.mode);
         if *mode == Mode::Hidden {
-            self.api.hide_windows();
+            let docked = lock(&self.docked).clone();
+            for bar in self.api.bars() {
+                if !shown(Mode::Hidden, bar.monitor, &docked) {
+                    self.api.set_shown(bar.id, false);
+                }
+            }
         }
     }
 
@@ -89,7 +132,9 @@ impl<A: TaskbarApi> Taskbar<A> {
         if let Ok(saved) = std::fs::read_to_string(&self.state_file) {
             self.api.set_autohide(saved.trim() == "1");
         }
-        self.api.show_windows();
+        for bar in self.api.bars() {
+            self.api.set_shown(bar.id, true);
+        }
         let _ = std::fs::remove_file(&self.state_file);
     }
 }
@@ -131,20 +176,26 @@ impl TaskbarApi for RealTaskbar {
         unsafe { SHAppBarMessage(ABM_SETSTATE, &mut abd) };
     }
 
-    fn hide_windows(&self) {
-        for h in taskbars() {
-            unsafe {
-                if IsWindowVisible(h).as_bool() {
-                    let _ = ShowWindow(h, SW_HIDE);
-                }
-            }
-        }
+    fn bars(&self) -> Vec<Bar> {
+        taskbars()
+            .into_iter()
+            .map(|h| {
+                let mut info = MONITORINFO { cbSize: size_of::<MONITORINFO>() as u32, ..Default::default() };
+                // A hidden taskbar still has its place, so its monitor is still known.
+                let _ = unsafe { GetMonitorInfoW(MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST), &mut info) };
+                let r = info.rcMonitor;
+                Bar { id: h.0 as isize, monitor: Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top } }
+            })
+            .collect()
     }
 
-    fn show_windows(&self) {
-        for h in taskbars() {
-            unsafe {
+    fn set_shown(&self, id: isize, shown: bool) {
+        let h = HWND(id as *mut std::ffi::c_void);
+        unsafe {
+            if shown {
                 let _ = ShowWindow(h, SW_SHOW);
+            } else if IsWindowVisible(h).as_bool() {
+                let _ = ShowWindow(h, SW_HIDE);
             }
         }
     }
@@ -184,11 +235,21 @@ pub(crate) mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    /// Records calls and never touches the real taskbar.
-    #[derive(Clone, Default)]
+    pub const FHD: Rect = Rect { x: 0, y: 0, w: 1920, h: 1080 };
+    const SIDE: Rect = Rect { x: 1920, y: 0, w: 1920, h: 1080 };
+
+    /// Records calls and never touches the real taskbar. Has one taskbar, `1`, on `FHD`.
+    #[derive(Clone)]
     pub struct Fake {
         pub autohide: Rc<RefCell<bool>>,
         pub calls: Rc<RefCell<Vec<String>>>,
+        pub bars: Vec<Bar>,
+    }
+
+    impl Default for Fake {
+        fn default() -> Self {
+            Fake { autohide: Rc::default(), calls: Rc::default(), bars: vec![Bar { id: 1, monitor: FHD }] }
+        }
     }
 
     impl TaskbarApi for Fake {
@@ -199,12 +260,91 @@ pub(crate) mod tests {
             *self.autohide.borrow_mut() = on;
             self.calls.borrow_mut().push(format!("set_autohide({on})"));
         }
-        fn hide_windows(&self) {
-            self.calls.borrow_mut().push("hide".into());
+        fn bars(&self) -> Vec<Bar> {
+            self.bars.clone()
         }
-        fn show_windows(&self) {
-            self.calls.borrow_mut().push("show".into());
+        fn set_shown(&self, id: isize, shown: bool) {
+            let what = if shown { "show" } else { "hide" };
+            self.calls.borrow_mut().push(format!("{what}:{id}"));
         }
+    }
+
+    /// A taskbar whose only screen, `FHD`, has the dock: the usual case.
+    pub fn docked(fake: Fake, path: std::path::PathBuf) -> Taskbar<Fake> {
+        let bar = Taskbar::new(fake, path);
+        bar.set_docked(vec![FHD]);
+        bar
+    }
+
+    fn two_screens() -> Fake {
+        Fake { bars: vec![Bar { id: 1, monitor: FHD }, Bar { id: 2, monitor: SIDE }], ..Fake::default() }
+    }
+
+    fn has(fake: &Fake, call: &str) -> bool {
+        fake.calls.borrow().iter().any(|c| c == call)
+    }
+
+    #[test]
+    fn only_the_screen_with_the_dock_loses_its_taskbar() {
+        let fake = two_screens();
+        let bar = Taskbar::new(fake.clone(), state_path("per-screen"));
+        bar.set_docked(vec![FHD]);
+        bar.apply(Mode::Hidden);
+        assert!(has(&fake, "hide:1") && has(&fake, "show:2"), "{:?}", fake.calls.borrow());
+        assert!(fake.autohide(), "the screen without a dock keeps its taskbar on auto-hide");
+    }
+
+    #[test]
+    fn a_screen_that_loses_the_dock_gets_its_taskbar_back() {
+        let fake = two_screens();
+        let bar = Taskbar::new(fake.clone(), state_path("moves"));
+        bar.set_docked(vec![FHD]);
+        bar.apply(Mode::Hidden);
+        fake.calls.borrow_mut().clear();
+        bar.set_docked(vec![SIDE]);
+        assert!(has(&fake, "show:1") && has(&fake, "hide:2"), "{:?}", fake.calls.borrow());
+    }
+
+    #[test]
+    fn autohide_mode_shows_every_taskbar() {
+        let fake = two_screens();
+        let bar = Taskbar::new(fake.clone(), state_path("autohide-all"));
+        bar.set_docked(vec![FHD]);
+        bar.apply(Mode::Autohide);
+        assert!(has(&fake, "show:1") && has(&fake, "show:2"), "{:?}", fake.calls.borrow());
+    }
+
+    #[test]
+    fn restore_shows_every_taskbar() {
+        let fake = two_screens();
+        let bar = Taskbar::new(fake.clone(), state_path("restore-all"));
+        bar.set_docked(vec![FHD]);
+        bar.apply(Mode::Hidden);
+        fake.calls.borrow_mut().clear();
+        bar.restore();
+        assert!(has(&fake, "show:1") && has(&fake, "show:2"), "{:?}", fake.calls.borrow());
+    }
+
+    #[test]
+    fn keep_rehides_only_the_docked_screen() {
+        let fake = two_screens();
+        let bar = Taskbar::new(fake.clone(), state_path("keep-docked"));
+        bar.set_docked(vec![FHD]);
+        bar.apply(Mode::Hidden);
+        fake.calls.borrow_mut().clear();
+        bar.keep();
+        assert_eq!(*fake.calls.borrow(), vec!["hide:1"]);
+    }
+
+    #[test]
+    fn the_same_screens_again_touch_nothing() {
+        let fake = two_screens();
+        let bar = Taskbar::new(fake.clone(), state_path("same"));
+        bar.set_docked(vec![FHD]);
+        bar.apply(Mode::Hidden);
+        fake.calls.borrow_mut().clear();
+        bar.set_docked(vec![FHD]);
+        assert!(fake.calls.borrow().is_empty(), "{:?}", fake.calls.borrow());
     }
 
     pub fn state_path(name: &str) -> std::path::PathBuf {
@@ -235,12 +375,12 @@ pub(crate) mod tests {
     #[test]
     fn hide_saves_the_original_setting_then_restore_puts_it_back() {
         let fake = Fake::default();
-        let bar = Taskbar::new(fake.clone(), state_path("restore"));
+        let bar = docked(fake.clone(), state_path("restore"));
         bar.apply(Mode::Hidden);
         assert!(fake.autohide());
         bar.restore();
         assert!(!fake.autohide());
-        assert!(fake.calls.borrow().contains(&"show".to_string()));
+        assert!(fake.calls.borrow().contains(&"show:1".to_string()));
     }
 
     #[test]
@@ -272,27 +412,27 @@ pub(crate) mod tests {
     #[test]
     fn keep_rehides_only_in_hidden_mode() {
         let fake = Fake::default();
-        let bar = Taskbar::new(fake.clone(), state_path("keep"));
+        let bar = docked(fake.clone(), state_path("keep"));
         bar.keep();
         assert!(fake.calls.borrow().is_empty(), "does nothing before apply");
         bar.apply(Mode::Autohide);
         fake.calls.borrow_mut().clear();
         bar.keep();
-        assert!(!fake.calls.borrow().contains(&"hide".to_string()));
+        assert!(!fake.calls.borrow().contains(&"hide:1".to_string()));
         bar.apply(Mode::Hidden);
         fake.calls.borrow_mut().clear();
         bar.keep();
-        assert_eq!(*fake.calls.borrow(), vec!["hide"]);
+        assert_eq!(*fake.calls.borrow(), vec!["hide:1"]);
     }
 
     #[test]
     fn switching_to_autohide_shows_the_taskbar_again() {
         let fake = Fake::default();
-        let bar = Taskbar::new(fake.clone(), state_path("switch"));
+        let bar = docked(fake.clone(), state_path("switch"));
         bar.apply(Mode::Hidden);
         fake.calls.borrow_mut().clear();
         bar.apply(Mode::Autohide);
-        assert!(fake.calls.borrow().contains(&"show".to_string()));
+        assert!(fake.calls.borrow().contains(&"show:1".to_string()));
         assert!(fake.autohide());
     }
 }

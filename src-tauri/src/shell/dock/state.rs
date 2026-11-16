@@ -105,8 +105,8 @@ pub fn taskbar_mode_for(chosen: Mode, auto_hide: bool) -> Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shell::taskbar::tests::{state_path, Fake};
-    use crate::shell::taskbar::{Mode, Taskbar, TaskbarApi};
+    use crate::shell::taskbar::tests::{docked, state_path, Fake};
+    use crate::shell::taskbar::{Mode, TaskbarApi};
 
     #[test]
     fn a_maximized_window_is_not_fullscreen() {
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn taskbar_created_event_rehides_and_reregisters_appbar() {
         let fake = Fake::default();
-        let bar = Taskbar::new(fake.clone(), state_path("created"));
+        let bar = docked(fake.clone(), state_path("created"));
         bar.apply(Mode::Hidden);
         fake.calls.borrow_mut().clear();
 
@@ -129,7 +129,7 @@ mod tests {
         assert!(actions.contains(&Action::KeepTaskbar));
 
         bar.keep(); // what KeepTaskbar runs
-        assert_eq!(*fake.calls.borrow(), vec!["hide"]);
+        assert_eq!(*fake.calls.borrow(), vec!["hide:1"]);
         assert!(fake.autohide());
     }
 
