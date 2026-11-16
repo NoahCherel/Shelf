@@ -46,7 +46,16 @@ export interface SettingsData {
   narrowWidth: number | null;
   weather: { city: string };
   github: { user: string };
+  /** Every alert waits out these hours, "HH:MM" in local time; they can run past midnight. */
+  quietHours: { on: boolean; from: string; to: string };
+  /** The sound alerts play, one of Windows' own, or none. */
+  alertTone: AlertTone;
+  /** One switch per automation. */
+  automations: { aiLimits: boolean };
 }
+
+export const ALERT_TONES = ["none", "notify", "calendar", "chimes", "ding", "tada", "alarm"] as const;
+export type AlertTone = (typeof ALERT_TONES)[number];
 
 const SIZE_MIN = 40;
 const SIZE_MAX = 62;
@@ -80,6 +89,9 @@ export function defaults(): SettingsData {
     previews: true,
     weather: { city: "" },
     github: { user: "" },
+    quietHours: { on: false, from: "22:00", to: "08:00" },
+    alertTone: "notify",
+    automations: { aiLimits: true },
   };
 }
 
@@ -87,6 +99,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const oneOf = <T,>(v: unknown, options: readonly T[], fallback: T): T => (options.includes(v as T) ? (v as T) : fallback);
 const bool = (v: unknown, fallback: boolean) => (typeof v === "boolean" ? v : fallback);
 const text = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
+const clock = (v: unknown, fallback: string) => (typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : fallback);
 
 /** Each key falls back on its own, so one bad value can't cost the others. */
 export function sanitize(raw: unknown): SettingsData {
@@ -94,6 +107,8 @@ export function sanitize(raw: unknown): SettingsData {
   if (!isObject(raw)) return d;
   const weather = isObject(raw.weather) ? raw.weather : {};
   const github = isObject(raw.github) ? raw.github : {};
+  const quiet = isObject(raw.quietHours) ? raw.quietHours : {};
+  const automations = isObject(raw.automations) ? raw.automations : {};
   return {
     style: oneOf(raw.style, STYLES, d.style),
     clearMaterial: oneOf(raw.clearMaterial, ["black", "white", "frosted"] as const, d.clearMaterial),
@@ -120,6 +135,9 @@ export function sanitize(raw: unknown): SettingsData {
     narrowWidth: typeof raw.narrowWidth === "number" && Number.isFinite(raw.narrowWidth) ? Math.max(SIZE_MIN, raw.narrowWidth) : null,
     weather: { city: text(weather.city, d.weather.city) },
     github: { user: text(github.user, d.github.user) },
+    quietHours: { on: bool(quiet.on, d.quietHours.on), from: clock(quiet.from, d.quietHours.from), to: clock(quiet.to, d.quietHours.to) },
+    alertTone: oneOf(raw.alertTone, ALERT_TONES, d.alertTone),
+    automations: { aiLimits: bool(automations.aiLimits, d.automations.aiLimits) },
   };
 }
 

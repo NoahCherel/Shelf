@@ -149,3 +149,22 @@ it("keeps album as an accent", () => {
 it("keeps a dock on every screen", () => {
   expect(sanitize({ display: "all" }).display).toBe("all");
 });
+
+it("keeps quiet hours and falls back on bad times", () => {
+  expect(sanitize({ quietHours: { on: true, from: "23:30", to: "7:00" } }).quietHours).toEqual({ on: true, from: "23:30", to: "08:00" });
+  expect(sanitize({ quietHours: { on: "yes", from: "24:00", to: 8 } }).quietHours).toEqual({ on: false, from: "22:00", to: "08:00" });
+  expect(defaults().quietHours).toEqual({ on: false, from: "22:00", to: "08:00" });
+});
+
+it("keeps a known alert tone", () => {
+  expect(sanitize({ alertTone: "tada" }).alertTone).toBe("tada");
+  expect(sanitize({ alertTone: "none" }).alertTone).toBe("none");
+  expect(sanitize({ alertTone: "bell" }).alertTone).toBe("notify");
+  expect(defaults().alertTone).toBe("notify");
+});
+
+it("ai limit alerts are on by default", () => {
+  expect(defaults().automations).toEqual({ aiLimits: true });
+  expect(sanitize({ automations: { aiLimits: false } }).automations).toEqual({ aiLimits: false });
+  expect(sanitize({ automations: "off" }).automations).toEqual({ aiLimits: true });
+});

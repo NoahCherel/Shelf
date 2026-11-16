@@ -49,7 +49,6 @@ pub struct ToastAction {
 }
 
 /// Minutes since midnight. A range whose start is after its end runs past midnight; an empty one is never quiet.
-#[allow(dead_code)] // The gate reads it once quiet hours are a setting.
 pub fn quiet(now_min: u16, from_min: u16, to_min: u16) -> bool {
     if from_min <= to_min {
         (from_min..to_min).contains(&now_min)
@@ -168,8 +167,36 @@ fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
+/// "HH:MM" as minutes since midnight.
+fn minutes(text: &str) -> Option<u16> {
+    let (h, m) = text.split_once(':')?;
+    let (h, m) = (h.parse::<u16>().ok()?, m.parse::<u16>().ok()?);
+    (h < 24 && m < 60 && text.len() == 5).then_some(h * 60 + m)
+}
+
+/// The quiet hours set in Settings, as minutes since midnight, or None when they're off.
+fn quiet_from(settings: Option<&serde_json::Value>) -> Option<(u16, u16)> {
+    let quiet = settings?.get("quietHours")?;
+    if quiet.get("on")?.as_bool() != Some(true) {
+        return None;
+    }
+    Some((minutes(quiet.get("from")?.as_str()?)?, minutes(quiet.get("to")?.as_str()?)?))
+}
+
+/// The alert sound picked in Settings.
+fn tone_from(settings: Option<&serde_json::Value>) -> String {
+    settings.and_then(|s| s.get("alertTone")).and_then(|t| t.as_str()).unwrap_or("notify").to_string()
+}
+
+fn now_minutes() -> u16 {
+    let t = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
+    t.wHour * 60 + t.wMinute
+}
+
 fn gate() -> Gate {
-    Gate { quiet: false, fullscreen: events::FULLSCREEN.load(Ordering::Relaxed), locked: events::LOCKED.load(Ordering::Relaxed) }
+    let settings = crate::store::load(crate::store::SETTINGS);
+    let quiet = quiet_from(settings.as_ref()).is_some_and(|(from, to)| quiet(now_minutes(), from, to));
+    Gate { quiet, fullscreen: events::FULLSCREEN.load(Ordering::Relaxed), locked: events::LOCKED.load(Ordering::Relaxed) }
 }
 
 /// Puts the next toast on screen if none is, and the gate lets one through.
@@ -188,6 +215,9 @@ fn pump(app: &AppHandle) {
 }
 
 fn show(app: &AppHandle, toast: Toast, window_open: bool) {
+    if toast.sound {
+        crate::system::tone::play(&tone_from(crate::store::load(crate::store::SETTINGS).as_ref()));
+    }
     match window_open {
         true => {
             let _ = app.emit_to(LABEL, "toast-show", &toast);
@@ -456,6 +486,24 @@ mod tests {
     fn a_toast_taller_than_the_room_stays_on_the_screen() {
         let dock = Rect { x: 660, y: 1002, w: 600, h: 72 };
         assert_eq!(toast_rect(FHD, dock, Edge::Bottom, (340, 2000), 12).y, 0);
+    }
+
+    #[test]
+    fn quiet_hours_are_read_from_the_settings() {
+        let on = serde_json::json!({"quietHours": {"on": true, "from": "22:00", "to": "08:00"}});
+        assert_eq!(quiet_from(Some(&on)), Some((1320, 480)));
+        let off = serde_json::json!({"quietHours": {"on": false, "from": "22:00", "to": "08:00"}});
+        assert_eq!(quiet_from(Some(&off)), None);
+        let bad = serde_json::json!({"quietHours": {"on": true, "from": "25:00", "to": "08:00"}});
+        assert_eq!(quiet_from(Some(&bad)), None);
+        assert_eq!(quiet_from(None), None);
+    }
+
+    #[test]
+    fn the_tone_is_read_from_the_settings() {
+        assert_eq!(tone_from(Some(&serde_json::json!({"alertTone": "tada"}))), "tada");
+        assert_eq!(tone_from(Some(&serde_json::json!({}))), "notify");
+        assert_eq!(tone_from(None), "notify");
     }
 
     #[test]
