@@ -7,6 +7,7 @@ pub mod card;
 pub mod displays;
 pub mod dock;
 pub mod events;
+pub mod keys;
 pub mod taskbar;
 pub mod windows;
 
