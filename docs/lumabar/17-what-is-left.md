@@ -142,21 +142,18 @@ Dans `src/windows/settings/schema.ts` :
 
 ---
 
-### 1.7. Cartes et Interactions (`F-069` à `F-075`) — 5 / 7 faits
+### 1.7. Cartes et Interactions (`F-069` à `F-075`) — 7 / 7 faits
 
-Dans `src/windows/card/CardWindow.tsx` et `src/design/parts/Card.tsx` :
+Dans `src/windows/card/CardWindow.tsx`, `src/design/parts/Card.tsx`, `src-tauri/src/shell/toast.rs`, `src/windows/toast/` et `src/windows/dock/` :
 - ✅ `F-069` : Ouverture au-dessus (ou en-dessous) du widget avec glissement, sans jamais déborder de l'écran
 - ✅ `F-070` : Anatomie standard des cartes (en-tête, corps, pied de page, action)
 - ✅ `F-071` : Flux de connexion (`ConnectCard`), rafraîchissement, déconnexion et `Logout`
 - ✅ `F-072` : Menus clic droit spécifiques aux tuiles
+- ✅ `F-073` : Toasts. N'importe quelle page appelle `showToast` (`src/core/toast.ts`) ; la file Rust (`shell/toast.rs`) les garde pendant un plein écran ou une session verrouillée (et les heures calmes, F-080), jette ceux devenus faux (`expiresAt`) ou attendus plus de 24 h, et les montre un par un dans une fenêtre `toast` créée à la demande, à droite au-dessus du dock, sans prendre le focus. 8 secondes, temps suspendu sous le pointeur. Le bouton d'action passe par `open-request`, que seul le dock principal reçoit (`useOpenRequests`). **Coût mesuré :** environ +58 Mo pendant qu'un toast est à l'écran, rendus quand la fenêtre est détruite (accepté)
+- ✅ `F-074` : Le nom d'un widget dans la bulle des apps (`preview_tip`), après 600 ms de survol, sous le réglage *Names on hover*. `apps` et `system-status` nomment déjà chacune de leurs parties ; une app épinglée seule prend le nom affiché par sa tuile
 - ✅ `F-075` : Messages d'erreur en langage clair
 
-**Ce qu'il reste à faire :**
-
-| ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
-| --- | --- | --- | --- |
-| **F-073** | P2 | **Toasts** : petites fenêtres/bannières temporaires au-dessus du dock (pour les résumés Screen Time, les alertes de limite IA, les rappels de renouvellement, la pause musique avant réunion) | ❌ **Absent** → 🗓️ **Prévu** (plan 2026-11-16, Tasks 1 et 2 : file Rust `shell/toast.rs` qui attend pendant les heures calmes, un plein écran ou une session verrouillée ; fenêtre `toast` créée à la demande, à droite au-dessus du dock, sans prendre le focus ; bouton d'action par `open-request`) |
-| **F-074** | P2 | **Tooltips de widgets** : étiquette flottante sombre au-dessus d'une tuile de widget au survol indiquant son nom | ⚠️ **Partiel** (la bulle native `preview_name` existe pour les icônes d'apps, mais pas comme tooltip générique sur toutes les tuiles de widgets) → 🗓️ **Prévu** (plan 2026-11-16, Task 3 : `preview_tip` après 600 ms, sous le réglage *Names on hover* ; `apps` et `system-status` gardent leurs propres noms) |
+**À vérifier à la main :** `docs/manual-checks.md`, « Toasts » et « Widget names ».
 
 ---
 

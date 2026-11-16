@@ -244,6 +244,20 @@ Only in your own build: the preview doesn't watch the keyboard, so it can run be
 - [ ] **Left alone:** Win+T, then touch nothing: after 8 seconds the arrows go back to the app in front.
 - [ ] **Limit:** an open app kept inside a group isn't reached by Win+T.
 
+## Toasts
+
+The preview can show one: `window.__TAURI_INTERNALS__.invoke("toast_show", { toast: { id: "t", title: "Test", body: "Hello", sound: false } })` in the dock's page, through the debug port.
+
+- [ ] **Where it lands:** at the screen's right, just above the dock (below it with the dock at the top), sliding in from the right. Your app keeps the keyboard: typing still reaches it.
+- [ ] **How long:** it goes after 8 seconds, but not while the pointer rests on it. The cross closes it at once.
+- [ ] **During a game:** a toast sent while a game is fullscreen waits, and shows within 30 seconds of leaving the game.
+- [ ] **Its button:** Details opens the widget's card over its tile.
+
+## Widget names
+
+- [ ] **Resting on a widget:** after about half a second, its name shows above it in the same bubble as the apps' names. It goes when the pointer leaves or the tile is clicked.
+- [ ] **Not twice:** the Apps and Status widgets show only their own names, and an app pinned on its own shows the name on its tile, with no Windows tooltip as well.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?
