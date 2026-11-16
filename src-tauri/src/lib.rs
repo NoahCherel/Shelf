@@ -149,6 +149,8 @@ pub fn run() {
             shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,
             shell::displays::displays_list,
+            system::media::album_accent_follow,
+            system::media::album_accent_current,
             glass::glass_start,
             glass::glass_stop,
             glass::glass_frame,
@@ -261,6 +263,7 @@ pub fn run() {
             apps::previews::prepare(app.handle())?;
             shell::dock::start(app.handle(), keeps_dock_up)?;
             apps::watch_foreground(app.handle());
+            system::media::start(app.handle());
             build_tray(app.handle())?;
             shell::listen_for_quit(app.handle().clone());
             Ok(())
