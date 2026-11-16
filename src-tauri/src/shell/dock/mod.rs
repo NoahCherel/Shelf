@@ -7,7 +7,7 @@ mod state;
 
 pub use geometry::*;
 pub use state::*;
-use saved::{saved_behaviour, saved_layout, saved_taskbar_mode};
+use saved::{saved_behaviour, saved_display, saved_layout, saved_taskbar_mode};
 
 use crate::util::lock;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
@@ -27,6 +27,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::glass::{self, capture::Region};
 
 use super::appbar;
+use super::displays::{self, dock_display, Display, DisplayMode};
 use super::autohide::{self, AutoHide, Seen, Slide};
 use super::events;
 use super::taskbar::{Mode, TASKBAR};
@@ -56,6 +57,15 @@ struct Shared {
     chosen_taskbar: Mutex<Mode>,
     /// The dock's monitor, as last placed, so the pointer can be checked without asking the window.
     monitor: Mutex<Option<(Rect, f64)>>,
+    /// The screens as Windows last described them: read again only when they may have changed.
+    displays: Mutex<Vec<Display>>,
+    display_mode: Mutex<DisplayMode>,
+    /// The screen picked in Settings; None for the main one.
+    chosen_display: Mutex<Option<String>>,
+    /// With Follow: the screen the pointer last asked for.
+    followed: Mutex<Option<String>>,
+    /// The monitor the edge was last reserved on, so a move to another one drops the old strip.
+    appbar_on: Mutex<Option<Rect>>,
     hwnd: AtomicIsize,
     events: OnceLock<Sender<ShellEvent>>,
     taskbar_created: OnceLock<u32>,
@@ -73,6 +83,11 @@ static DOCK: Shared = Shared {
     slides: AtomicIsize::new(0),
     chosen_taskbar: Mutex::new(Mode::Hidden),
     monitor: Mutex::new(None),
+    displays: Mutex::new(Vec::new()),
+    display_mode: Mutex::new(DisplayMode::Single),
+    chosen_display: Mutex::new(None),
+    followed: Mutex::new(None),
+    appbar_on: Mutex::new(None),
     hwnd: AtomicIsize::new(0),
     events: OnceLock::new(),
     taskbar_created: OnceLock::new(),
@@ -85,52 +100,84 @@ pub fn os_drag(on: bool) {
 
 /// Where the dock rests on this monitor, as its layout says.
 fn resting_rect(monitor: Rect, scale: f64) -> Rect {
-    let l = layout();
-    dock_rect(monitor, scale, l.width, l.bar, l.gap, l.edge, l.along)
+    resting_on(monitor, scale, layout())
 }
 
 fn layout() -> DockLayout {
     *lock(&DOCK.layout)
 }
 
-fn monitor_rect(dock: &WebviewWindow) -> Option<(Rect, f64)> {
-    let m = dock.primary_monitor().ok().flatten()?;
-    let (pos, size) = (m.position(), m.size());
-    Some((Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }, m.scale_factor()))
+/// The screen the dock belongs on: the one chosen, or with Follow the one the pointer asked for.
+fn target(displays: &[Display]) -> Option<&Display> {
+    let chosen = lock(&DOCK.chosen_display).clone();
+    let wanted = match *lock(&DOCK.display_mode) {
+        DisplayMode::Follow => lock(&DOCK.followed).clone().or(chosen),
+        _ => chosen,
+    };
+    dock_display(displays, wanted.as_deref())
+}
+
+fn target_monitor() -> Option<(Rect, f64)> {
+    let displays = lock(&DOCK.displays);
+    target(&displays).map(|d| (d.rect, d.scale))
+}
+
+/// The dock's monitor as last placed, and its scale.
+pub fn monitor() -> Option<(Rect, f64)> {
+    *lock(&DOCK.monitor)
+}
+
+fn read_displays(app: &AppHandle) {
+    *lock(&DOCK.displays) = displays::list();
+    let _ = app.emit("displays-changed", ());
 }
 
 fn place(dock: &WebviewWindow) {
-    let Some((monitor, scale)) = monitor_rect(dock) else { return };
+    let Some((monitor, scale)) = target_monitor() else { return };
     *lock(&DOCK.monitor) = Some((monitor, scale));
     let r = resting_rect(monitor, scale);
-    let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
     if DOCK.moving.load(Ordering::Relaxed) || DOCK.away.load(Ordering::Relaxed) {
+        let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
         return;
     }
-    let _ = dock.set_position(PhysicalPosition::new(r.x, r.y));
+    let _ = super::windows::put(dock, r);
     glass::set_region(dock.app_handle(), Region { x: r.x, y: r.y, w: r.w, h: r.h });
 }
 
 /// The reserved edge stays the monitor's full width, so maximized windows
 /// keep stopping short of the bar however narrow the bar is.
 fn register_appbar(dock: &WebviewWindow) {
-    let Some((m, scale)) = monitor_rect(dock) else { return };
+    let _ = dock;
+    let Some((m, scale)) = target_monitor() else { return };
     if !crate::preview::current().reserve_edge {
         return;
     }
     let raw = DOCK.hwnd.load(Ordering::Relaxed);
     let l = layout();
+    let mut on = lock(&DOCK.appbar_on);
     match reserved_with(l, scale, DOCK.auto_hide.load(Ordering::Relaxed)) {
         Some(h) => {
+            // Setting a new position on another monitor leaves the old strip reserved.
+            if on.is_some_and(|was| was != m) {
+                appbar::unregister(raw);
+            }
             appbar::register(raw, reserved_rect(m, h, l.edge), l.edge);
+            *on = Some(m);
         }
-        None => appbar::unregister(raw),
+        None => {
+            appbar::unregister(raw);
+            *on = None;
+        }
     }
 }
 
 fn run_action(app: &AppHandle, action: Action) {
     if action == Action::KeepTaskbar {
         TASKBAR.keep();
+        return;
+    }
+    if action == Action::ReadDisplays {
+        read_displays(app);
         return;
     }
     let Some(dock) = app.get_webview_window("dock") else { return };
@@ -154,7 +201,7 @@ fn run_action(app: &AppHandle, action: Action) {
             glass::dock_hidden(app, status.autohidden);
             let _ = app.emit("shell-changed", status);
         }
-        Action::KeepTaskbar => {}
+        Action::KeepTaskbar | Action::ReadDisplays => {}
     }
 }
 
@@ -304,6 +351,10 @@ pub fn start(app: &AppHandle, busy: fn(&AppHandle) -> bool) -> Result<(), Box<dy
     DOCK.auto_hide.store(auto_hide, Ordering::Relaxed);
     DOCK.show_on_desktop.store(show_on_desktop, Ordering::Relaxed);
     *lock(&DOCK.chosen_taskbar) = saved_taskbar_mode(settings.as_ref());
+    let (mode, chosen) = saved_display(settings.as_ref());
+    *lock(&DOCK.display_mode) = mode;
+    *lock(&DOCK.chosen_display) = chosen;
+    *lock(&DOCK.displays) = displays::list();
     apply_taskbar();
     *lock(&DOCK.layout) = saved_layout(settings.as_ref(), layout());
 
@@ -374,7 +425,7 @@ pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: boo
 #[tauri::command]
 pub fn dock_drag(app: AppHandle, dx: f64, dy: f64) -> Result<(), String> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let (monitor, scale) = monitor_rect(&dock).ok_or("no monitor")?;
+    let (monitor, scale) = monitor().ok_or("no monitor")?;
     let rest = resting_rect(monitor, scale);
     DOCK.moving.store(true, Ordering::Relaxed);
     let (x, y) = dragged(rest, monitor, scale, dx, dy);

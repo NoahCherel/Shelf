@@ -79,16 +79,11 @@ impl Backend for RealCapture {
     fn begin(&mut self) -> Result<(), String> {
         let dock = self.app.get_webview_window("dock").ok_or("dock window missing")?;
         let hwnd = dock.hwnd().map_err(|e| e.to_string())?;
-        let origin = dock
-            .primary_monitor()
-            .ok()
-            .flatten()
-            .map_or((0, 0), |m| (m.position().x, m.position().y));
         let app = self.app.clone();
         let notify = Box::new(move || {
             let _ = app.emit_to("dock", "glass-frame", ());
         });
-        let session = capture::start(HWND(hwnd.0), origin, notify).map_err(|e| e.to_string())?;
+        let session = capture::start(HWND(hwnd.0), notify).map_err(|e| e.to_string())?;
         self.session = Some(session);
         Ok(())
     }

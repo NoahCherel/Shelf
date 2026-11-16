@@ -21,6 +21,8 @@ pub enum ShellEvent {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Action {
+    /// Asks Windows for its screens again: they may have changed.
+    ReadDisplays,
     KeepTaskbar,
     RegisterAppbar,
     PlaceDock,
@@ -54,10 +56,10 @@ pub fn fullscreen_now(fg: Foreground, previous_still_covers: bool) -> bool {
 pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
     use Action::*;
     match event {
-        ShellEvent::TaskbarCreated => vec![KeepTaskbar, RegisterAppbar, PlaceDock],
-        ShellEvent::DisplayChange => vec![KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass],
+        ShellEvent::TaskbarCreated => vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock],
+        ShellEvent::DisplayChange => vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass],
         ShellEvent::Resume => {
-            let mut actions = vec![KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass];
+            let mut actions = vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass];
             if !state.fullscreen && !state.autohidden {
                 actions.push(ShowDock);
             }
@@ -69,7 +71,7 @@ pub fn react(event: ShellEvent, state: &mut DockState) -> Vec<Action> {
         }
         ShellEvent::Unlock => {
             state.locked = false;
-            vec![KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass, Announce]
+            vec![ReadDisplays, KeepTaskbar, RegisterAppbar, PlaceDock, RestartGlass, Announce]
         }
         ShellEvent::Tick { fullscreen } => {
             let mut actions = vec![KeepTaskbar];
@@ -203,6 +205,16 @@ mod tests {
         assert_eq!(taskbar_mode_for(Mode::Autohide, true), Mode::Hidden);
         assert_eq!(taskbar_mode_for(Mode::Autohide, false), Mode::Autohide);
         assert_eq!(taskbar_mode_for(Mode::Hidden, false), Mode::Hidden);
+    }
+
+    #[test]
+    fn the_screens_are_reread_before_the_dock_is_placed() {
+        for event in [ShellEvent::DisplayChange, ShellEvent::Resume, ShellEvent::Unlock, ShellEvent::TaskbarCreated] {
+            let actions = react(event, &mut DockState { locked: true, ..Default::default() });
+            assert_eq!(actions[0], Action::ReadDisplays, "{event:?}");
+            let place = actions.iter().position(|a| *a == Action::PlaceDock).unwrap();
+            assert!(place > 0, "{event:?}");
+        }
     }
 
     #[test]

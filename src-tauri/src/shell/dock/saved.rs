@@ -2,6 +2,14 @@
 
 use super::super::taskbar::Mode;
 use super::geometry::{DockLayout, Edge};
+use super::super::displays::DisplayMode;
+
+/// Which screen the dock sits on: one chosen, or the one the pointer last asked for.
+pub fn saved_display(settings: Option<&serde_json::Value>) -> (DisplayMode, Option<String>) {
+    let mode = DisplayMode::from_name(settings.and_then(|s| s["display"].as_str()));
+    let monitor = settings.and_then(|s| s["displayMonitor"].as_str()).map(str::to_string);
+    (mode, monitor)
+}
 
 /// Auto-hide, and whether the dock stays up over the desktop.
 pub fn saved_behaviour(settings: Option<&serde_json::Value>) -> (bool, bool) {
@@ -43,6 +51,13 @@ mod tests {
         assert_eq!((top.edge, top.gap), (Edge::Top, 10.0));
         let full = saved_layout(Some(&serde_json::json!({ "edgeGap": 10.0, "dockWidth": "full" })), FIRST_LAYOUT);
         assert_eq!((full.edge, full.gap), (Edge::Bottom, 0.0));
+    }
+
+    #[test]
+    fn the_saved_screen_is_used_from_the_first_placement() {
+        let saved = saved_display(Some(&serde_json::json!({ "display": "follow", "displayMonitor": "X" })));
+        assert_eq!(saved, (DisplayMode::Follow, Some("X".to_string())));
+        assert_eq!(saved_display(None), (DisplayMode::Single, None));
     }
 
     #[test]

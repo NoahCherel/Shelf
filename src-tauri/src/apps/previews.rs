@@ -17,7 +17,7 @@ use ::windows::Win32::Graphics::Dwm::{
 use ::windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use ::windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use super::merge::AppEntry;
 use super::{current, windows};
@@ -289,8 +289,7 @@ fn place_over_tile(
         ((width * scale).round() as i32, (height * scale).round() as i32),
         (DOCK_GAP * scale).round() as i32,
     );
-    window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+    crate::shell::windows::put(window, r).map_err(|e| e.to_string())?;
     Ok(Some((on.dock, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
 }
 

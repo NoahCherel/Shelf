@@ -54,6 +54,11 @@ pub fn dock_rect(monitor: Rect, scale: f64, logical_width: f64, bar: f64, gap: f
     Rect { x, y, w, h }
 }
 
+/// Where the dock rests on this monitor, as its layout says.
+pub fn resting_on(monitor: Rect, scale: f64, layout: DockLayout) -> Rect {
+    dock_rect(monitor, scale, layout.width, layout.bar, layout.gap, layout.edge, layout.along)
+}
+
 /// The strip of the screen to keep clear (left, top, right, bottom).
 pub fn reserved_rect(monitor: Rect, height: i32, edge: Edge) -> (i32, i32, i32, i32) {
     let (left, right) = (monitor.x, monitor.x + monitor.w);
@@ -166,6 +171,14 @@ mod tests {
         assert_eq!(dragged(r, FHD, 1.25, 100.0, 0.0).0, 585);
         assert_eq!(dragged(r, FHD, 1.0, -5000.0, 0.0).0, 0);
         assert_eq!(dragged(r, FHD, 1.0, 5000.0, 0.0).0, 920);
+    }
+
+    #[test]
+    fn the_dock_is_sized_with_its_own_screen_s_scale() {
+        let side = Rect { x: 1920, y: 0, w: 2560, h: 1440 };
+        let r = resting_on(side, 1.5, FIRST_LAYOUT);
+        assert!(r.x >= 1920, "{r:?}");
+        assert_eq!(r.h, 83);
     }
 
     #[test]

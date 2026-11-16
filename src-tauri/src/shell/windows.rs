@@ -1,6 +1,15 @@
 //! Windows made on demand and destroyed on close, so they cost nothing when closed.
 
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+
+use super::dock::Rect;
+
+/// Position first, then size. Moved onto a screen of another scale, Windows rescales the window as it
+/// arrives, so a size set before the move would be scaled a second time.
+pub fn put(window: &WebviewWindow, r: Rect) -> tauri::Result<()> {
+    window.set_position(PhysicalPosition::new(r.x, r.y))?;
+    window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))
+}
 
 /// Must match every window in tauri.conf.json: windows with different options can't share WebView2.
 /// One renderer between them keeps memory down, as they only ever show Shelf's own pages.

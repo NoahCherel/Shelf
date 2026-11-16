@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use windows::Win32::Foundation::POINT;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
@@ -65,13 +65,9 @@ pub struct DockOnScreen {
 pub fn dock_on_screen(app: &AppHandle) -> Result<Option<DockOnScreen>, String> {
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let read = || -> tauri::Result<Option<DockOnScreen>> {
-        let Some(m) = dock.primary_monitor()? else { return Ok(None) };
+        let Some((monitor, scale)) = super::dock::monitor() else { return Ok(None) };
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
-        Ok(Some(DockOnScreen {
-            dock: Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 },
-            monitor: Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 },
-            scale: m.scale_factor(),
-        }))
+        Ok(Some(DockOnScreen { dock: Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }, monitor, scale }))
     };
     read().map_err(|e| e.to_string())
 }
@@ -204,8 +200,7 @@ fn place(app: &AppHandle, logical: (f64, f64)) -> Result<(), String> {
     let height = limit_height(logical.1, room_for_card(dock, monitor, margin, scale));
     let wanted = ((logical.0 * scale).round() as i32, (height * scale).round() as i32);
     let r = card_rect(tile, dock, monitor, wanted, margin);
-    card.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
-    card.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())
+    super::windows::put(&card, r).map_err(|e| e.to_string())
 }
 
 /// How tall a card may be here, so its body can scroll inside that rather than being cut off.
