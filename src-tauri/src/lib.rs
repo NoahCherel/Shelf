@@ -224,6 +224,7 @@ pub fn run() {
             apps::previews::preview_hint,
             apps::previews::preview_tip,
             shell::toast::toast_show,
+            shell::keys::set_panel_keys,
             system::tone::play_tone,
             shell::toast::toast_current,
             shell::toast::toast_fit,

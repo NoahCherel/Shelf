@@ -31,7 +31,11 @@ function ToggleRow({ row }: { row: Extract<RowDef, { kind: "toggle" }> }) {
     };
     return <Switch label={row.label} on={external} onFlip={flip} />;
   }
-  return <Switch label={row.label} on={Boolean(saved)} onFlip={() => save(!saved)} />;
+  const flip = () => {
+    save(!saved);
+    row.onChange?.(!saved as never);
+  };
+  return <Switch label={row.label} on={Boolean(saved)} onFlip={flip} />;
 }
 
 function SliderRow({ row }: { row: Extract<RowDef, { kind: "slider" }> }) {
