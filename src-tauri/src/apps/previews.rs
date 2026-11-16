@@ -350,6 +350,36 @@ pub fn preview_name(app: AppHandle, window: WebviewWindow, key: String, tile_x: 
     Ok(())
 }
 
+/// A widget's name in the same bubble, above its tile (F-074). The page gives the words, as only it
+/// knows a widget's name.
+#[tauri::command(async)]
+pub fn preview_tip(app: AppHandle, window: WebviewWindow, text: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
+    let opening = HOVER.bump();
+    if !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
+    let shown_as = format!("tip:{text}");
+    if lock(&SHOWN).as_deref() == Some(shown_as.as_str()) {
+        return Ok(());
+    }
+    let window = preview_window(&app)?;
+    let Some((dock_rect, strip)) = place_over_tile(&app, &window, |_| (name_width(&text), NAME_HEIGHT), tile_x, tile_width)? else { return Ok(()) };
+    if !HOVER.still_leaving(opening) || !may_show(crate::shell::card::is_open()) {
+        return Ok(());
+    }
+    let _ = set_peek(&app, None);
+    clear_pictures();
+    lock(&ON_STRIP).clear();
+    *lock(&SHOWN) = Some(shown_as);
+    let shown = Shown { key: String::new(), name: text, slot_width: 0.0, windows: Vec::new(), hint: false };
+    app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
+    window.show().map_err(|e| e.to_string())?;
+    watch_pointer(app.clone(), dock_rect, strip);
+    Ok(())
+}
+
 /// The window Tab chose during Win+T, marked in the strip.
 #[tauri::command]
 pub fn preview_select(app: AppHandle, hwnd: Option<isize>) -> Result<(), String> {

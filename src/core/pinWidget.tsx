@@ -51,7 +51,7 @@ function PinTile({ id, pinned, data, preview }: { id: string; pinned: Pinned } &
     else invoke("pin_widget_open", { id }).catch(() => {});
   };
   return (
-    <button type="button" className={running?.active ? "app app--active" : "app"} aria-label={name} title={name} onClick={open}>
+    <button type="button" className={running?.active ? "app app--active" : "app"} aria-label={name} onClick={open}>
       {icon ? <img className="app__icon" src={icon} alt="" draggable={false} /> : <span className="app__icon app__icon--blank">{name.charAt(0).toUpperCase()}</span>}
       {!!running?.windows.length && <span className="app__dot" />}
     </button>

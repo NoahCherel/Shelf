@@ -222,6 +222,7 @@ pub fn run() {
             apps::pin_widget::pin_widget_open,
             apps::pin_widget::pick_folder,
             apps::previews::preview_hint,
+            apps::previews::preview_tip,
             shell::toast::toast_show,
             shell::toast::toast_current,
             shell::toast::toast_fit,

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, type MouseEvent } from
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { byId } from "../../core/byId";
+import { isPinId } from "../../core/pinId";
 import { useLayout } from "../../core/layout";
 import { useSettings, type SettingsData } from "../../core/settings";
 import { usePicker, useShell } from "../../core/shell";
@@ -22,6 +23,10 @@ const DEFAULT_CARD_WIDTH = 340;
 const DEFAULT_CARD_HEIGHT = 300;
 const MENU_WIDTH = 210;
 const MENU_HEIGHT = 190;
+/** How long the pointer rests on a tile before its name shows. */
+const TIP_DELAY_MS = 600;
+/** Widgets that name each of their own parts. */
+const OWN_NAMES = new Set(["apps", "system-status"]);
 
 type Edge = SettingsData["edge"];
 
@@ -49,6 +54,35 @@ export function openWidgetCard(def: WidgetDef, tile: HTMLElement): void {
     width: def.cardWidth ?? DEFAULT_CARD_WIDTH,
     height: def.cardHeight ?? DEFAULT_CARD_HEIGHT,
   }).catch(() => {});
+}
+
+/** The words in a tile's bubble. A pinned app's widget is named after what its tile shows, as its id only knows the file. */
+function tipText(def: WidgetDef, tile: HTMLElement): string {
+  if (!isPinId(def.id)) return def.name;
+  return tile.querySelector("[aria-label]")?.getAttribute("aria-label") ?? def.name;
+}
+
+/** The widget's name in a bubble above it, once the pointer rests there, as for apps. */
+function useTileTip(def: WidgetDef, off: boolean) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const shown = useRef(false);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const cancel = () => {
+    clearTimeout(timer.current);
+    if (shown.current) invoke("preview_leave").catch(() => {});
+    shown.current = false;
+  };
+  const enter = (e: MouseEvent<HTMLDivElement>) => {
+    if (off || OWN_NAMES.has(def.id) || !useSettings.getState().hoverNames) return;
+    const tile = e.currentTarget;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const r = tile.getBoundingClientRect();
+      shown.current = true;
+      invoke("preview_tip", { text: tipText(def, tile), tileX: r.left, tileWidth: r.width }).catch(() => {});
+    }, TIP_DELAY_MS);
+  };
+  return { enter, cancel };
 }
 
 /** Whether a tile shows inside a narrowed, scrolling dock. Everything counts as shown without one. */
@@ -82,6 +116,8 @@ function Slot({ def, free, arriving, leavingWidth }: { def: WidgetDef; free?: Fr
     [setNodeRef],
   );
 
+  const tip = useTileTip(def, pickerOpen || leaving || isDragging);
+
   const openCard = (e: MouseEvent<HTMLDivElement>) => {
     if (pickerOpen) return;
     openWidgetCard(def, e.currentTarget);
@@ -102,6 +138,9 @@ function Slot({ def, free, arriving, leavingWidth }: { def: WidgetDef; free?: Fr
         ...(leaving ? ({ "--w": `${leavingWidth}px` } as React.CSSProperties) : {}),
       }}
       onClick={leaving ? undefined : openCard}
+      onPointerEnter={tip.enter}
+      onPointerLeave={tip.cancel}
+      onPointerDownCapture={tip.cancel}
       {...(leaving ? {} : free ? { onPointerDown: free.grab } : listeners)}
     >
       <T data={data} status={status} error={error} refresh={refresh} />
