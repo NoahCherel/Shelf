@@ -229,14 +229,14 @@ pub fn run() {
         ])
         .on_window_event(|window, event| match (event, window.label()) {
             // Alt+F4 must not take the dock down with the taskbar still hidden.
-            (WindowEvent::CloseRequested { api, .. }, "dock" | "preview") => api.prevent_close(),
+            (WindowEvent::CloseRequested { api, .. }, label) if label == "preview" || shell::dock::many::is_dock(label) => api.prevent_close(),
             (WindowEvent::CloseRequested { api, .. }, "card") => {
                 api.prevent_close();
                 shell::card::on_close(window);
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             // Something dragged from Windows over the dock holds it up while auto-hide is on.
-            (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), "dock") => {
+            (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), label) if shell::dock::many::is_dock(label) => {
                 if let WindowEvent::DragDrop(DragDropEvent::Enter { paths, .. }) = event {
                     diag::note("drag from Windows entered the dock");
                     apps::drag_entered(paths);
@@ -245,12 +245,12 @@ pub fn run() {
                 let at = serde_json::json!({ "x": position.x, "y": position.y, "pinnable": apps::drag_is_pinnable() });
                 let _ = tauri::Emitter::emit(window, "os-drag", at);
             }
-            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => {
+            (WindowEvent::DragDrop(DragDropEvent::Leave), label) if shell::dock::many::is_dock(label) => {
                 diag::note("drag from Windows left the dock");
                 shell::dock::os_drag(false);
                 let _ = tauri::Emitter::emit(window, "os-drag", serde_json::Value::Null);
             }
-            (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
+            (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), label) if shell::dock::many::is_dock(label) => {
                 diag::note(&format!("{} dropped on the dock", paths.len()));
                 shell::dock::os_drag(false);
                 apps::pin_dropped(window.app_handle().clone(), paths.clone());

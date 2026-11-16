@@ -253,7 +253,7 @@ fn set_peek(app: &AppHandle, target: Option<isize>) -> Result<(), String> {
 }
 
 /// A peek fades every other window, and these two have to stay for the pointer to move on.
-fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
+pub(crate) fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
     let raw = window.hwnd().map_err(|e| e.to_string())?;
     let exclude = BOOL::from(true);
     unsafe {
@@ -298,7 +298,9 @@ const HINT_ICON_WIDTH: f64 = 24.0;
 
 /// The bubble above the dock during a drag: what letting go would do. The page takes it down.
 #[tauri::command(async)]
-pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f64, tile_width: f64) -> Result<(), String> {
+pub fn preview_hint(app: AppHandle, window: WebviewWindow, what: String, key: Option<String>, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
     let lang = unsafe { ::windows::Win32::Globalization::GetUserDefaultUILanguage() };
     let name = match &key {
         Some(key) if what == "open" => crate::apps::every_entry()?.into_iter().find(|e| e.key == *key).map(|e| e.name).unwrap_or_default(),
@@ -317,7 +319,9 @@ pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f
 }
 
 #[tauri::command(async)]
-pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+pub fn preview_name(app: AppHandle, window: WebviewWindow, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
     let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
@@ -377,7 +381,9 @@ pub fn prepare(app: &AppHandle) -> Result<(), String> {
 /// Tile position is logical px inside the dock window.
 #[tauri::command(async)]
 /// `from_keys`: opened by Tab during Win+T. Optional, so a hover's call needn't name it.
-pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64, from_keys: Option<bool>) -> Result<(), String> {
+pub fn preview_show(app: AppHandle, window: WebviewWindow, key: String, tile_x: f64, tile_width: f64, from_keys: Option<bool>) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
     let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());

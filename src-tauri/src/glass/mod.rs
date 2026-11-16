@@ -101,15 +101,26 @@ fn glass(app: &AppHandle) -> &'static Mutex<Glass<RealCapture>> {
     GLASS.get_or_init(|| Mutex::new(Glass::new(RealCapture { app: app.clone(), session: None })))
 }
 
+/// Live glass films the screen behind the main dock only; extra docks use their style's solid look.
+fn has_glass(label: &str) -> bool {
+    label == crate::shell::dock::many::MAIN
+}
+
 /// The page asks when its style is glass, and stops asking when it isn't.
 #[tauri::command(async)]
-pub fn glass_start(app: AppHandle) -> Result<(), String> {
+pub fn glass_start(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if !has_glass(window.label()) {
+        return Err("no glass on this dock".into());
+    }
     ACTIVE.store(true, Ordering::Relaxed);
     lock(glass(&app)).want(true)
 }
 
 #[tauri::command(async)]
-pub fn glass_stop(app: AppHandle) -> Result<(), String> {
+pub fn glass_stop(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if !has_glass(window.label()) {
+        return Ok(());
+    }
     ACTIVE.store(false, Ordering::Relaxed);
     lock(glass(&app)).want(false)
 }
@@ -145,6 +156,12 @@ pub fn set_region(app: &AppHandle, region: Region) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_main_dock_films_the_screen() {
+        assert!(has_glass("dock"));
+        assert!(!has_glass("dock-2"));
+    }
 
     #[derive(Default)]
     struct Fake {

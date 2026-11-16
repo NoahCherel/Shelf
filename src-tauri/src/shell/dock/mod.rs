@@ -1,8 +1,10 @@
 //! The dock window: where it sits, and how it reacts to the shell. Decisions live
 //! in `react`, which is pure; `run_action` is the only part that touches Windows.
 
+mod extras;
 mod follow;
 mod geometry;
+pub mod many;
 mod saved;
 mod state;
 
@@ -114,7 +116,9 @@ fn target(displays: &[Display]) -> Option<&Display> {
     let chosen = lock(&DOCK.chosen_display).clone();
     let wanted = match *lock(&DOCK.display_mode) {
         DisplayMode::Follow => lock(&DOCK.followed).clone().or(chosen),
-        _ => chosen,
+        // With a dock on every screen, this one is the main screen's.
+        DisplayMode::All => None,
+        DisplayMode::Single => chosen,
     };
     dock_display(displays, wanted.as_deref())
 }
@@ -129,6 +133,15 @@ pub fn monitor() -> Option<(Rect, f64)> {
     *lock(&DOCK.monitor)
 }
 
+/// The monitor and scale of any of the docks, by window label.
+pub fn monitor_of(label: &str) -> Option<(Rect, f64)> {
+    if label == many::MAIN {
+        monitor()
+    } else {
+        extras::monitor_of(label)
+    }
+}
+
 fn read_displays(app: &AppHandle) {
     *lock(&DOCK.displays) = displays::list();
     let _ = app.emit("displays-changed", ());
@@ -138,7 +151,7 @@ fn place(dock: &WebviewWindow) {
     let Some((monitor, scale)) = target_monitor() else { return };
     *lock(&DOCK.monitor) = Some((monitor, scale));
     // Before the early return, so the taskbar follows a dock that's slid away too.
-    TASKBAR.set_docked(vec![monitor]);
+    TASKBAR.set_docked(extras::docked_monitors(monitor));
     let r = resting_rect(monitor, scale);
     if DOCK.moving.load(Ordering::Relaxed) || DOCK.away.load(Ordering::Relaxed) {
         let _ = dock.set_size(PhysicalSize::new(r.w as u32, r.h as u32));
@@ -183,6 +196,7 @@ fn run_action(app: &AppHandle, action: Action) {
     }
     if action == Action::ReadDisplays {
         read_displays(app);
+        extras::sync(app);
         return;
     }
     let Some(dock) = app.get_webview_window("dock") else { return };
@@ -213,6 +227,7 @@ fn run_action(app: &AppHandle, action: Action) {
 fn watch(app: AppHandle, rx: std::sync::mpsc::Receiver<ShellEvent>) {
     let mut state = DockState::default();
     let mut tracker = events::FullscreenTracker::default();
+    let mut extra_trackers = std::collections::HashMap::new();
     loop {
         let event = match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(event) => event,
@@ -222,6 +237,9 @@ fn watch(app: AppHandle, rx: std::sync::mpsc::Receiver<ShellEvent>) {
             }
             Err(RecvTimeoutError::Disconnected) => return,
         };
+        if matches!(event, ShellEvent::Tick { .. }) {
+            extras::tick(&app, &mut extra_trackers);
+        }
         let actions = react(event, &mut state);
         events::FULLSCREEN.store(state.fullscreen, Ordering::Relaxed);
         events::LOCKED.store(state.locked, Ordering::Relaxed);
@@ -473,7 +491,13 @@ pub fn stop() {
 
 /// Fits the window to the bar. Anything but a new width also changes what's reserved.
 #[tauri::command]
-pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: bool, edge: String, along: f64) -> Result<(), String> {
+pub fn set_dock_width(window: WebviewWindow, width: f64, bar: f64, gap: f64, float: bool, edge: String, along: f64) -> Result<(), String> {
+    let app = window.app_handle().clone();
+    // An extra dock shares the main one's layout, and has only its own width to report.
+    if window.label() != many::MAIN {
+        extras::set_width(&app, window.label(), width);
+        return Ok(());
+    }
     let edge = Edge::from_name(Some(&edge));
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let edge_changed = {
@@ -491,7 +515,11 @@ pub fn set_dock_width(app: AppHandle, width: f64, bar: f64, gap: f64, float: boo
 
 /// The dock follows the pointer, `dx` and `dy` logical px from where it rests.
 #[tauri::command]
-pub fn dock_drag(app: AppHandle, dx: f64, dy: f64) -> Result<(), String> {
+pub fn dock_drag(app: AppHandle, window: WebviewWindow, dx: f64, dy: f64) -> Result<(), String> {
+    // Only the main dock is moved by hand; the extras follow its settings.
+    if window.label() != many::MAIN {
+        return Ok(());
+    }
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let (monitor, scale) = monitor().ok_or("no monitor")?;
     let rest = resting_rect(monitor, scale);
@@ -509,7 +537,10 @@ pub struct Settled {
 /// Where the dock would settle if let go now, read from the window itself and the screen it's on,
 /// so a dock on another screen settles on that one. Moves nothing: the page saves this first.
 #[tauri::command]
-pub fn dock_drag_settle(app: AppHandle) -> Result<Settled, String> {
+pub fn dock_drag_settle(app: AppHandle, window: WebviewWindow) -> Result<Settled, String> {
+    if window.label() != many::MAIN {
+        return Err("only the main dock is moved by hand".into());
+    }
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     let (monitor, _) = monitor().ok_or("no monitor")?;
     let (pos, size) = (dock.outer_position().map_err(|e| e.to_string())?, dock.outer_size().map_err(|e| e.to_string())?);
@@ -519,7 +550,10 @@ pub fn dock_drag_settle(app: AppHandle) -> Result<Settled, String> {
 
 /// Let go: it goes back to where its layout says.
 #[tauri::command]
-pub fn dock_drag_end(app: AppHandle) -> Result<(), String> {
+pub fn dock_drag_end(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    if window.label() != many::MAIN {
+        return Ok(());
+    }
     let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
     DOCK.moving.store(false, Ordering::Relaxed);
     place(&dock);

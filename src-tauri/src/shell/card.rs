@@ -62,10 +62,18 @@ pub struct DockOnScreen {
     pub scale: f64,
 }
 
+/// The dock whose tile was last clicked or hovered: what opens is placed over that one.
+static ASKING: Mutex<String> = Mutex::new(String::new());
+
+pub fn asked_from(window: &WebviewWindow) {
+    *lock(&ASKING) = window.label().to_string();
+}
+
 pub fn dock_on_screen(app: &AppHandle) -> Result<Option<DockOnScreen>, String> {
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let label = Some(lock(&ASKING).clone()).filter(|l| !l.is_empty()).unwrap_or_else(|| "dock".into());
+    let dock = app.get_webview_window(&label).ok_or("dock window missing")?;
     let read = || -> tauri::Result<Option<DockOnScreen>> {
-        let Some((monitor, scale)) = super::dock::monitor() else { return Ok(None) };
+        let Some((monitor, scale)) = super::dock::monitor_of(&label) else { return Ok(None) };
         let (pos, size) = (dock.outer_position()?, dock.outer_size()?);
         Ok(Some(DockOnScreen { dock: Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }, monitor, scale }))
     };
@@ -215,6 +223,7 @@ pub fn card_room(app: AppHandle) -> Result<f64, String> {
 #[tauri::command]
 pub fn open_card(
     app: AppHandle,
+    window: WebviewWindow,
     widget_id: String,
     tile_x: f64,
     tile_width: f64,
@@ -230,9 +239,9 @@ pub fn open_card(
         CardMove::Close => return hide_card(&app),
         CardMove::Open => {}
     }
-    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
-    let scale = dock.scale_factor().map_err(|e| e.to_string())?;
-    let origin = dock.outer_position().map_err(|e| e.to_string())?.x;
+    asked_from(&window);
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let origin = window.outer_position().map_err(|e| e.to_string())?.x;
     *lock(&TILE) =
         Span { x: origin + (tile_x * scale).round() as i32, w: (tile_width * scale).round() as i32 };
     place(&app, (width, height))?;
@@ -363,6 +372,16 @@ pub fn on_close(window: &tauri::Window) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_card_opens_over_the_dock_it_was_asked_from() {
+        // dock-2, on a screen to the right of the main one.
+        let side = Rect { x: 1920, y: 0, w: 1920, h: 1080 };
+        let dock = Rect { x: 1920 + 560, y: 1000, w: 800, h: 72 };
+        let r = card_rect(Span { x: 1920 + 600, w: 50 }, dock, side, (340, 300), 8);
+        assert!(r.x >= side.x && r.x + r.w <= side.x + side.w, "{r:?}");
+        assert!(r.y + r.h <= dock.y, "above that dock");
+    }
 
     const MONITOR: Rect = Rect { x: 0, y: 0, w: 1920, h: 1080 };
     const DOCK: Rect = Rect { x: 460, y: 1008, w: 1000, h: 72 };

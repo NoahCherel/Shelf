@@ -125,8 +125,9 @@ pub fn close_grid() {
 
 /// Tile position is logical px inside the dock window.
 #[tauri::command(async)]
-pub fn tray_toggle(app: AppHandle, tile_x: f64, tile_width: f64) -> Result<(), String> {
+pub fn tray_toggle(app: AppHandle, window: tauri::WebviewWindow, tile_x: f64, tile_width: f64) -> Result<(), String> {
     crate::preview::guard()?;
+    crate::shell::card::asked_from(&window);
     let since_closed = lock(&CLOSED_AT).map(|at| at.elapsed().as_millis() as u64);
     let open = grid();
     match next_step(open.is_some(), since_closed) {

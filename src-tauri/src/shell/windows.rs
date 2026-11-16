@@ -13,7 +13,7 @@ pub fn put(window: &WebviewWindow, r: Rect) -> tauri::Result<()> {
 
 /// Must match every window in tauri.conf.json: windows with different options can't share WebView2.
 /// One renderer between them keeps memory down, as they only ever show Shelf's own pages.
-const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1";
+pub(crate) const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1";
 
 fn size_of(kind: &str) -> Option<(f64, f64, &'static str)> {
     match kind {
@@ -77,5 +77,17 @@ mod browser_args_tests {
         for window in windows {
             assert_eq!(window["additionalBrowserArgs"], BROWSER_ARGS, "{}", window["label"]);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_extra_docks_share_the_main_dock_s_browser_settings() {
+        // Windows with other arguments couldn't share WebView2 with the main dock.
+        let conf = include_str!("../../tauri.conf.json");
+        assert!(conf.contains(&format!("\"additionalBrowserArgs\": \"{BROWSER_ARGS}\"")));
     }
 }
