@@ -63,6 +63,9 @@ pub fn on_destroyed(window: &tauri::Window) {
     if window.label() == "picker" {
         let _ = window.emit("picker-open", false);
     }
+    if window.label() == "toast" {
+        super::toast::closed(window.app_handle());
+    }
 }
 
 #[cfg(test)]

@@ -22,6 +22,9 @@ const TOAST_WIDTH: f64 = 340.0;
 const MARGIN: f64 = 12.0;
 /// How often held toasts are looked at again, as quiet hours or a game end.
 const RECHECK: Duration = Duration::from_secs(30);
+/// A toast on screen this long with no word from its page is given up, so one page that broke or
+/// never loaded can't hold back every toast after it. Longer than a toast lasts under the pointer.
+const STUCK_MS: u64 = 120_000;
 
 /// Longer than any quiet hours, so what was held does come out when they end.
 pub const HOLD_MAX_MS: u64 = 24 * 3_600_000;
@@ -113,8 +116,50 @@ pub fn toast_rect(monitor: Rect, dock: Rect, edge: Edge, size: (i32, i32), margi
 #[derive(Default)]
 struct State {
     queue: Toasts,
-    /// The toast on screen, apart from those waiting.
-    current: Option<Toast>,
+    /// The toast on screen, apart from those waiting, and since when.
+    current: Option<(Toast, u64)>,
+    /// The window was told to go and hasn't gone yet: Windows destroys it a moment later, and a
+    /// toast sent to it meanwhile would never be seen nor finished.
+    closing: bool,
+}
+
+/// What the window does once a toast is over.
+#[derive(Debug, PartialEq)]
+enum After {
+    Show(Toast),
+    Close,
+}
+
+impl State {
+    /// The next toast to put on screen, if none is, the window isn't going away, and the gate is open.
+    fn take(&mut self, gate: Gate, now: u64) -> Option<Toast> {
+        if self.current.is_some() || self.closing {
+            return None;
+        }
+        let next = self.queue.next(gate, now)?;
+        self.current = Some((next.clone(), now));
+        Some(next)
+    }
+
+    fn finish(&mut self, gate: Gate, now: u64) -> After {
+        self.current = None;
+        match self.take(gate, now) {
+            Some(next) => After::Show(next),
+            None => {
+                self.closing = true;
+                After::Close
+            }
+        }
+    }
+
+    /// The window is gone: the next toast gets a new one.
+    fn closed(&mut self) {
+        self.closing = false;
+    }
+
+    fn stuck(&self, now: u64) -> bool {
+        self.current.as_ref().is_some_and(|(_, since)| now.saturating_sub(*since) > STUCK_MS)
+    }
 }
 
 static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| Mutex::new(State::default()));
@@ -129,22 +174,26 @@ fn gate() -> Gate {
 
 /// Puts the next toast on screen if none is, and the gate lets one through.
 fn pump(app: &AppHandle) {
+    let window = app.get_webview_window(LABEL);
     let next = {
         let mut state = lock(&STATE);
-        if state.current.is_some() {
-            return;
+        // Gone without its Destroyed event being seen: nothing is closing any more.
+        if window.is_none() {
+            state.closed();
         }
-        let next = state.queue.next(gate(), now_ms());
-        state.current.clone_from(&next);
-        next
+        state.take(gate(), now_ms())
     };
     let Some(toast) = next else { return };
-    match app.get_webview_window(LABEL) {
-        Some(_) => {
+    show(app, toast, window.is_some());
+}
+
+fn show(app: &AppHandle, toast: Toast, window_open: bool) {
+    match window_open {
+        true => {
             let _ = app.emit_to(LABEL, "toast-show", &toast);
         }
         // The new page asks for it with toast_current.
-        None => open_window(app),
+        false => open_window(app),
     }
 }
 
@@ -194,7 +243,7 @@ pub fn toast_show(app: AppHandle, toast: Toast) {
 /// Catches up a page that loaded after `toast-show` fired.
 #[tauri::command]
 pub fn toast_current() -> Option<Toast> {
-    lock(&STATE).current.clone()
+    lock(&STATE).current.as_ref().map(|(t, _)| t.clone())
 }
 
 /// The page reports how tall the toast is, once drawn: it is placed and shown.
@@ -214,13 +263,31 @@ pub fn toast_fit(app: AppHandle, height: f64) -> Result<(), String> {
 /// The toast on screen is over: the next one, or the window goes, so a closed toast costs nothing.
 #[tauri::command(async)]
 pub fn toast_done(app: AppHandle) {
-    lock(&STATE).current = None;
-    pump(&app);
-    if lock(&STATE).current.is_none() {
-        if let Some(window) = app.get_webview_window(LABEL) {
-            let _ = window.destroy();
+    finish(&app);
+}
+
+fn finish(app: &AppHandle) {
+    let window = app.get_webview_window(LABEL);
+    // Decided under the lock, so a toast arriving meanwhile waits for the new window.
+    let after = lock(&STATE).finish(gate(), now_ms());
+    match (after, window) {
+        (After::Show(next), Some(_)) => show(app, next, true),
+        (After::Show(next), None) => show(app, next, false),
+        (After::Close, Some(window)) => {
+            if window.destroy().is_err() {
+                lock(&STATE).closed();
+            }
         }
+        (After::Close, None) => lock(&STATE).closed(),
     }
+}
+
+/// The window is gone: whatever waited for it can show.
+pub fn closed(app: &AppHandle) {
+    lock(&STATE).closed();
+    // Off this thread: this runs in a window event, and making a window there deadlocks WebView2.
+    let app = app.clone();
+    std::thread::spawn(move || pump(&app));
 }
 
 /// Looks at held toasts again now and then, so they come out once quiet hours or a game end.
@@ -228,11 +295,14 @@ pub fn start(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || loop {
         std::thread::sleep(RECHECK);
-        let waiting = {
+        let (stuck, waiting) = {
             let state = lock(&STATE);
-            state.current.is_none() && !state.queue.is_empty()
+            (state.stuck(now_ms()), state.current.is_none() && !state.queue.is_empty())
         };
-        if waiting {
+        if stuck {
+            crate::diag::note("a toast's page never finished it; giving it up");
+            finish(&app);
+        } else if waiting {
             pump(&app);
         }
     });
@@ -246,6 +316,48 @@ mod tests {
 
     fn toast(id: &str, title: &str) -> Toast {
         Toast { id: id.into(), title: title.into(), body: String::new(), action: None, sound: false, expires_at: None }
+    }
+
+    #[test]
+    fn nothing_comes_out_while_the_last_window_is_closing() {
+        let mut s = State::default();
+        s.queue.push(toast("a", "A"), 0);
+        assert_eq!(s.take(Gate::default(), 1).map(|t| t.id), Some("a".into()));
+        assert_eq!(s.finish(Gate::default(), 2), After::Close);
+        s.queue.push(toast("b", "B"), 3);
+        assert_eq!(s.take(Gate::default(), 4), None, "the old window is still going away");
+        s.closed();
+        assert_eq!(s.take(Gate::default(), 5).map(|t| t.id), Some("b".into()));
+    }
+
+    #[test]
+    fn the_next_toast_reuses_the_window() {
+        let mut s = State::default();
+        s.queue.push(toast("a", "A"), 0);
+        s.queue.push(toast("b", "B"), 0);
+        s.take(Gate::default(), 1);
+        assert_eq!(s.finish(Gate::default(), 2), After::Show(toast("b", "B")));
+        assert!(!s.closing);
+    }
+
+    #[test]
+    fn a_held_toast_still_lets_the_window_close() {
+        let mut s = State::default();
+        s.queue.push(toast("a", "A"), 0);
+        s.take(Gate::default(), 1);
+        s.queue.push(toast("b", "B"), 1);
+        assert_eq!(s.finish(Gate { quiet: true, ..Gate::default() }, 2), After::Close);
+        assert!(!s.queue.is_empty());
+    }
+
+    #[test]
+    fn a_toast_page_that_never_answers_is_given_up() {
+        let mut s = State::default();
+        s.queue.push(toast("a", "A"), 0);
+        s.take(Gate::default(), 1_000);
+        assert!(!s.stuck(1_000 + STUCK_MS));
+        assert!(s.stuck(1_000 + STUCK_MS + 1));
+        assert!(!State::default().stuck(u64::MAX));
     }
 
     const OPEN: Gate = Gate { quiet: false, fullscreen: false, locked: false };
