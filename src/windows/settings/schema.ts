@@ -25,6 +25,8 @@ export type RowDef =
   | (Common & { kind: "text"; placeholder?: string })
   | (Common & { kind: "accent" })
   | (Common & { kind: "screen" })
+  | (Common & { kind: "select"; options: { value: string; label: string }[] })
+  | (Common & { kind: "time" })
   | (Common & { kind: "image" })
   | (Common & { kind: "action"; run: () => void; danger?: boolean })
   | (Common & { kind: "version" });
@@ -47,6 +49,10 @@ export const toggle = (key: string, o: Options<Extract<RowDef, { kind: "toggle" 
 export const slider = (key: string, o: Options<Extract<RowDef, { kind: "slider" }>>): RowDef => ({ kind: "slider", key, ...o });
 const choice = (key: string, o: Options<Extract<RowDef, { kind: "choice" }>>): RowDef => ({ kind: "choice", key, ...o });
 const text = (key: string, o: Options<Extract<RowDef, { kind: "text" }>>): RowDef => ({ kind: "text", key, ...o });
+const select = (key: string, o: Options<Extract<RowDef, { kind: "select" }>>): RowDef => ({ kind: "select", key, ...o });
+const time = (key: string, o: Options<Extract<RowDef, { kind: "time" }>>): RowDef => ({ kind: "time", key, ...o });
+
+const quietOff = (s: SettingsData) => !s.quietHours.on;
 
 /** Tells the dock which screen to sit on, from both rows that decide it. */
 const moveDock = () => {
@@ -238,6 +244,34 @@ export const SCHEMA: PageDef[] = [
           danger: true,
           run: () => void invoke("quit").catch(() => {}),
         },
+      ]),
+    ],
+  },
+  {
+    id: "automations",
+    title: "Automations",
+    groups: [
+      section("Alerts", [
+        toggle("automations.aiLimits", { label: "AI limits", tip: "Warns when a Claude limit reaches 80%, and again at 95%." }),
+        select("alertTone", {
+          label: "Alert sound",
+          tip: "Played with each alert. Picking one plays it.",
+          options: [
+            { value: "none", label: "None" },
+            { value: "notify", label: "Notify" },
+            { value: "calendar", label: "Calendar" },
+            { value: "chimes", label: "Chimes" },
+            { value: "ding", label: "Ding" },
+            { value: "tada", label: "Tada" },
+            { value: "alarm", label: "Alarm" },
+          ],
+          onChange: (name: never) => void invoke("play_tone", { name }).catch(() => {}),
+        }),
+      ]),
+      section("Quiet hours", [
+        toggle("quietHours.on", { label: "Quiet hours", tip: "Holds every alert during these hours. Held alerts show when quiet hours end." }),
+        time("quietHours.from", { label: "From", tip: "Quiet hours can run past midnight.", disabledWhen: quietOff }),
+        time("quietHours.to", { label: "To", tip: "Quiet hours can run past midnight.", disabledWhen: quietOff }),
       ]),
     ],
   },
