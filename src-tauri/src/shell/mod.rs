@@ -3,6 +3,7 @@
 pub mod appbar;
 pub mod autohide;
 pub mod card;
+pub mod displays;
 pub mod dock;
 pub mod events;
 pub mod taskbar;

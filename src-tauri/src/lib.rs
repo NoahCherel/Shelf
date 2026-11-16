@@ -146,6 +146,7 @@ pub fn run() {
             shell::windows::open_window,
             shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,
+            shell::displays::displays_list,
             glass::glass_start,
             glass::glass_stop,
             glass::glass_frame,
