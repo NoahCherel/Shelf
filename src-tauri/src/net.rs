@@ -42,6 +42,32 @@ fn allowed_url(url: &str, has_secret: bool) -> bool {
     url.starts_with("https://") || (!has_secret && url.starts_with("http://"))
 }
 
+/// The error and every cause under it, as SChannel's reason for refusing a certificate is deep down.
+fn error_chain(e: &reqwest::Error) -> String {
+    let mut text = e.to_string();
+    let mut cause = std::error::Error::source(e);
+    while let Some(c) = cause {
+        text.push_str(": ");
+        text.push_str(&c.to_string());
+        cause = c.source();
+    }
+    text
+}
+
+/// "certificate" when a secure connection was refused, as behind a company proxy that inspects
+/// traffic with a certificate Windows doesn't trust; "offline" when nothing answered; else the error.
+/// A refused certificate is also a connection error to reqwest, so it's looked for first.
+fn failure_text(connect: bool, timeout: bool, chain: &str) -> String {
+    let lower = chain.to_lowercase();
+    if lower.contains("certificate") || lower.contains("revocation") {
+        "certificate".into()
+    } else if connect || timeout {
+        "offline".into()
+    } else {
+        chain.to_string()
+    }
+}
+
 /// Errors are a plain string: "offline" for network failures, which providers
 /// turn into their own typed error.
 #[tauri::command]
@@ -58,11 +84,8 @@ pub async fn http_get(client: State<'_, reqwest::Client>, req: HttpGet) -> Resul
         request = request.header(secret.header, header_value(secret.prefix.as_deref(), &value));
     }
     let response = request.send().await.map_err(|e| {
-        if e.is_connect() || e.is_timeout() {
-            "offline".to_string()
-        } else {
-            e.without_url().to_string()
-        }
+        let (connect, timeout) = (e.is_connect(), e.is_timeout());
+        failure_text(connect, timeout, &error_chain(&e.without_url()))
     })?;
     let status = response.status().as_u16();
     let body = response.text().await.map_err(|_| "offline".to_string())?;
@@ -85,5 +108,34 @@ mod tests {
         assert!(!allowed_url("http://api.stripe.com/v1", true));
         assert!(allowed_url("http://example.test", false));
         assert!(!allowed_url("file:///c:/x", false));
+    }
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use super::failure_text;
+
+    #[test]
+    fn an_untrusted_certificate_is_named() {
+        let chain = "error sending request: error trying to connect: The certificate chain was issued by an authority that is not trusted.";
+        assert_eq!(failure_text(true, false, chain), "certificate");
+    }
+
+    #[test]
+    fn a_revocation_check_failure_is_named_too() {
+        let chain = "error trying to connect: The revocation function was unable to check revocation for the certificate.";
+        assert_eq!(failure_text(true, false, chain), "certificate");
+        assert_eq!(failure_text(true, false, "CRYPT_E_NO_REVOCATION_CHECK"), "certificate");
+    }
+
+    #[test]
+    fn a_dropped_connection_is_offline() {
+        assert_eq!(failure_text(true, false, "connection refused"), "offline");
+        assert_eq!(failure_text(false, true, ""), "offline");
+    }
+
+    #[test]
+    fn anything_else_is_told_as_it_is() {
+        assert_eq!(failure_text(false, false, "builder error"), "builder error");
     }
 }

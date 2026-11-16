@@ -4,6 +4,8 @@ import type { Provider, ProviderError, Status } from "./widget";
 export type { Provider } from "./widget";
 
 const MIN_RETRY_MS = 60_000;
+/** After an offline failure, as when the PC wakes before its Wi-Fi does: soon, then less often. */
+export const OFFLINE_RETRY_MS = [5_000, 15_000, 30_000, 60_000];
 
 export interface Snapshot<D> {
   data: D | null;
@@ -24,6 +26,8 @@ interface Entry<D> {
   timer?: ReturnType<typeof setTimeout>;
   inFlight: boolean;
   lastAt: number;
+  /** Offline failures in a row, for how soon to try again. */
+  offlineTries: number;
 }
 
 const entries = new Map<string, Entry<any>>();
@@ -38,6 +42,7 @@ function entryFor<D>(provider: Provider<D>, sample?: D): Entry<D> {
       state: { data: null, status: "loading" },
       listeners: new Set(),
       inFlight: false,
+      offlineTries: 0,
       lastAt: 0,
     };
     entries.set(provider.id, entry);
@@ -80,12 +85,19 @@ async function run<D>(entry: Entry<D>) {
       const cached: Cached<D> = { value, at: entry.lastAt };
       invoke("store_save", { name: `cache-${provider.id}`, value: cached }).catch(() => {});
     }
+    entry.offlineTries = 0;
     schedule(entry, provider.intervalMs);
   } catch (e) {
     const error = asError(e);
     const known = entry.state.status === "sample" ? null : entry.state.data;
     publish(entry, known === null ? { data: null, status: "error", error } : { data: known, status: "stale", error });
-    schedule(entry, Math.max(provider.intervalMs, MIN_RETRY_MS));
+    if (error.kind === "offline") {
+      // The network is likely back within seconds; waiting a whole interval could mean half an hour.
+      schedule(entry, OFFLINE_RETRY_MS[Math.min(entry.offlineTries, OFFLINE_RETRY_MS.length - 1)]);
+      entry.offlineTries++;
+    } else {
+      schedule(entry, Math.max(provider.intervalMs, MIN_RETRY_MS));
+    }
   } finally {
     entry.inFlight = false;
   }
@@ -151,6 +163,17 @@ listen<string>("provider-refresh", (id) => {
   const entry = entries.get(id);
   if (entry && entry.listeners.size > 0) void run(entry);
 });
+
+// Windows says the network is back: whatever failed for want of it tries again now.
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    for (const entry of entries.values()) {
+      if (entry.state.error?.kind !== "offline" || entry.listeners.size === 0) continue;
+      clearTimeout(entry.timer);
+      void run(entry);
+    }
+  });
+}
 
 listen<string>("store-changed", async (name) => {
   if (!name.startsWith("cache-")) return;

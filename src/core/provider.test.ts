@@ -123,7 +123,7 @@ it("failures back off to at least 60 seconds", async () => {
   const p: Provider<number> = {
     id: "demo",
     intervalMs: 1_000,
-    fetch: vi.fn().mockRejectedValue({ kind: "offline", message: "x" }),
+    fetch: vi.fn().mockRejectedValue({ kind: "other", message: "x" }),
   };
   renderHook(() => useProvider(p));
   await flush();
@@ -259,4 +259,93 @@ it("a source shared with a tile still in view keeps going", async () => {
   await flush();
   await advance(3000);
   expect(p.fetch.mock.calls.length).toBeGreaterThan(2);
+});
+
+describe("coming back after the network", () => {
+  const offline: ProviderError = { kind: "offline", message: "Can't reach the service." };
+
+  it("retries soon after an offline failure", async () => {
+    const { useProvider } = await fresh();
+    const p = counter({ intervalMs: 30 * 60_000 });
+    p.fetch.mockRejectedValue(offline);
+    renderHook(() => useProvider(p));
+    await flush();
+    expect(p.fetch).toHaveBeenCalledTimes(1);
+    await advance(4_999);
+    expect(p.fetch).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(p.fetch).toHaveBeenCalledTimes(2);
+    await advance(15_000);
+    expect(p.fetch).toHaveBeenCalledTimes(3);
+    await advance(30_000);
+    expect(p.fetch).toHaveBeenCalledTimes(4);
+    await advance(60_000);
+    expect(p.fetch).toHaveBeenCalledTimes(5);
+    await advance(60_000);
+    expect(p.fetch).toHaveBeenCalledTimes(6);
+  });
+
+  it("keeps its last values while offline", async () => {
+    const { useProvider } = await fresh();
+    const p = counter({ intervalMs: 30 * 60_000 });
+    const { result } = renderHook(() => useProvider(p));
+    await flush();
+    p.fetch.mockRejectedValue(offline);
+    await advance(30 * 60_000);
+    expect(result.current.status).toBe("stale");
+    expect(result.current.data).toBe(1);
+  });
+
+  it("goes back to its interval once it reaches the service", async () => {
+    const { useProvider } = await fresh();
+    const p = counter({ intervalMs: 30 * 60_000 });
+    p.fetch.mockRejectedValueOnce(offline);
+    renderHook(() => useProvider(p));
+    await flush();
+    await advance(5_000);
+    expect(p.fetch).toHaveBeenCalledTimes(2);
+    await advance(29 * 60_000);
+    expect(p.fetch).toHaveBeenCalledTimes(2);
+    p.fetch.mockRejectedValueOnce(offline);
+    await advance(60_000);
+    expect(p.fetch).toHaveBeenCalledTimes(3);
+    await advance(5_000);
+    expect(p.fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("refreshes offline providers when the network comes back", async () => {
+    const { useProvider } = await fresh();
+    const p = counter({ intervalMs: 30 * 60_000 });
+    p.fetch.mockRejectedValueOnce(offline);
+    renderHook(() => useProvider(p));
+    await flush();
+    await advance(1_000);
+    expect(p.fetch).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event("online"));
+    await flush();
+    expect(p.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("the network coming back leaves working providers alone", async () => {
+    const { useProvider } = await fresh();
+    const p = counter({ intervalMs: 30 * 60_000 });
+    renderHook(() => useProvider(p));
+    await flush();
+    window.dispatchEvent(new Event("online"));
+    await flush();
+    expect(p.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("other errors still wait for the interval", async () => {
+    const { useProvider } = await fresh();
+    const p = counter({ intervalMs: 30 * 60_000 });
+    p.fetch.mockRejectedValue({ kind: "rejected", message: "Key rejected" });
+    renderHook(() => useProvider(p));
+    await flush();
+    await advance(30 * 60_000 - 1);
+    expect(p.fetch).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event("online"));
+    await flush();
+    expect(p.fetch).toHaveBeenCalledTimes(1);
+  });
 });

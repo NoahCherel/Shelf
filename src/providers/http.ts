@@ -13,6 +13,8 @@ export interface HttpResponse {
   body: string;
 }
 
+const CERTIFICATE = "Your network checks secure connections, and Windows doesn't trust it. Your IT team can add its certificate.";
+
 /** Network failures become an `offline` error. Status codes are left to the caller. */
 export async function httpGet(req: HttpRequest): Promise<HttpResponse> {
   try {
@@ -20,6 +22,8 @@ export async function httpGet(req: HttpRequest): Promise<HttpResponse> {
   } catch (e) {
     const offline: ProviderError = { kind: "offline", message: "Can't reach the service. Check your connection." };
     if (e === "offline") throw offline;
+    // A company network that inspects secure connections, with a certificate Windows doesn't trust. Retrying won't help.
+    if (e === "certificate") throw { kind: "other", message: CERTIFICATE } satisfies ProviderError;
     throw { kind: "other", message: String(e) } satisfies ProviderError;
   }
 }
