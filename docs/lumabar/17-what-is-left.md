@@ -4,7 +4,7 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 
 ## Bilan global en chiffres
 
-- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **73 / 90 faites** — il reste **17 fonctionnalités** (ou compléments partiels), principalement les automatisations, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement). Les sections 1.7 à 1.9 ont leur plan, `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (pas encore exécuté) : il couvre `F-073`, `F-074`, `F-077`, `F-080`, `F-081`, `F-087`, `F-088` et `Win+A/S/N`. `F-089` (32 bits) est écarté volontairement. `F-076`, `F-078`, `F-079`, `F-082`, `F-083` et `F-090` attendent leur widget (Calendar, abonnements, Todos, Screen Time).
+- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **75 / 90 faites** (F-081 pour les alertes seulement) — il reste **15 fonctionnalités** (ou compléments partiels), principalement les automatisations qui attendent leur widget, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement). Les sections 1.7 à 1.9 ont leur plan, `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (pas encore exécuté) : il couvre `F-073`, `F-074`, `F-077`, `F-080`, `F-081`, `F-087`, `F-088` et `Win+A/S/N`. `F-089` (32 bits) est écarté volontairement. `F-076`, `F-078`, `F-079`, `F-082`, `F-083` et `F-090` attendent leur widget (Calendar, abonnements, Todos, Screen Time).
 - **Panneaux système (Spécificité Shelf) :** Shelf possède déjà ses propres cartes natives **Sound**, **Wi-Fi**, **Bluetooth**, **Quick Settings**, **Search** et **Notifications** dans `src/panels/`, regroupées derrière la tuile `system-status` et la loupe d'`apps`.
 - **Catalogue de widgets :** **11 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **92 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
 
@@ -132,13 +132,13 @@ Dans `src/windows/settings/schema.ts` :
 - ✅ `F-066` : Format 12/24 heures et affichage des secondes
 - ✅ `F-067` : Interrupteurs pour les noms au survol et les aperçus de fenêtres
 - ✅ *(Lié à F-017..019)* : Réglage `Displays` (`One screen`, `All screens`, `Follow pointer`) et liste `Screen` dans la section Dock
+- ✅ *(Lié à F-076..081)* : Page `Automations`, entre General et About : *AI limits*, *Alert sound* (choisir un son le joue) et *Quiet hours* (*From* / *To*). Les automatisations qui attendent leur widget y ajouteront leur interrupteur
 
 **Ce qu'il reste à faire :**
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
 | **F-068** *(partiel)* | P3 | **Vérification de mise à jour, notice de mise à jour et formulaire de Feedback** (message, captures, rapport avec logs/config) dans `About` | ⚠️ **Partiel** (`About` affiche la version statique ; pas d'auto-updater ni de formulaire de feedback, conformément à G-17 pour un outil privé) |
-| *(Lié à F-076..081)* | P3 | **Onglet / Section `Automations`** (interrupteurs pour chaque automatisation et choix des sons d'alerte) | ❌ **Absent** → 🗓️ **Prévu** (plan 2026-11-16, Task 5 : page entre General et About, avec *AI limits*, *Alert sound* et *Quiet hours*) |
 
 ---
 
@@ -157,20 +157,24 @@ Dans `src/windows/card/CardWindow.tsx`, `src/design/parts/Card.tsx`, `src-tauri/
 
 ---
 
-### 1.8. Automatisations (`F-076` à `F-083`) — 0 / 8 faits
+### 1.8. Automatisations (`F-076` à `F-083`) — 2,5 / 8 faits
 
-Aucune automatisation n'est encore implémentée dans Shelf. Le plan du 2026-11-16 (PR 2, `automations`) fait celles qui ne demandent aucun widget absent. Les autres attendent leur widget, qui trouvera prêts `toast_show` (prévenir), `play_tone` (sonner), `open-request` (ouvrir sa carte depuis un toast ou un raccourci) et la page *Automations* (son interrupteur).
+Dans `src/automations/`, `src-tauri/src/shell/toast.rs` et `src-tauri/src/system/tone.rs`, réglées dans la page *Automations* de Settings :
+- ✅ `F-077` : Alerte avant limite IA, pour Claude : un toast à 80 % puis à 95 % de la session de 5 h ou de la semaine (G-13), une seule fois par fenêtre de limite, même après un redémarrage (mémoire dans le store `automations`). Son bouton *Details* ouvre la carte du widget Claude présent sur le dock. Les autres IA suivront leurs widgets (W-003 à W-010). Tourne dans le dock principal seulement (`useAutomations`)
+- ✅ `F-080` : Heures calmes, 22:00–08:00 par défaut, désactivées au départ. Elles retiennent chaque toast, qui sort à leur fin ; un toast devenu faux entre-temps (limite remise à zéro) est jeté
+- ✅ `F-081` *(pour les alertes)* : Son d'alerte choisi parmi ceux de `%WINDIR%\Media` (*None*, *Notify*, *Calendar*, *Chimes*, *Ding*, *Tada*, *Alarm*), joué avec chaque toast qui le demande. Minuteurs, Pomodoro, calendrier et To-Do y brancheront le leur (`play_tone`) avec W-013, W-014, W-016 et W-018
+
+**Ce qui attend son widget.** Il trouvera prêts `showToast` (prévenir), `play_tone` (sonner), `open-request` (ouvrir sa carte depuis un toast ou un raccourci) et la page *Automations* (son interrupteur) :
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
-| **F-076** | P3 | **Pause musique avant les réunions** : met en pause le média en cours ~1 min avant un événement du calendrier | ❌ **Absent** — ⏳ en attente de **W-018 Calendar** |
-| **F-077** | P3 | **Alerte avant limite IA** : prévient par toast/son quand une limite d'usage IA approche de la saturation (ex. 80 %, 95 %) | ❌ **Absent** → 🗓️ **Prévu** (Task 6, pour Claude : 80 % puis 95 %, une fois par fenêtre de limite, mémoire gardée d'un démarrage à l'autre ; les autres IA suivront leurs widgets W-003 à W-010) |
-| **F-078** | P3 | **Rappels de renouvellement** : rappelle avant le renouvellement d'un abonnement et demande si on en a toujours besoin | ❌ **Absent** — ⏳ en attente d'un **suivi d'abonnements** (aucun widget du catalogue ne le porte encore) |
-| **F-079** | P3 | **Demandes de review → To-Dos** : transforme automatiquement les demandes de review GitHub en tâches dans le widget Todos | ❌ **Absent** — ⏳ en attente de **W-016 Todos** (et d'un jeton GitHub `ghp_`) |
-| **F-080** | P3 | **Heures calmes (*Quiet hours*)** : suspend toutes les alertes et toasts pendant la plage horaire configurée | ❌ **Absent** → 🗓️ **Prévu** (Tasks 1, 4 et 5 : 22:00–08:00 par défaut, désactivé au départ ; les alertes retenues sortent à la fin) |
-| **F-081** | P3 | **Sons d'alerte (*Alert tones*)** : choix d'un son pour les minuteurs, sessions Pomodoro, événements calendrier et rappels To-Do | ❌ **Absent** → 🗓️ **Prévu pour les alertes** (Tasks 4 et 5 : un son de `%WINDIR%\Media` au choix). Minuteurs, Pomodoro, calendrier et To-Do y brancheront le leur avec W-013, W-014, W-016 et W-018 |
-| **F-082** | P3 | **Calendrier unifié** : la carte Calendrier regroupe sur une même grille les événements iCal, renouvellements d'abonnements, virements (*payouts* Stripe/etc.), échéances To-Do et heures de reset des limites IA | ❌ **Absent** — ⏳ en attente de **W-018 Calendar** |
-| **F-083** | P3 | **Résumés quotidiens et hebdomadaires Screen Time** : notification au-dessus du dock chaque jour (et bilan de la semaine le lundi) avec bouton *Details* | ❌ **Absent** — ⏳ en attente de **W-012 Screen Time** |
+| **F-076** | P3 | **Pause musique avant les réunions** : met en pause le média en cours ~1 min avant un événement du calendrier | ⏳ en attente de **W-018 Calendar** |
+| **F-078** | P3 | **Rappels de renouvellement** : rappelle avant le renouvellement d'un abonnement et demande si on en a toujours besoin | ⏳ en attente d'un **suivi d'abonnements** (aucun widget du catalogue ne le porte encore) |
+| **F-079** | P3 | **Demandes de review → To-Dos** : transforme automatiquement les demandes de review GitHub en tâches dans le widget Todos | ⏳ en attente de **W-016 Todos** (et d'un jeton GitHub `ghp_`) |
+| **F-082** | P3 | **Calendrier unifié** : la carte Calendrier regroupe sur une même grille les événements iCal, renouvellements d'abonnements, virements (*payouts* Stripe/etc.), échéances To-Do et heures de reset des limites IA | ⏳ en attente de **W-018 Calendar** |
+| **F-083** | P3 | **Résumés quotidiens et hebdomadaires Screen Time** : notification au-dessus du dock chaque jour (et bilan de la semaine le lundi) avec bouton *Details* | ⏳ en attente de **W-012 Screen Time** |
+
+**À vérifier à la main :** `docs/manual-checks.md`, « Quiet hours and alert sound » et « AI limits ».
 
 ---
 
