@@ -12,4 +12,6 @@ export const STORE = {
   layout: "layout",
   settings: "settings",
   startImage: "start-image",
+  /** What the automations already warned about. */
+  automations: "automations",
 } as const;
