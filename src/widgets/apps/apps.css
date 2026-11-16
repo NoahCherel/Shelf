@@ -196,3 +196,9 @@
   border-radius: calc(var(--T) * 0.14);
   object-fit: cover;
 }
+
+/* The app Win+T has reached. */
+.app--keyfocus {
+  border-radius: var(--radius-inner);
+  box-shadow: 0 0 0 2px var(--accent);
+}

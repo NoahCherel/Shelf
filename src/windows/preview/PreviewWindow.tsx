@@ -71,7 +71,7 @@ function usePeek() {
 }
 
 /** The strip itself. Windows draws each live picture over its frame. */
-export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwnd: number) => void }) {
+export function PreviewStrip({ shown, onClosed, selected = null }: { shown: Shown; onClosed: (hwnd: number) => void; selected?: number | null }) {
   const strip = useRef<HTMLDivElement>(null);
   const peek = usePeek();
 
@@ -101,7 +101,8 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
         return (
           <div
             key={window.hwnd}
-            className="pv__window"
+            className={selected === window.hwnd ? "pv__window pv__window--selected" : "pv__window"}
+            aria-selected={selected === window.hwnd}
             onClick={() => invoke("preview_activate", { hwnd: window.hwnd }).catch(() => {})}
             onMouseEnter={() => peek.over(window.hwnd)}
             onMouseMove={() => peek.over(window.hwnd)}
@@ -138,12 +139,19 @@ export function PreviewStrip({ shown, onClosed }: { shown: Shown; onClosed: (hwn
 
 export function PreviewWindow() {
   const [shown, setShown] = useState<Shown | null>(null);
+  // Win+T's choice, kept apart: it can arrive before the windows it names.
+  const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
     const offShow = listen<Shown>("preview-show", setShown);
-    const offClosed = listen("preview-closed", () => setShown(null));
+    const offSelect = listen<number | null>("preview-select", setSelected);
+    const offClosed = listen("preview-closed", () => {
+      setShown(null);
+      setSelected(null);
+    });
     return () => {
       offShow.then((stop) => stop());
+      offSelect.then((stop) => stop());
       offClosed.then((stop) => stop());
     };
   }, []);
@@ -166,5 +174,5 @@ export function PreviewWindow() {
     if (windows.length === 0) invoke("preview_hide").catch(() => {});
     else setShown({ ...shown, windows });
   };
-  return <PreviewStrip shown={shown} onClosed={closed} />;
+  return <PreviewStrip shown={shown} onClosed={closed} selected={selected} />;
 }

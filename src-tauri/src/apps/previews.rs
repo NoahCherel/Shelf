@@ -346,6 +346,12 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     Ok(())
 }
 
+/// The window Tab chose during Win+T, marked in the strip.
+#[tauri::command]
+pub fn preview_select(app: AppHandle, hwnd: Option<isize>) -> Result<(), String> {
+    app.emit_to("preview", "preview-select", hwnd).map_err(|e| e.to_string())
+}
+
 /// Previews open right where an app's menu does, so none show while a menu or card is open, as on
 /// Windows. A right-click just as they were being prepared used to put them over the menu.
 fn may_show(card_open: bool) -> bool {
@@ -370,7 +376,8 @@ pub fn prepare(app: &AppHandle) -> Result<(), String> {
 
 /// Tile position is logical px inside the dock window.
 #[tauri::command(async)]
-pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+/// `from_keys`: opened by Tab during Win+T. Optional, so a hover's call needn't name it.
+pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64, from_keys: Option<bool>) -> Result<(), String> {
     let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
@@ -411,8 +418,15 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     crate::diag::note("previews shown");
     window.show().map_err(|e| e.to_string())?;
-    watch_pointer(app.clone(), dock_rect, strip);
+    if watches_pointer(from_keys.unwrap_or(false)) {
+        watch_pointer(app.clone(), dock_rect, strip);
+    }
     Ok(())
+}
+
+/// Previews opened from the keyboard stay up wherever the pointer is: it isn't what opened them.
+fn watches_pointer(from_keys: bool) -> bool {
+    !from_keys
 }
 
 /// Where the page laid out each picture, in logical px. Windows draws them from here on.
@@ -680,5 +694,11 @@ mod tests {
         let second = hover.bump();
         assert!(!hover.still_leaving(first));
         assert!(hover.still_leaving(second));
+    }
+
+    #[test]
+    fn previews_opened_from_the_keyboard_are_not_closed_by_the_pointer() {
+        assert!(!watches_pointer(true));
+        assert!(watches_pointer(false));
     }
 }

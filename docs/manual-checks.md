@@ -225,6 +225,17 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **No colour to take:** a black and white cover, or nothing playing, gives the default blue rather than a grey.
 - [ ] **The swatch itself:** does the record read as "album art" beside the colour wheel of your own colour?
 
+## Win+T
+
+Only in your own build: the preview doesn't watch the keyboard, so it can run beside your Shelf.
+
+- [ ] **Walk the apps:** Win+T rings the app in front on the dock. Left and right, or Win+T again, move along the open apps; Shift+Win+T goes back.
+- [ ] **Start stays shut:** letting go of Win after Win+T doesn't open Start. Win alone, pressed and let go during the walk, opens Start and ends the walk.
+- [ ] **Windows:** Tab shows the app's windows above it, with the chosen one outlined; Shift+Tab goes back; Enter brings that window forward. With one window, Enter brings it forward.
+- [ ] **Leaving it:** Escape ends it. So does a click anywhere: then arrows in an editor move its cursor as usual. Typing a letter ends it too, and the letter reaches the app.
+- [ ] **Not during a game:** with a game in fullscreen, Win+T does whatever Windows does, and nothing happens on the dock.
+- [ ] **Limit:** an open app kept inside a group isn't reached by Win+T.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

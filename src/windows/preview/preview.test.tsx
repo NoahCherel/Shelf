@@ -205,3 +205,22 @@ it("with no windows to show, it's the app's name in a bubble", async () => {
   expect(screen.getByText("Discord").className).toContain("pv-name");
   expect(screen.queryByRole("button", { name: /Close/ })).toBeNull();
 });
+
+it("marks the window picked from the keyboard", async () => {
+  await openIt();
+  await act(async () => handler("preview-select")(22));
+  const second = screen.getByText("Second window").closest(".pv__window")!;
+  expect(second.getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByText("First window").closest(".pv__window")!.getAttribute("aria-selected")).toBe("false");
+});
+
+it("keeps a choice that arrives before the windows", async () => {
+  render(<PreviewWindow />);
+  await act(async () => {});
+  await act(async () => handler("preview-select")(22));
+  await act(async () => handler("preview-show")(SHOWN));
+  expect(screen.getByText("Second window").closest(".pv__window")!.getAttribute("aria-selected")).toBe("true");
+  await act(async () => handler("preview-closed")(null));
+  await act(async () => handler("preview-show")(SHOWN));
+  expect(screen.getByText("Second window").closest(".pv__window")!.getAttribute("aria-selected")).toBe("false");
+});
