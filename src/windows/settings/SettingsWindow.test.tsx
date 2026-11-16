@@ -233,3 +233,10 @@ describe("the accent that follows the album art", () => {
     expect((accents().getByLabelText("Your own colour") as HTMLInputElement).value).toBe(ACCENTS[0].color);
   });
 });
+
+it("offers one screen, all screens or following the pointer", () => {
+  render(<SettingsWindow />);
+  open("Dock");
+  const modes = within(screen.getByRole("radiogroup", { name: "Displays" })).getAllByRole("radio").map((r) => r.textContent);
+  expect(modes).toEqual(["One screen", "All screens", "Follow pointer"]);
+});

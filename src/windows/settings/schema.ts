@@ -128,9 +128,10 @@ export const SCHEMA: PageDef[] = [
       section("Position", [
         choice("display", {
           label: "Displays",
-          tip: "One screen keeps the dock on the screen you pick, and brings it back there when it's plugged in again. Follow pointer moves it to a screen when you hold the pointer at that screen's edge.",
+          tip: "One screen keeps the dock on the screen you pick, and brings it back there when it's plugged in again. All screens puts a dock on each. Follow pointer moves it to a screen when you hold the pointer at that screen's edge.",
           options: [
             { value: "single", label: "One screen" },
+            { value: "all", label: "All screens" },
             { value: "follow", label: "Follow pointer" },
           ],
           onChange: moveDock,

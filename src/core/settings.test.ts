@@ -145,3 +145,7 @@ it("keeps album as an accent", () => {
   expect(sanitize({ accent: "album" }).accent).toBe("album");
   expect(sanitize({ accent: "Album" }).accent).toBeNull();
 });
+
+it("keeps a dock on every screen", () => {
+  expect(sanitize({ display: "all" }).display).toBe("all");
+});
