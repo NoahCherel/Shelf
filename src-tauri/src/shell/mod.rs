@@ -9,6 +9,7 @@ pub mod dock;
 pub mod events;
 pub mod keys;
 pub mod taskbar;
+pub mod toast;
 pub mod windows;
 
 use ::windows::core::HSTRING;
