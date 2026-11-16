@@ -225,7 +225,7 @@ export const SCHEMA: PageDef[] = [
         }),
         toggle("launchAtStartup", {
           label: "Launch at startup",
-          tip: "Starts Shelf when you sign in to Windows. This reads Windows' own list, so it stays right if you change it there.",
+          tip: "Starts Shelf when you sign in to Windows. This reads Windows' own list, including Task Manager's Startup apps, so it stays right if you change it there.",
           external: {
             read: () => invoke<boolean>("autostart_get"),
             write: (on) => invoke("autostart_set", { on }),

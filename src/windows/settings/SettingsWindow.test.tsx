@@ -291,3 +291,15 @@ describe("the Automations page", () => {
     expect(useSettings.getState().automations.aiLimits).toBe(false);
   });
 });
+
+it("rereads launch at startup when the window comes back", async () => {
+  let on = true;
+  mockInvoke.mockImplementation(async (cmd) => (cmd === "autostart_get" ? on : null));
+  render(<SettingsWindow />);
+  open("General");
+  const toggleEl = screen.getByRole("switch", { name: "Launch at startup" });
+  await waitFor(() => expect(toggleEl.getAttribute("aria-checked")).toBe("true"));
+  on = false; // turned off in Task Manager meanwhile
+  fireEvent.focus(window);
+  await waitFor(() => expect(toggleEl.getAttribute("aria-checked")).toBe("false"));
+});
