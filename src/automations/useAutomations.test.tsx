@@ -1,6 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { act, render } from "@testing-library/react";
-import { invoke } from "../core/tauri";
+import { invoke, listen } from "../core/tauri";
 import { useProvider } from "../core/useProvider";
 import { windowLabel } from "../core/windowLabel";
 import { defaults, useSettings } from "../core/settings";
@@ -25,28 +25,68 @@ function Host() {
 
 const toasts = () => vi.mocked(invoke).mock.calls.filter(([c]) => c === "toast_show").map(([, a]) => (a as { toast: { title: string } }).toast);
 
-async function mount(stored: unknown = null) {
-  vi.mocked(invoke).mockImplementation(async (command: string, args?: Record<string, unknown>) =>
-    (command === "store_load" && args?.name === "automations" ? stored : null) as never,
-  );
+/** What the store holds under "automations", kept across mounts as on disk. */
+let store: unknown = null;
+
+async function mount(stored?: unknown) {
+  if (stored !== undefined) store = stored;
+  vi.mocked(invoke).mockImplementation(async (command: string, args?: Record<string, unknown>) => {
+    if (args?.name !== "automations") return null as never;
+    if (command === "store_load") return store as never;
+    if (command === "store_save") store = args.value;
+    return null as never;
+  });
   const view = render(<Host />);
   await act(async () => {});
   return view;
 }
 
 beforeEach(() => {
+  store = null;
   vi.mocked(invoke).mockReset();
+  vi.mocked(listen).mockClear();
   vi.mocked(windowLabel).mockReturnValue("dock");
   vi.mocked(useProvider).mockReturnValue(reading(85) as never);
   useSettings.setState({ ...defaults() });
   useLayout.setState({ ids: ["claude-usage", "apps"] });
 });
 
+/** Rust says a toast reached the screen. */
+async function shown(id: string) {
+  const handler = vi.mocked(listen).mock.calls.filter(([event]) => event === "toast-shown").at(-1)?.[1];
+  await act(async () => handler?.(id as never));
+}
+
+const saved = () => vi.mocked(invoke).mock.calls.filter(([c, a]) => c === "store_save" && (a as { name: string }).name === "automations");
+
 it("warns once the reading crosses a step, with a way to the card", async () => {
   await mount();
   expect(toasts()).toHaveLength(1);
   expect(toasts()[0]).toMatchObject({ title: "Claude session at 85%", action: { target: "widget:claude-usage" } });
+});
+
+it("counts a warning as given only once it has shown", async () => {
+  await mount();
+  expect(saved()).toEqual([]);
+  await shown("ai-limit-session");
   expect(invoke).toHaveBeenCalledWith("store_save", { name: "automations", value: { session: { resetsAt: RESET, step: 80 } } });
+});
+
+it("a warning still waiting when Shelf stops comes back after a restart", async () => {
+  const first = await mount();
+  expect(toasts()).toHaveLength(1);
+  first.unmount();
+  vi.mocked(invoke).mockClear();
+  await mount();
+  expect(toasts()).toHaveLength(1);
+});
+
+it("a warning waiting to show isn't sent again with each reading", async () => {
+  const view = await mount();
+  vi.mocked(useProvider).mockReturnValue(reading(86) as never);
+  view.rerender(<Host />);
+  await act(async () => {});
+  expect(toasts()).toHaveLength(1);
 });
 
 it("remembers warnings across restarts", async () => {

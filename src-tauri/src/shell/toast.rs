@@ -215,6 +215,8 @@ fn pump(app: &AppHandle) {
 }
 
 fn show(app: &AppHandle, toast: Toast, window_open: bool) {
+    // Whoever sent it can now count it as seen, as the automations do.
+    let _ = app.emit_to("dock", "toast-shown", &toast.id);
     if toast.sound {
         crate::system::tone::play(&tone_from(crate::store::load(crate::store::SETTINGS).as_ref()));
     }
