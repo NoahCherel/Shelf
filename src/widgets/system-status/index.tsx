@@ -103,6 +103,7 @@ function Part({ label, title, panel, preview, onScroll, children }: { label: str
       className="status__part"
       aria-label={label}
       title={title ?? label}
+      data-panel={panel}
       onClick={open}
       onWheel={(e) => !preview && onScroll?.(e.deltaY < 0)}
       data-own-wheel={onScroll ? "" : undefined}

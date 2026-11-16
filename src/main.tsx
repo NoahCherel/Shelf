@@ -14,6 +14,7 @@ const views: Record<string, View> = {
   dock: () => import("./windows/dock/DockWindow").then((m) => m.DockWindow),
   card: () => import("./windows/card/CardWindow").then((m) => m.CardWindow),
   preview: () => import("./windows/preview/PreviewWindow").then((m) => m.PreviewWindow),
+  toast: () => import("./windows/toast/ToastWindow").then((m) => m.ToastWindow),
   picker: () => {
     syncLayout();
     return import("./windows/picker/PickerWindow").then((m) => m.PickerWindow);

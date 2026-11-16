@@ -37,6 +37,20 @@ export function handleDragEnd({ active, over }: { active: { id: unknown }; over:
   move(ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
 }
 
+/** What a click on a widget's tile opens: its shared panel, or its own card over the tile. */
+export function openWidgetCard(def: WidgetDef, tile: HTMLElement): void {
+  if (def.panel) return openPanel(def.panel, tile);
+  if (!def.Card) return;
+  const r = tile.getBoundingClientRect();
+  invoke("open_card", {
+    widgetId: def.id,
+    tileX: r.left,
+    tileWidth: r.width,
+    width: def.cardWidth ?? DEFAULT_CARD_WIDTH,
+    height: def.cardHeight ?? DEFAULT_CARD_HEIGHT,
+  }).catch(() => {});
+}
+
 /** Whether a tile shows inside a narrowed, scrolling dock. Everything counts as shown without one. */
 function useInView(el: HTMLElement | null): boolean {
   const [shown, setShown] = useState(true);
@@ -70,16 +84,7 @@ function Slot({ def, free, arriving, leavingWidth }: { def: WidgetDef; free?: Fr
 
   const openCard = (e: MouseEvent<HTMLDivElement>) => {
     if (pickerOpen) return;
-    if (def.panel) return openPanel(def.panel, e.currentTarget);
-    if (!def.Card) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    invoke("open_card", {
-      widgetId: def.id,
-      tileX: r.left,
-      tileWidth: r.width,
-      width: def.cardWidth ?? DEFAULT_CARD_WIDTH,
-      height: def.cardHeight ?? DEFAULT_CARD_HEIGHT,
-    }).catch(() => {});
+    openWidgetCard(def, e.currentTarget);
   };
 
   return (

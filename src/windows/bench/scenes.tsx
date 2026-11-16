@@ -10,7 +10,7 @@ export interface Scene {
   previews?: Shown; // the strip above the bar, with empty frames: Windows draws the pictures
   card?: string; // card id, drawn above the bar
   anchor?: string; // selector the card centres on, when it isn't a tile's id
-  view?: "picker" | "settings"; // a whole window instead of a dock
+  view?: "picker" | "settings" | "toast"; // a whole window instead of a dock
   settings?: Record<string, unknown>;
   backend?: Record<string, (args: any) => unknown>;
   /** type: text into what has focus. */
@@ -422,6 +422,16 @@ export const scenes: Scene[] = [
     },
   },
   { id: "picker", size: [1225, 825], wallpaper: "ribbons", theme: "dark", view: "picker", scale: 1 },
+  {
+    id: "toast",
+    size: [480, 160],
+    wallpaper: "glow",
+    theme: "dark",
+    view: "toast",
+    backend: {
+      toast_current: () => ({ id: "ai-limit-session", title: "Claude session at 80%", body: "Resets in 1h 25m.", action: { label: "Details", target: "widget:claude-usage" }, sound: true }),
+    },
+  },
   { id: "settings-dock", size: [950, 700], wallpaper: "ribbons", theme: "dark", view: "settings", scale: 1, steps: [{ click: ".side__row:nth-of-type(2)" }] },
 ];
 

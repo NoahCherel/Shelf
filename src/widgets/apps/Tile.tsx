@@ -153,6 +153,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
         className="app"
         aria-label="Search"
         title="Search"
+        data-panel="search"
         onClick={(e) => !preview && openPanel("search", e.currentTarget)}
       >
         <SearchGlyph />

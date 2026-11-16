@@ -107,6 +107,12 @@ fn resting_rect(monitor: Rect, scale: f64) -> Rect {
     resting_on(monitor, scale, layout())
 }
 
+/// Where the main dock rests, on which screen and edge, at what scale: what a toast is placed from.
+pub(crate) fn resting() -> Option<(Rect, Rect, Edge, f64)> {
+    let (monitor, scale) = monitor()?;
+    Some((monitor, resting_rect(monitor, scale), layout().edge, scale))
+}
+
 fn layout() -> DockLayout {
     *lock(&DOCK.layout)
 }
