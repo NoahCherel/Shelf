@@ -215,6 +215,12 @@ These need a real pointer, and closing or switching real windows.
 - [ ] **Drag the dock on the second screen:** let it go in the top half, then the bottom half, then near each end: it settles on that screen's edge, where you let it go.
 - [ ] **Follow pointer:** choose it, then hold the pointer half a second at the bottom of the other screen: the dock moves there. Passing through the edge on the way elsewhere doesn't move it, and nothing moves during a game or a drag.
 
+- [ ] **All screens:** each screen gets a dock with the same widgets, each reserving its own edge when Float over windows is off. No Windows taskbar shows on any of them. A card, a preview or the hidden icons open over the dock you clicked.
+- [ ] **All screens, unplugging:** unplug the second screen: its dock goes, the main one stays. Plug it back: a dock comes back. Make the other screen the main one in Windows: the main dock moves there.
+- [ ] **All screens, a game:** a fullscreen game on one screen hides that screen's dock only.
+- [ ] **All screens, what stays with the main dock:** only the main dock can be dragged by hand, and only it slides away with Auto-hide. In Liquid Glass or iOS Glass the other docks are solid, not glass.
+- [ ] **All screens, memory:** run `src/test/resources.ps1` with one dock, then with two, and send me both numbers. If the second dock costs more than the first, that needs looking at.
+
 ## Starting with Windows
 
 - [ ] **How soon the edge is reserved (F-023):** turn Float over windows off, run `setx SHELF_DIAG 1` once, restart Windows, then open `diag.log` beside Shelf's data. Its "edge reserved" line gives three numbers: sign-in to Shelf starting, starting to setup, setup to reserving. The correction depends on which one is long; send me the line. Then `setx SHELF_DIAG ""` turns the trace off again.
