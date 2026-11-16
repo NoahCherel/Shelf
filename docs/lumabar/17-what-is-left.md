@@ -4,7 +4,7 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 
 ## Bilan global en chiffres
 
-- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **66 / 90 faites** (dont 5 partielles) — il reste **24 fonctionnalités** (ou compléments partiels), principalement le multi-écran, les raccourcis clavier globaux, les toasts et les automatisations.
+- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **71 / 90 faites** — il reste **19 fonctionnalités** (ou compléments partiels), principalement les toasts, les automatisations, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement).
 - **Panneaux système (Spécificité Shelf) :** Shelf possède déjà ses propres cartes natives **Sound**, **Wi-Fi**, **Bluetooth**, **Quick Settings**, **Search** et **Notifications** dans `src/panels/`, regroupées derrière la tuile `system-status` et la loupe d'`apps`.
 - **Catalogue de widgets :** **11 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **92 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
 
@@ -12,9 +12,9 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 
 ## 1. Fonctionnalités du socle (F-001 à F-090)
 
-### 1.1. Le Dock (`F-001` à `F-023`) — 19 / 23 faits
+### 1.1. Le Dock (`F-001` à `F-023`) — 22 / 23 faits
 
-Dans `src-tauri/src/shell/dock.rs`, `src-tauri/src/shell/autohide.rs` et `src/windows/dock/Bar.tsx`, **19 fonctionnalités sur 23 sont terminées** :
+Dans `src-tauri/src/shell/dock/` (`mod.rs`, `geometry.rs`, `follow.rs`, `many.rs`, `extras.rs`), `src-tauri/src/shell/displays.rs`, `src-tauri/src/shell/autohide.rs` et `src/windows/dock/Bar.tsx`, **22 fonctionnalités sur 23 sont terminées** :
 - ✅ `F-001` : Forme de pilule, centrée ou déplaçable, ajustée au contenu
 - ✅ `F-002` : Bord inférieur, réservation d'espace d'écran (`appbar`)
 - ✅ `F-003` : Mise à l'échelle à partir d'une seule valeur de hauteur de tuile (`--T`)
@@ -31,38 +31,35 @@ Dans `src-tauri/src/shell/dock.rs`, `src-tauri/src/shell/autohide.rs` et `src/wi
 - ✅ `F-014` : Défilement horizontal fluide à la molette et au pavé tactile
 - ✅ `F-015` : Masquer en plein écran, arrêter le dessin et mettre les providers en pause
 - ✅ `F-016` : Reprendre correctement après veille et déverrouillage de session
+- ✅ `F-017` : Choisir l'écran du dock (`Displays > One screen` et liste `Screen` dans Settings), mémorisé par l'identifiant stable de l'écran (`monitorDevicePath`), avec retour quand on le rebranche ; en attendant, le dock se pose sur l'écran principal. Le dock, son verre, ses cartes et ses aperçus suivent l'écran du dock, et le déplacer à la main sur un autre écran l'y pose (`dock_drag_settle`)
+- ✅ `F-018` : Un dock sur chaque écran (`Displays > All screens`), chacun réservant son propre bord, ouverts et fermés quand on branche ou débranche un écran. **Limites voulues :** seul le dock principal se déplace à la main et se masque automatiquement, et les docks en plus prennent le fond plein du style au lieu du verre vivant (comme avec *Show in screenshots*)
+- ✅ `F-019` : Le dock suit le pointeur (`Displays > Follow pointer`) : tenir le pointeur une demi-seconde au bord d'un autre écran l'y amène ; rien ne bouge pendant un jeu, une session verrouillée ou un glisser
 - ✅ `F-020` : Résister aux outils tiers qui tentent de déplacer le dock
 - ✅ `F-021` : Pas de clignotement dans les enregistrements d'écran (`visibleInCaptures` / `WDA_EXCLUDEFROMCAPTURE`)
 - ✅ `F-022` : Animations de glissement ; les widgets et icônes s'écartent et se replient (`useComeAndGo`)
+
+**À vérifier à la main :** le multi-écran a été écrit et testé par des tests automatiques sur un PC à un seul écran. Les essais à deux écrans sont listés dans `docs/manual-checks.md` (section « Screens »).
 
 **Ce qu'il reste à faire sur le Dock :**
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
-| **F-017** | P2 | **Choisir l'écran du dock (`Displays > Single`)** : choisir un moniteur spécifique, le mémoriser et y revenir quand on le rebranche | ❌ **Absent** (Shelf cible uniquement `primary_monitor()`) |
-| **F-018** | P3 | **Dock sur tous les écrans (`Displays > All`)** : un dock par écran, chacun réservant son propre espace | ❌ **Absent** |
-| **F-019** | P3 | **Dock qui suit le pointeur (`Displays > Follow`)** : maintenir le pointeur en bas d'un autre écran y déplace le dock | ❌ **Absent** |
-| **F-023** | P2 | **Réservation dès la première seconde au boot** : réserver l'espace d'écran immédiatement à l'ouverture de session avant que les fenêtres ne prennent toute la place | ⚠️ **Partiel** (lancement classique via clé `HKCU\...\Run`, pas d'optimisation early-boot dédiée) |
+| **F-023** | P2 | **Réservation dès la première seconde au boot** : réserver l'espace d'écran immédiatement à l'ouverture de session avant que les fenêtres ne prennent toute la place | ⚠️ **Partiel** : la mesure est en place (`shell/boot.rs` écrit dans `diag.log`, avec `SHELF_DIAG=1`, les délais ouverture de session → lancement de Shelf → `setup` → réservation). La correction dépend de ce que donne cette mesure après un redémarrage (`docs/manual-checks.md`, « Starting with Windows »). Ne se voit qu'avec *Float over windows* désactivé |
 
 ---
 
-### 1.2. Barre des tâches Windows (`F-024` à `F-026`) — 2 / 3 faits
+### 1.2. Barre des tâches Windows (`F-024` à `F-026`) — 3 / 3 faits
 
 Dans `src-tauri/src/shell/taskbar.rs` :
 - ✅ `F-024` : Choix `Hidden` ou `Auto-hide`
 - ✅ `F-025` : Restauration exacte en quittant, avec récupération après crash (`--watch-taskbar` et `--restore-taskbar`)
-
-**Ce qu'il reste à faire :**
-
-| ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
-| --- | --- | --- | --- |
-| **F-026** | P1 | **Gestion par écran** : cacher la barre Windows sur les écrans qui ont un dock, mais laisser la barre secondaire (`Shell_SecondaryTrayWnd`) en auto-hide sur les écrans sans dock | ❌ **Absent** (Shelf masque actuellement `Shell_TrayWnd` et tous les `Shell_SecondaryTrayWnd` sur tous les écrans) |
+- ✅ `F-026` : Gestion par écran : la barre Windows n'est cachée que sur les écrans qui portent un dock ; sur les autres elle reste, en masquage automatique (`Taskbar::set_docked`)
 
 ---
 
-### 1.3. Styles et Apparence (`F-027` à `F-037`) — 10,5 / 11 faits
+### 1.3. Styles et Apparence (`F-027` à `F-037`) — 11 / 11 faits
 
-Dans `src/design/styles/` et `src/design/glass/GlassLayer.tsx` :
+Dans `src/design/styles/`, `src/design/glass/GlassLayer.tsx`, `src/core/look.ts` et `src-tauri/src/system/media.rs` :
 - ✅ `F-027` : Liquid Glass avec réfraction WebGL en direct
 - ✅ `F-028` : iOS Glass
 - ✅ `F-029` : Midnight
@@ -71,21 +68,15 @@ Dans `src/design/styles/` et `src/design/glass/GlassLayer.tsx` :
 - ✅ `F-032` : Clear, avec widgets noirs, blancs ou givrés (`clearMaterial`)
 - ✅ `F-033` : Jeux de tuiles sombres et clairs (`theme: auto | dark | light`)
 - ✅ `F-034` : 9 couleurs d'accentuation système
-- ✅ `F-035` *(en partie)* : Sélecteur de couleur d'accentuation personnalisée libre
+- ✅ `F-035` : Couleur d'accent personnalisée libre, et **Album art** : la pastille en forme de disque suit la pochette du titre en cours, lue dans la session média de Windows (`system/media.rs`), sans attendre les widgets *Now Playing*. Sans couleur à prendre (pochette noir et blanc, rien qui joue), l'accent revient au bleu par défaut. Le décodage d'une vraie pochette reste à essayer à la main (`docs/manual-checks.md`, « Album art accent »)
 - ✅ `F-036` : Le verre se met au repos quand rien ne change à l'écran
 - ✅ `F-037` : Le verre reste hors de sa propre capture d'écran
 
-**Ce qu'il reste à faire :**
-
-| ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
-| --- | --- | --- | --- |
-| **F-035** *(partiel)* | P3 | **Couleur d'accent selon la pochette d'album (*Album art accent*)** : adapter automatiquement la couleur d'accent à la pochette du titre en cours de lecture | ❌ **Absent** (dépend des widgets *Now Playing*) |
-
 ---
 
-### 1.4. Applications et rôle de barre des tâches (`F-038` à `F-054`) — 15,5 / 17 faits
+### 1.4. Applications et rôle de barre des tâches (`F-038` à `F-054`) — 16,5 / 17 faits
 
-Dans `src/widgets/apps/` et `src-tauri/src/apps/` :
+Dans `src/widgets/apps/`, `src-tauri/src/apps/` et `src-tauri/src/shell/keys.rs` :
 - ✅ `F-038` : Bouton Start ouvrant/fermant Démarrer (plus bouton Loupe pour Search)
 - ✅ `F-039` : Épingles de la barre des tâches Windows et fenêtres ouvertes
 - ✅ `F-040` : Point d'ouverture + plaque active + clic pour focus ou minimiser
@@ -102,13 +93,13 @@ Dans `src/widgets/apps/` et `src-tauri/src/apps/` :
 - ✅ `F-051` : Survoler une app ouverte avec un fichier la ramène au premier plan
 - ✅ `F-052` : N'importe quelle app installée ou dossier comme widget indépendant (`pin:<clé>`)
 - ✅ `F-053` : Image personnalisée sur le bouton Start (`startImage`)
+- ✅ `F-054` : Raccourci `Win+T` : un crochet clavier bas niveau (`shell/keys.rs`) amène le dock ; flèches (ou `Win+T` à nouveau) entre les apps ouvertes, `Tab` entre les fenêtres avec leurs aperçus, `Entrée` pour activer, `Échap`, un clic, toute autre touche ou 8 secondes sans rien pour sortir (`widgets/apps/keyNav.ts`). Rien n'est enregistré, et la combinaison passe à Windows pendant un jeu en plein écran. **Limite :** une app rangée dans un groupe n'est pas atteinte. À essayer à la main sur la vraie version (`docs/manual-checks.md`, « Win+T »)
 
-**Ce qu'il reste à faire (ou qui a été écarté) :**
+**Ce qui a été écarté :**
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
 | **F-046** *(partiel)* | P2 | **Action « End task » (Fin de tâche)** dans le menu clic droit d'une application ouverte | ➖ **Écarté volontairement** (jugé risqué ; le Gestionnaire des tâches est accessible via clic droit sur Start) |
-| **F-054** | P2 | **Raccourci `Win+T`** : afficher/parcourir les apps ouvertes sur le dock au clavier (flèches entre les apps, Tab entre les fenêtres, Entrée pour activer) | ❌ **Absent** (pas de hook clavier global) |
 
 ---
 
@@ -140,13 +131,13 @@ Dans `src/windows/settings/schema.ts` :
 - ✅ `F-065` : Mode barre des tâches Windows et lancement au démarrage
 - ✅ `F-066` : Format 12/24 heures et affichage des secondes
 - ✅ `F-067` : Interrupteurs pour les noms au survol et les aperçus de fenêtres
+- ✅ *(Lié à F-017..019)* : Réglage `Displays` (`One screen`, `All screens`, `Follow pointer`) et liste `Screen` dans la section Dock
 
 **Ce qu'il reste à faire :**
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
 | **F-068** *(partiel)* | P3 | **Vérification de mise à jour, notice de mise à jour et formulaire de Feedback** (message, captures, rapport avec logs/config) dans `About` | ⚠️ **Partiel** (`About` affiche la version statique ; pas d'auto-updater ni de formulaire de feedback, conformément à G-17 pour un outil privé) |
-| *(Lié à F-017..019)* | P2/P3 | **Réglage `Displays`** (`Single`, `All`, `Follow`) dans la section Dock | ❌ **Absent** |
 | *(Lié à F-076..081)* | P3 | **Onglet / Section `Automations`** (interrupteurs pour chaque automatisation et choix des sons d'alerte) | ❌ **Absent** |
 
 ---
@@ -199,8 +190,8 @@ Aucune automatisation n'est encore implémentée dans Shelf :
 | **F-087** | P2 | **Démarrage automatique qui reflète l'état du Gestionnaire des tâches** : refléter si l'utilisateur a désactivé Shelf dans l'onglet Démarrage du Gestionnaire des tâches Windows | ⚠️ **Partiel** (`autostart_get()` dans `src-tauri/src/system/mod.rs` lit uniquement la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, mais **ne lit pas** la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run` où le Gestionnaire des tâches Windows stocke l'état désactivé `03`) |
 | **F-088** | P3 | **Réseaux d'entreprise avec inspection TLS (Zscaler, etc.)** : tolérance explicite aux proxys d'inspection et réveil réseau différé après veille | ⚠️ **Partiel** (`reqwest` utilise `native-tls` de Windows et `provider.ts` garde le cache en mode `stale`, mais sans gestion spécifique au-delà du magasin Windows) |
 | **F-089** | P3 | **Build 32-bit** | ❌ **Absent** (cible 64-bit uniquement) |
-| **F-090** | P3 | **Raccourci global `Alt+T`** pour ouvrir la carte *Todos* depuis n'importe quelle application | ❌ **Absent** (pas de hook clavier global, et le widget *Todos* n'est pas encore construit) |
-| *(Lié aux panneaux)* | — | **Raccourcis globaux `Win+A`, `Win+S`, `Win+N`** pour ouvrir les cartes Quick Settings, Search et Notifications de Shelf au lieu de celles de Windows | ❌ **Absent** (laissé à Windows faute de hook clavier global) |
+| **F-090** | P3 | **Raccourci global `Alt+T`** pour ouvrir la carte *Todos* depuis n'importe quelle application | ❌ **Absent** (le crochet clavier de `Win+T` existe dans `shell/keys.rs` et peut l'accueillir ; il manque le widget *Todos*) |
+| *(Lié aux panneaux)* | — | **Raccourcis globaux `Win+A`, `Win+S`, `Win+N`** pour ouvrir les cartes Quick Settings, Search et Notifications de Shelf au lieu de celles de Windows | ❌ **Absent** (laissé à Windows ; le crochet clavier de `Win+T`, `shell/keys.rs`, peut maintenant les accueillir) |
 
 ---
 

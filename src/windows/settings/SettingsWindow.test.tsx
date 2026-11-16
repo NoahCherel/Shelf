@@ -171,3 +171,72 @@ it("with auto-hide on, floating over windows can't be changed, as nothing is res
   expect(float().matches(":disabled")).toBe(true);
   expect(screen.getByRole("switch", { name: "Stay up on the desktop" })).toBeTruthy();
 });
+
+describe("the screen the dock sits on", () => {
+  const screens = [
+    { id: "a", name: "DELL U2720Q", primary: true },
+    { id: "b", name: "LG TV", primary: false },
+  ];
+  beforeEach(() => mockInvoke.mockImplementation(async (cmd) => (cmd === "displays_list" ? screens : null)));
+  const picker = () => screen.findByRole("combobox", { name: "Screen" });
+
+  it("lists the screens with the main one marked", async () => {
+    render(<SettingsWindow />);
+    open("Dock");
+    const list = await picker();
+    await waitFor(() => expect(within(list).getByRole("option", { name: "DELL U2720Q (main)" })).toBeTruthy());
+    expect(within(list).getByRole("option", { name: "LG TV" })).toBeTruthy();
+  });
+
+  it("moves the dock when another screen is picked", async () => {
+    render(<SettingsWindow />);
+    open("Dock");
+    const list = await picker();
+    await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(2));
+    fireEvent.change(list, { target: { value: "b" } });
+    expect(useSettings.getState().displayMonitor).toBe("b");
+    expect(mockInvoke).toHaveBeenCalledWith("set_dock_display", { mode: "single", monitor: "b" });
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Displays" })).getByRole("radio", { name: "Follow pointer" }));
+    expect(mockInvoke).toHaveBeenCalledWith("set_dock_display", { mode: "follow", monitor: "b" });
+  });
+
+  it("greys the screen out when following the pointer", async () => {
+    useSettings.setState({ display: "follow" });
+    render(<SettingsWindow />);
+    open("Dock");
+    expect((await picker()).closest("fieldset")?.disabled).toBe(true);
+  });
+});
+
+describe("the accent that follows the album art", () => {
+  const accents = () => within(screen.getByRole("radiogroup", { name: "Accent" }));
+
+  it("picking Album art follows the cover", () => {
+    render(<SettingsWindow />);
+    fireEvent.click(accents().getByRole("radio", { name: "Album art" }));
+    expect(useSettings.getState().accent).toBe("album");
+    expect(mockInvoke).toHaveBeenCalledWith("album_accent_follow", { on: true });
+  });
+
+  it("picking a colour stops following", () => {
+    useSettings.setState({ accent: "album" });
+    render(<SettingsWindow />);
+    fireEvent.click(accents().getByRole("radio", { name: "Blue" }));
+    expect(useSettings.getState().accent).toBe(ACCENTS[0].color);
+    expect(mockInvoke).toHaveBeenCalledWith("album_accent_follow", { on: false });
+  });
+
+  it("album art is not taken for an own colour", () => {
+    useSettings.setState({ accent: "album" });
+    render(<SettingsWindow />);
+    expect(accents().getByRole("radio", { name: "Album art" }).getAttribute("aria-checked")).toBe("true");
+    expect((accents().getByLabelText("Your own colour") as HTMLInputElement).value).toBe(ACCENTS[0].color);
+  });
+});
+
+it("offers one screen, all screens or following the pointer", () => {
+  render(<SettingsWindow />);
+  open("Dock");
+  const modes = within(screen.getByRole("radiogroup", { name: "Displays" })).getAllByRole("radio").map((r) => r.textContent);
+  expect(modes).toEqual(["One screen", "All screens", "Follow pointer"]);
+});

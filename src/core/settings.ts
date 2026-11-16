@@ -10,6 +10,7 @@ export interface SettingsData {
   /** What Clear's widgets are made of, with no bar behind them. */
   clearMaterial: ClearMaterial;
   theme: "auto" | "dark" | "light";
+  /** A colour, "album" to follow the cover of what's playing, or null for the default. */
   accent: string | null;
   size: number;
   hour24: boolean;
@@ -31,6 +32,10 @@ export interface SettingsData {
   autoHide: boolean;
   /** With auto-hide: stays up while the desktop is in front. */
   showOnDesktop: boolean;
+  /** The dock sits on one chosen screen, on every screen, or moves to the screen whose edge the pointer is held at. */
+  display: "single" | "all" | "follow";
+  /** The chosen screen's id, which survives unplugging it; null for the main screen. */
+  displayMonitor: string | null;
   /** An app's name in a bubble when hovering it. */
   hoverNames: boolean;
   /** The dock shows in screenshots and screen sharing, at the cost of the glass. */
@@ -67,6 +72,8 @@ export function defaults(): SettingsData {
     spacing: 4,
     autoHide: false,
     showOnDesktop: false,
+    display: "single",
+    displayMonitor: null,
     narrowWidth: null,
     hoverNames: true,
     visibleInCaptures: false,
@@ -91,7 +98,7 @@ export function sanitize(raw: unknown): SettingsData {
     style: oneOf(raw.style, STYLES, d.style),
     clearMaterial: oneOf(raw.clearMaterial, ["black", "white", "frosted"] as const, d.clearMaterial),
     theme: oneOf(raw.theme, ["auto", "dark", "light"] as const, d.theme),
-    accent: typeof raw.accent === "string" && /^#[0-9a-f]{6}$/i.test(raw.accent) ? raw.accent : null,
+    accent: raw.accent === "album" || (typeof raw.accent === "string" && /^#[0-9a-f]{6}$/i.test(raw.accent)) ? raw.accent : null,
     size: typeof raw.size === "number" && Number.isFinite(raw.size) ? Math.min(SIZE_MAX, Math.max(SIZE_MIN, raw.size)) : d.size,
     hour24: bool(raw.hour24, d.hour24),
     seconds: bool(raw.seconds, d.seconds),
@@ -105,6 +112,8 @@ export function sanitize(raw: unknown): SettingsData {
     spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
     autoHide: bool(raw.autoHide, d.autoHide),
     showOnDesktop: bool(raw.showOnDesktop, d.showOnDesktop),
+    display: oneOf(raw.display, ["single", "all", "follow"] as const, d.display),
+    displayMonitor: typeof raw.displayMonitor === "string" ? raw.displayMonitor : null,
     hoverNames: bool(raw.hoverNames, d.hoverNames),
     visibleInCaptures: bool(raw.visibleInCaptures, d.visibleInCaptures),
     previews: bool(raw.previews, d.previews),

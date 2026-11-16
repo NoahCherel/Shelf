@@ -70,6 +70,7 @@ fn keeps_dock_up(app: &AppHandle) -> bool {
         || apps::start_is_open()
         || app.get_webview_window("picker").is_some()
         || app.get_webview_window("settings").is_some()
+        || shell::keys::navigating()
 }
 
 fn spawn_taskbar_watch() {
@@ -135,7 +136,9 @@ pub fn run() {
             shell::dock::set_dock_width,
             shell::dock::dock_drag,
             shell::dock::dock_drag_end,
+            shell::dock::dock_drag_settle,
             shell::dock::set_dock_behaviour,
+            shell::dock::set_dock_display,
             shell::card::open_card,
             shell::card::fit_card,
             shell::card::card_current,
@@ -146,6 +149,10 @@ pub fn run() {
             shell::windows::open_window,
             shell::windows::close_window,
             shell::taskbar::set_taskbar_mode,
+            shell::displays::displays_list,
+            system::media::album_accent_follow,
+            system::media::album_accent_current,
+            shell::keys::keynav_end,
             glass::glass_start,
             glass::glass_stop,
             glass::glass_frame,
@@ -157,6 +164,7 @@ pub fn run() {
             system::notifications::notifications_clear,
             system::notifications::notification_open,
             apps::previews::preview_show,
+            apps::previews::preview_select,
             apps::previews::preview_name,
             apps::previews::preview_slots,
             apps::previews::preview_peek,
@@ -221,14 +229,14 @@ pub fn run() {
         ])
         .on_window_event(|window, event| match (event, window.label()) {
             // Alt+F4 must not take the dock down with the taskbar still hidden.
-            (WindowEvent::CloseRequested { api, .. }, "dock" | "preview") => api.prevent_close(),
+            (WindowEvent::CloseRequested { api, .. }, label) if label == "preview" || shell::dock::many::is_dock(label) => api.prevent_close(),
             (WindowEvent::CloseRequested { api, .. }, "card") => {
                 api.prevent_close();
                 shell::card::on_close(window);
             }
             (WindowEvent::Focused(false), "card") => shell::card::on_blur(window),
             // Something dragged from Windows over the dock holds it up while auto-hide is on.
-            (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), "dock") => {
+            (WindowEvent::DragDrop(DragDropEvent::Enter { position, .. } | DragDropEvent::Over { position }), label) if shell::dock::many::is_dock(label) => {
                 if let WindowEvent::DragDrop(DragDropEvent::Enter { paths, .. }) = event {
                     diag::note("drag from Windows entered the dock");
                     apps::drag_entered(paths);
@@ -237,12 +245,12 @@ pub fn run() {
                 let at = serde_json::json!({ "x": position.x, "y": position.y, "pinnable": apps::drag_is_pinnable() });
                 let _ = tauri::Emitter::emit(window, "os-drag", at);
             }
-            (WindowEvent::DragDrop(DragDropEvent::Leave), "dock") => {
+            (WindowEvent::DragDrop(DragDropEvent::Leave), label) if shell::dock::many::is_dock(label) => {
                 diag::note("drag from Windows left the dock");
                 shell::dock::os_drag(false);
                 let _ = tauri::Emitter::emit(window, "os-drag", serde_json::Value::Null);
             }
-            (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), "dock") => {
+            (WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }), label) if shell::dock::many::is_dock(label) => {
                 diag::note(&format!("{} dropped on the dock", paths.len()));
                 shell::dock::os_drag(false);
                 apps::pin_dropped(window.app_handle().clone(), paths.clone());
@@ -252,11 +260,14 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
+            shell::boot::setup_began();
             diag::remember(app.handle());
             search::refresh_apps();
             apps::previews::prepare(app.handle())?;
             shell::dock::start(app.handle(), keeps_dock_up)?;
             apps::watch_foreground(app.handle());
+            system::media::start(app.handle());
+            shell::keys::start(app.handle());
             build_tray(app.handle())?;
             shell::listen_for_quit(app.handle().clone());
             Ok(())

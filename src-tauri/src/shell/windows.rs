@@ -1,10 +1,19 @@
 //! Windows made on demand and destroyed on close, so they cost nothing when closed.
 
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+
+use super::dock::Rect;
+
+/// Position first, then size. Moved onto a screen of another scale, Windows rescales the window as it
+/// arrives, so a size set before the move would be scaled a second time.
+pub fn put(window: &WebviewWindow, r: Rect) -> tauri::Result<()> {
+    window.set_position(PhysicalPosition::new(r.x, r.y))?;
+    window.set_size(PhysicalSize::new(r.w as u32, r.h as u32))
+}
 
 /// Must match every window in tauri.conf.json: windows with different options can't share WebView2.
 /// One renderer between them keeps memory down, as they only ever show Shelf's own pages.
-const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1";
+pub(crate) const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess --disable-background-timer-throttling --disable-renderer-backgrounding --renderer-process-limit=1";
 
 fn size_of(kind: &str) -> Option<(f64, f64, &'static str)> {
     match kind {
@@ -68,5 +77,17 @@ mod browser_args_tests {
         for window in windows {
             assert_eq!(window["additionalBrowserArgs"], BROWSER_ARGS, "{}", window["label"]);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_extra_docks_share_the_main_dock_s_browser_settings() {
+        // Windows with other arguments couldn't share WebView2 with the main dock.
+        let conf = include_str!("../../tauri.conf.json");
+        assert!(conf.contains(&format!("\"additionalBrowserArgs\": \"{BROWSER_ARGS}\"")));
     }
 }

@@ -1,7 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react";
 import { DockBar, reportSize } from "./Bar";
-import { edgeAt } from "./useEdgeDrag";
 import { useLayout } from "../../core/layout";
 import { useShell } from "../../core/shell";
 
@@ -86,12 +85,6 @@ it("opens a card over its tile on click, only for widgets that have one", async 
   expect(invoke).toHaveBeenCalledWith("open_card", expect.objectContaining({ widgetId: "clock" }));
 });
 
-it("the dock goes to whichever half of the screen it's let go in", () => {
-  expect(edgeAt(100, 864)).toBe("top");
-  expect(edgeAt(431, 864)).toBe("top");
-  expect(edgeAt(432, 864)).toBe("bottom");
-  expect(edgeAt(860, 864)).toBe("bottom");
-});
 
 it("tells Rust about auto-hide when it starts and whenever it changes", async () => {
   const { invoke } = await import("../../core/tauri");

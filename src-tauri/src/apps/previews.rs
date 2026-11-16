@@ -17,7 +17,7 @@ use ::windows::Win32::Graphics::Dwm::{
 use ::windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use ::windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use super::merge::AppEntry;
 use super::{current, windows};
@@ -253,7 +253,7 @@ fn set_peek(app: &AppHandle, target: Option<isize>) -> Result<(), String> {
 }
 
 /// A peek fades every other window, and these two have to stay for the pointer to move on.
-fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
+pub(crate) fn stay_during_peek(window: &WebviewWindow) -> Result<(), String> {
     let raw = window.hwnd().map_err(|e| e.to_string())?;
     let exclude = BOOL::from(true);
     unsafe {
@@ -289,8 +289,7 @@ fn place_over_tile(
         ((width * scale).round() as i32, (height * scale).round() as i32),
         (DOCK_GAP * scale).round() as i32,
     );
-    window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+    crate::shell::windows::put(window, r).map_err(|e| e.to_string())?;
     Ok(Some((on.dock, Rect { x: r.x, y: r.y, w: r.w, h: r.h })))
 }
 
@@ -299,7 +298,9 @@ const HINT_ICON_WIDTH: f64 = 24.0;
 
 /// The bubble above the dock during a drag: what letting go would do. The page takes it down.
 #[tauri::command(async)]
-pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f64, tile_width: f64) -> Result<(), String> {
+pub fn preview_hint(app: AppHandle, window: WebviewWindow, what: String, key: Option<String>, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
     let lang = unsafe { ::windows::Win32::Globalization::GetUserDefaultUILanguage() };
     let name = match &key {
         Some(key) if what == "open" => crate::apps::every_entry()?.into_iter().find(|e| e.key == *key).map(|e| e.name).unwrap_or_default(),
@@ -318,7 +319,9 @@ pub fn preview_hint(app: AppHandle, what: String, key: Option<String>, tile_x: f
 }
 
 #[tauri::command(async)]
-pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+pub fn preview_name(app: AppHandle, window: WebviewWindow, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
     let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
@@ -347,6 +350,12 @@ pub fn preview_name(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     Ok(())
 }
 
+/// The window Tab chose during Win+T, marked in the strip.
+#[tauri::command]
+pub fn preview_select(app: AppHandle, hwnd: Option<isize>) -> Result<(), String> {
+    app.emit_to("preview", "preview-select", hwnd).map_err(|e| e.to_string())
+}
+
 /// Previews open right where an app's menu does, so none show while a menu or card is open, as on
 /// Windows. A right-click just as they were being prepared used to put them over the menu.
 fn may_show(card_open: bool) -> bool {
@@ -371,7 +380,10 @@ pub fn prepare(app: &AppHandle) -> Result<(), String> {
 
 /// Tile position is logical px inside the dock window.
 #[tauri::command(async)]
-pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -> Result<(), String> {
+/// `from_keys`: opened by Tab during Win+T. Optional, so a hover's call needn't name it.
+pub fn preview_show(app: AppHandle, window: WebviewWindow, key: String, tile_x: f64, tile_width: f64, from_keys: Option<bool>) -> Result<(), String> {
+    // What opens goes over the dock that asked.
+    crate::shell::card::asked_from(&window);
     let opening = HOVER.bump();
     if !may_show(crate::shell::card::is_open()) {
         return Ok(());
@@ -412,8 +424,15 @@ pub fn preview_show(app: AppHandle, key: String, tile_x: f64, tile_width: f64) -
     app.emit_to("preview", "preview-show", shown).map_err(|e| e.to_string())?;
     crate::diag::note("previews shown");
     window.show().map_err(|e| e.to_string())?;
-    watch_pointer(app.clone(), dock_rect, strip);
+    if watches_pointer(from_keys.unwrap_or(false)) {
+        watch_pointer(app.clone(), dock_rect, strip);
+    }
     Ok(())
+}
+
+/// Previews opened from the keyboard stay up wherever the pointer is: it isn't what opened them.
+fn watches_pointer(from_keys: bool) -> bool {
+    !from_keys
 }
 
 /// Where the page laid out each picture, in logical px. Windows draws them from here on.
@@ -681,5 +700,11 @@ mod tests {
         let second = hover.bump();
         assert!(!hover.still_leaving(first));
         assert!(hover.still_leaving(second));
+    }
+
+    #[test]
+    fn previews_opened_from_the_keyboard_are_not_closed_by_the_pointer() {
+        assert!(!watches_pointer(true));
+        assert!(watches_pointer(false));
     }
 }

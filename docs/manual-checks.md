@@ -207,6 +207,43 @@ These need a real pointer, and closing or switching real windows.
 
 - [ ] **Show in screenshots:** with it on, the dock appears in a Win+Shift+S capture and in screen sharing, on a solid background. With it off, the glass comes back and the dock leaves captures.
 
+## Screens
+
+- [ ] **Pick a screen:** with a second screen plugged in, Settings › Dock › Screen lists both, the main one marked "(main)". Pick the other one: the dock, its glass and its cards move there, and the Windows taskbar comes back on the screen the dock left, sliding away by itself.
+- [ ] **Unplug it, then plug it back:** the dock waits on the main screen meanwhile, Screen shows "Unplugged screen", and the dock goes back once it's plugged in again.
+- [ ] **Two scales:** with one screen at 100 % and the other at 125 % or 150 %, the dock has the right size on each, and so do the cards and previews opened from it.
+- [ ] **Drag the dock on the second screen:** let it go in the top half, then the bottom half, then near each end: it settles on that screen's edge, where you let it go.
+- [ ] **Follow pointer:** choose it, then hold the pointer half a second at the bottom of the other screen: the dock moves there. Passing through the edge on the way elsewhere doesn't move it, and nothing moves during a game or a drag.
+
+- [ ] **All screens:** each screen gets a dock with the same widgets, each reserving its own edge when Float over windows is off. No Windows taskbar shows on any of them. A card, a preview or the hidden icons open over the dock you clicked.
+- [ ] **All screens, unplugging:** unplug the second screen: its dock goes, the main one stays. Plug it back: a dock comes back. Make the other screen the main one in Windows: the main dock moves there.
+- [ ] **All screens, a game:** a fullscreen game on one screen hides that screen's dock only.
+- [ ] **All screens, what stays with the main dock:** only the main dock can be dragged by hand, and only it slides away with Auto-hide. In Liquid Glass or iOS Glass the other docks are solid, not glass.
+- [ ] **All screens, memory:** run `src/test/resources.ps1` with one dock, then with two, and send me both numbers. If the second dock costs more than the first, that needs looking at.
+
+## Starting with Windows
+
+- [ ] **How soon the edge is reserved (F-023):** turn Float over windows off, run `setx SHELF_DIAG 1` once, restart Windows, then open `diag.log` beside Shelf's data. Its "edge reserved" line gives three numbers: sign-in to Shelf starting, starting to setup, setup to reserving. The correction depends on which one is long; send me the line. Then `setx SHELF_DIAG ""` turns the trace off again.
+
+## Album art accent
+
+- [ ] **Follow the cover:** Settings › Appearance › Accent › the record swatch (Album art). Play something with a cover in Spotify or the browser: switches, rings and the open-app dots take a colour from it within two seconds, and change with the track.
+- [ ] **No colour to take:** a black and white cover, or nothing playing, gives the default blue rather than a grey.
+- [ ] **The swatch itself:** does the record read as "album art" beside the colour wheel of your own colour?
+
+## Win+T
+
+Only in your own build: the preview doesn't watch the keyboard, so it can run beside your Shelf.
+
+- [ ] **Walk the apps:** Win+T rings the app in front on the dock. Left and right, or Win+T again, move along the open apps; Shift+Win+T goes back.
+- [ ] **Start stays shut:** letting go of Win after Win+T doesn't open Start. Win alone, pressed and let go during the walk, opens Start and ends the walk.
+- [ ] **Windows:** Tab shows the app's windows above it, with the chosen one outlined; Shift+Tab goes back; Enter brings that window forward. With one window, Enter brings it forward.
+- [ ] **Leaving it:** Escape ends it. So does a click anywhere: then arrows in an editor move its cursor as usual. Typing a letter ends it too, and the letter reaches the app.
+- [ ] **Not during a game:** with a game in fullscreen, on any screen, Win+T does whatever Windows does, and nothing happens on the dock.
+- [ ] **After locking:** Win+L, unlock, then type "test" in Notepad: all four letters arrive.
+- [ ] **Left alone:** Win+T, then touch nothing: after 8 seconds the arrows go back to the app in front.
+- [ ] **Limit:** an open app kept inside a group isn't reached by Win+T.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?

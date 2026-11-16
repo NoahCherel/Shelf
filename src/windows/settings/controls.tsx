@@ -1,6 +1,6 @@
 import { saveStartImage, shrinkImage } from "../../core/startImage";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { appVersion } from "../../core/tauri";
+import { appVersion, invoke, listen } from "../../core/tauri";
 import { Switch } from "../../design/parts/Switch";
 import { useSettings } from "../../core/settings";
 import { ACCENTS, readPath, writePath, type RowDef, type SectionDef } from "./schema";
@@ -92,6 +92,14 @@ function TextRow({ row }: { row: Extract<RowDef, { kind: "text" }> }) {
 function AccentRow({ row }: { row: RowDef }) {
   const [value, save] = useValue<string | null>(row.key);
   const current = value ?? ACCENTS[0].color;
+  const following = current === "album";
+  // Following the cover is done by Rust, which only does it while asked to.
+  const pick = (next: string) => {
+    if (following !== (next === "album")) void invoke("album_accent_follow", { on: next === "album" }).catch(() => {});
+    save(next);
+  };
+  // Only a colour of the owner's own shows on its swatch: not one of the nine, not the album's.
+  const own = !following && !ACCENTS.some((a) => a.color === current) ? current : null;
   return (
     <div className="accents" role="radiogroup" aria-label={row.label}>
       {ACCENTS.map((accent) => (
@@ -103,13 +111,61 @@ function AccentRow({ row }: { row: RowDef }) {
           aria-checked={current === accent.color}
           className={current === accent.color ? "accent accent--on" : "accent"}
           style={{ background: accent.color }}
-          onClick={() => save(accent.color)}
+          onClick={() => pick(accent.color)}
         />
       ))}
-      <label className="accent accent--own" title="Your own colour" style={{ background: ACCENTS.some((a) => a.color === current) ? undefined : current }}>
-        <input type="color" aria-label="Your own colour" value={current} onChange={(e) => save(e.target.value)} />
+      <button
+        type="button"
+        role="radio"
+        aria-label="Album art"
+        title="Follows the cover of what's playing"
+        aria-checked={following}
+        className={following ? "accent accent--album accent--on" : "accent accent--album"}
+        onClick={() => pick("album")}
+      />
+      <label className="accent accent--own" title="Your own colour" style={{ background: own ?? undefined }}>
+        <input type="color" aria-label="Your own colour" value={own ?? ACCENTS[0].color} onChange={(e) => pick(e.target.value)} />
       </label>
     </div>
+  );
+}
+
+interface Screen {
+  id: string;
+  name: string;
+  primary: boolean;
+}
+
+/** Windows' screens, read again whenever they change. */
+function ScreenRow({ row }: { row: Extract<RowDef, { kind: "screen" }> }) {
+  const [value, save] = useValue<string | null>(row.key);
+  const [screens, setScreens] = useState<Screen[]>([]);
+  useEffect(() => {
+    const read = () => invoke<Screen[] | null>("displays_list").then((list) => setScreens(list ?? []), () => {});
+    read();
+    const off = listen("displays-changed", read);
+    return () => void off.then((stop) => stop());
+  }, []);
+  const current = value ?? screens.find((s) => s.primary)?.id ?? "";
+  // A chosen screen that's unplugged stays chosen, so the dock goes back when it returns.
+  const away = value !== null && screens.length > 0 && !screens.some((s) => s.id === value);
+  return (
+    <select
+      className="field"
+      aria-label={row.label}
+      value={current}
+      onChange={(e) => {
+        save(e.target.value);
+        row.onChange?.(e.target.value as never);
+      }}
+    >
+      {screens.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.primary ? `${s.name} (main)` : s.name}
+        </option>
+      ))}
+      {away && <option value={value}>Unplugged screen</option>}
+    </select>
   );
 }
 
@@ -154,6 +210,8 @@ function Control({ row }: { row: RowDef }) {
       return <TextRow row={row} />;
     case "accent":
       return <AccentRow row={row} />;
+    case "screen":
+      return <ScreenRow row={row} />;
     case "version":
       return <VersionRow />;
     case "action":

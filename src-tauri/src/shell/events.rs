@@ -86,6 +86,14 @@ fn covers(h: HWND, monitor: HMONITOR) -> bool {
     }
 }
 
+/// The window in front fills its screen, whichever screen that is: a game Win+T must be left to.
+pub fn front_is_fullscreen() -> bool {
+    unsafe {
+        let fg = GetForegroundWindow();
+        !fg.is_invalid() && !is_ours(fg) && covers(fg, MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST))
+    }
+}
+
 /// Remembers the window that hid the dock, so it can tell when that window is gone.
 #[derive(Default)]
 pub struct FullscreenTracker {

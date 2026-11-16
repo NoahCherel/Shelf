@@ -10,6 +10,8 @@ Every feature, numbered, for the implementation plan to trace back to. Prioritie
 
 **Status, 2026-11-09:** the [bar and apps plan](../superpowers/plans/2026-11-05-bar-and-apps.md) adds F-052, F-053, F-049, F-050, F-051, F-004, F-005, F-008, F-010, F-011, F-013, F-014, F-028, F-029, F-031, F-032, the own colour of F-035, F-022, F-048, F-043, F-045, F-047 and F-067, and free placement of widgets along a full-width dock (the owner's request). By the owner's choice it leaves out the several-screen features (F-017, F-018, F-019, F-026) and keyboard shortcuts (F-054, F-090).
 
+**Status, 2026-11-16:** the [plan to finish 1.1 to 1.4](../superpowers/plans/2026-11-13-finir-1-1-a-1-4.md) adds F-017, F-018, F-019, F-026, the Album art half of F-035 and F-054, and measures F-023, whose correction waits on that measurement after a restart. End task (in F-046) stays left out by the owner's choice. The several-screen features were tested on a one-screen PC: the two-screen trials are in [manual checks](../manual-checks.md).
+
 ## Dock
 
 | ID | P | Feature | Doc |

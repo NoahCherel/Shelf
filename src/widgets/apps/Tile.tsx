@@ -13,6 +13,7 @@ import { AppIcon, GroupIcon, SearchGlyph, StartLogo, useStartImage } from "./ico
 import { useAppPreviews } from "./useAppPreviews";
 import { useComeAndGo } from "../../core/useComeAndGo";
 import { useOsDrag } from "./useOsDrag";
+import { useKeyNav } from "./keyNav";
 import "./apps.css";
 
 /** While an app is held over another, the others stop making room for it. */
@@ -36,6 +37,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
   const startImage = useStartImage(preview);
   const box = useRef<HTMLDivElement>(null);
   const osDrag = useOsDrag(box, data, preview);
+  const keyNav = useKeyNav(data, preview);
   const { rows, arrived } = useComeAndGo(data, (e) => e.key, undefined, preview);
   const present = new Set((data ?? []).map((e) => e.key));
   const pickerOpen = usePicker((s) => s.open);
@@ -177,7 +179,7 @@ export function AppsTile({ data: fetched, preview, refresh }: TileProps<AppEntry
           data-key={entry.key}
           data-dragging={sortable.isDragging}
           style={{ transform: sortable.transform ? `translate3d(${sortable.transform.x}px, 0, 0)` : undefined, transition: sortable.transition }}
-          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 && entry.kind !== "group" ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}${pulledOff === entry.key ? " app--off" : ""}${onto === entry.key ? " app--onto" : ""}`}
+          className={`app${entry.active ? " app--active" : ""}${entry.windows.length > 1 && entry.kind !== "group" ? " app--many" : ""}${arrived.has(entry.key) ? " app--new" : ""}${pulledOff === entry.key ? " app--off" : ""}${onto === entry.key ? " app--onto" : ""}${keyNav.focused === entry.key ? " app--keyfocus" : ""}`}
           aria-label={entry.name}
           onMouseEnter={(e) => previews.enter(e, entry)}
           onMouseLeave={previews.leave}

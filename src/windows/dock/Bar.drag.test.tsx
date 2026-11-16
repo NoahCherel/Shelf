@@ -15,8 +15,13 @@ vi.mock("../../core/registry", () => {
   return { widgets, byId: (id: string) => widgets.find((w) => w.id === id) };
 });
 
+/** Rust reads where the window was let go: the page saves what it says. */
+const settleTo = (edge: "top" | "bottom", along: number) =>
+  vi.mocked(invoke).mockImplementation(async (command: string) => (command === "dock_drag_settle" ? { edge, along } : null) as never);
+
 beforeEach(() => {
   vi.mocked(invoke).mockClear();
+  vi.mocked(invoke).mockImplementation(async () => null as never);
   useLayout.setState({ ids: ["apps", "clock", "battery"] });
   useSettings.setState({ ...defaults() });
   usePicker.setState({ open: false });
@@ -99,10 +104,8 @@ describe("right-click", () => {
 });
 
 describe("moving the pill along its edge", () => {
-  it("follows the pointer sideways too, and stays where it's let go", () => {
-    Object.defineProperty(window.screen, "width", { value: 1536, configurable: true });
-    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
-    Object.defineProperty(window, "screenX", { value: 368, configurable: true });
+  it("follows the pointer sideways too, and stays where it's let go", async () => {
+    settleTo("bottom", 68 / 736);
     render(<DockBar />);
     const bar = screen.getByTestId("bar");
     bar.setPointerCapture = vi.fn();
@@ -111,21 +114,35 @@ describe("moving the pill along its edge", () => {
     fireEvent.pointerMove(bar, { pointerId: 1, screenX: 400, screenY: 840 });
     fireEvent.pointerUp(bar, { pointerId: 1, screenX: 400, screenY: 840 });
     expect(invoke).toHaveBeenCalledWith("dock_drag", { dx: -300, dy: 0 });
-    expect(useSettings.getState().pillAt).toBeCloseTo(68 / 736);
+    await vi.waitFor(() => expect(useSettings.getState().pillAt).toBeCloseTo(68 / 736));
     expect(useSettings.getState().edge).toBe("bottom");
   });
 
-  it("a full-width dock only changes edge", () => {
+  it("settles before letting go", async () => {
+    settleTo("top", 0.2);
+    render(<DockBar />);
+    const bar = screen.getByTestId("bar");
+    bar.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(bar, { button: 0, pointerId: 1, screenX: 700, screenY: 840 });
+    fireEvent.pointerMove(bar, { pointerId: 1, screenX: 400, screenY: 100 });
+    fireEvent.pointerUp(bar, { pointerId: 1, screenX: 400, screenY: 100 });
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("dock_drag_end"));
+    const order = vi.mocked(invoke).mock.calls.map(([command]) => command);
+    expect(order.indexOf("dock_drag_settle")).toBeLessThan(order.indexOf("dock_drag_end"));
+    expect(useSettings.getState().edge).toBe("top");
+  });
+
+  it("a full-width dock only changes edge", async () => {
     useSettings.setState({ dockWidth: "full", pillAt: 0.5 });
-    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+    settleTo("top", 0.9);
     render(<DockBar />);
     const bar = screen.getByTestId("bar");
     bar.setPointerCapture = vi.fn();
     fireEvent.pointerDown(bar, { button: 0, pointerId: 1, screenX: 700, screenY: 840 });
     fireEvent.pointerMove(bar, { pointerId: 1, screenX: 300, screenY: 100 });
     fireEvent.pointerUp(bar, { pointerId: 1, screenX: 300, screenY: 100 });
+    await vi.waitFor(() => expect(useSettings.getState().edge).toBe("top"));
     expect(useSettings.getState().pillAt).toBe(0.5);
-    expect(useSettings.getState().edge).toBe("top");
   });
 });
 
@@ -139,12 +156,12 @@ describe("moving the dock to another edge", () => {
     fireEvent.pointerUp(bar, { pointerId: 1, screenY: to });
   };
 
-  it("follows the pointer from an empty spot, and stays at the edge it's let go near", () => {
-    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+  it("follows the pointer from an empty spot, and stays at the edge it's let go near", async () => {
+    settleTo("top", 0.5);
     render(<DockBar />);
     grab(screen.getByTestId("bar"), 840, 100);
     expect(invoke).toHaveBeenCalledWith("dock_drag", { dx: 0, dy: -740 });
-    expect(invoke).toHaveBeenCalledWith("dock_drag_end");
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("dock_drag_end"));
     expect(useSettings.getState().edge).toBe("top");
   });
 
@@ -155,15 +172,16 @@ describe("moving the dock to another edge", () => {
     expect(useSettings.getState().edge).toBe("bottom");
   });
 
-  it("a locked dock stays put, until the picker is open", () => {
+  it("a locked dock stays put, until the picker is open", async () => {
     useSettings.setState({ lockDock: true });
+    settleTo("top", 0.5);
     render(<DockBar />);
     grab(screen.getByTestId("bar"), 840, 100);
     expect(invoke).not.toHaveBeenCalledWith("dock_drag", expect.anything());
     expect(useSettings.getState().edge).toBe("bottom");
     act(() => usePicker.setState({ open: true }));
     grab(screen.getByTestId("bar"), 840, 100);
-    expect(useSettings.getState().edge).toBe("top");
+    await vi.waitFor(() => expect(useSettings.getState().edge).toBe("top"));
   });
 
   it("grabbing a widget moves the widget, not the dock", () => {
@@ -340,8 +358,8 @@ describe("pressing a widget on a full-width dock", () => {
 });
 
 describe("moving a pill by its top and bottom borders", () => {
-  it("both borders grab the dock, and its ends still narrow it", () => {
-    Object.defineProperty(window.screen, "height", { value: 864, configurable: true });
+  it("both borders grab the dock, and its ends still narrow it", async () => {
+    settleTo("top", 0.5);
     render(<DockBar />);
     for (const name of ["Top border", "Bottom border"]) {
       const grip = screen.getByRole("separator", { name });
@@ -350,7 +368,7 @@ describe("moving a pill by its top and bottom borders", () => {
       fireEvent.pointerDown(grip, { button: 0, pointerId: 1, screenX: 500, screenY: 840 });
       fireEvent.pointerMove(grip, { pointerId: 1, screenX: 500, screenY: 100 });
       fireEvent.pointerUp(grip, { pointerId: 1, screenX: 500, screenY: 100 });
-      expect(useSettings.getState().edge).toBe("top");
+      await vi.waitFor(() => expect(useSettings.getState().edge).toBe("top"));
     }
     expect(screen.getByRole("separator", { name: "Right end" })).toBeTruthy();
   });

@@ -611,3 +611,26 @@ describe("files, folders and groups", () => {
     });
   });
 });
+
+describe("Win+T", () => {
+  const keynav = (event: unknown) => (vi.mocked(listen).mock.calls.filter((c) => c[0] === "keynav").at(-1)![1] as (e: unknown) => void)(event);
+
+  it("rings the app reached with Win+T", async () => {
+    render(<AppsTile data={[app("a", true), app("b", true, true)]} status="ready" />);
+    await act(async () => {});
+    act(() => keynav({ kind: "start" }));
+    expect(screen.getByRole("button", { name: "b" }).className).toContain("app--keyfocus");
+    expect(screen.getByRole("button", { name: "a" }).className).not.toContain("app--keyfocus");
+  });
+
+  it("keyboard previews ignore the previews setting", async () => {
+    useSettings.setState({ previews: false });
+    const two = { ...app("a", true, true), windows: [{ hwnd: 1, title: "one" }, { hwnd: 2, title: "two" }] };
+    render(<AppsTile data={[two]} status="ready" />);
+    await act(async () => {});
+    act(() => keynav({ kind: "start" }));
+    await act(async () => keynav({ kind: "window", step: 1 }));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_show", expect.objectContaining({ key: "a", fromKeys: true }));
+    expect(mockInvoke).toHaveBeenCalledWith("preview_select", { hwnd: 2 });
+  });
+});

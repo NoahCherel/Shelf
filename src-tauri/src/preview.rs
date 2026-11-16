@@ -11,6 +11,7 @@ pub struct Startup {
     pub touch_taskbar: bool,
     pub reserve_edge: bool,
     pub watchdog: bool,
+    pub hook_keys: bool,
     pub mutex: &'static str,
     pub quit_event: &'static str,
     pub data_folder: &'static str,
@@ -23,6 +24,7 @@ pub fn startup(on: bool) -> Startup {
             touch_taskbar: false,
             reserve_edge: false,
             watchdog: false,
+            hook_keys: false,
             mutex: "dev.personal.shelf.preview.instance",
             quit_event: "dev.personal.shelf.preview.quit",
             data_folder: "Shelf-preview",
@@ -33,6 +35,7 @@ pub fn startup(on: bool) -> Startup {
             touch_taskbar: true,
             reserve_edge: true,
             watchdog: true,
+            hook_keys: true,
             mutex: "dev.personal.shelf.instance",
             quit_event: "dev.personal.shelf.quit",
             data_folder: "Shelf",
@@ -111,6 +114,13 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("shelf-preview-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+
+    #[test]
+    fn the_preview_build_installs_no_keyboard_hook() {
+        // It runs beside the owner's Shelf: two hooks would both take Win+T.
+        assert!(!startup(true).hook_keys);
+        assert!(startup(false).hook_keys);
     }
 
     #[test]

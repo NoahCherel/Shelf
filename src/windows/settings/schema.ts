@@ -24,6 +24,7 @@ export type RowDef =
   | (Common & { kind: "choice"; options: { value: string; label: string }[] })
   | (Common & { kind: "text"; placeholder?: string })
   | (Common & { kind: "accent" })
+  | (Common & { kind: "screen" })
   | (Common & { kind: "image" })
   | (Common & { kind: "action"; run: () => void; danger?: boolean })
   | (Common & { kind: "version" });
@@ -46,6 +47,12 @@ export const toggle = (key: string, o: Options<Extract<RowDef, { kind: "toggle" 
 export const slider = (key: string, o: Options<Extract<RowDef, { kind: "slider" }>>): RowDef => ({ kind: "slider", key, ...o });
 const choice = (key: string, o: Options<Extract<RowDef, { kind: "choice" }>>): RowDef => ({ kind: "choice", key, ...o });
 const text = (key: string, o: Options<Extract<RowDef, { kind: "text" }>>): RowDef => ({ kind: "text", key, ...o });
+
+/** Tells the dock which screen to sit on, from both rows that decide it. */
+const moveDock = () => {
+  const { display, displayMonitor } = useSettings.getState();
+  void invoke("set_dock_display", { mode: display, monitor: displayMonitor }).catch(() => {});
+};
 
 /** The Apple system palette (G-09). */
 export const ACCENTS = [
@@ -101,7 +108,7 @@ export const SCHEMA: PageDef[] = [
             { value: "light", label: "Light" },
           ],
         }),
-        { kind: "accent", key: "accent", label: "Accent", tip: "Used for switches, rings, the open-app dots and highlights." },
+        { kind: "accent", key: "accent", label: "Accent", tip: "Used for switches, rings, the open-app dots and highlights. Album art follows the cover of what's playing." },
       ]),
     ],
   },
@@ -119,6 +126,24 @@ export const SCHEMA: PageDef[] = [
         }),
       ]),
       section("Position", [
+        choice("display", {
+          label: "Displays",
+          tip: "One screen keeps the dock on the screen you pick, and brings it back there when it's plugged in again. All screens puts a dock on each. Follow pointer moves it to a screen when you hold the pointer at that screen's edge.",
+          options: [
+            { value: "single", label: "One screen" },
+            { value: "all", label: "All screens" },
+            { value: "follow", label: "Follow pointer" },
+          ],
+          onChange: moveDock,
+        }),
+        {
+          kind: "screen",
+          key: "displayMonitor",
+          label: "Screen",
+          tip: "The screen the dock sits on. While it's unplugged, the dock waits on the main screen.",
+          disabledWhen: (s) => s.display !== "single",
+          onChange: moveDock,
+        },
         choice("edge", {
           label: "Screen edge",
           tip: "Which edge the dock sits on. You can also drag it there by an empty spot.",
