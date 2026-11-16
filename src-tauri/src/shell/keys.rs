@@ -130,6 +130,14 @@ impl KeyNav {
         self.held.clear();
     }
 
+    /// Shift, Ctrl and Alt as Windows has them now. Seen key by key they can be wrong: a release
+    /// that went to an elevated window, like Task Manager after Ctrl+Shift+Esc, never reaches the hook.
+    pub fn sync_modifiers(&mut self, shift: bool, ctrl: bool, alt: bool) {
+        self.shift = shift;
+        self.ctrl = ctrl;
+        self.alt = alt;
+    }
+
     /// Ends navigation from outside: a click elsewhere, a game, a locked screen.
     pub fn cancel(&mut self) -> Option<NavEvent> {
         std::mem::take(&mut self.navigating).then_some(NavEvent::Cancel)
@@ -161,11 +169,13 @@ impl KeyNav {
                 // As any other key, they end a walk and reach the app.
                 return Verdict { event: self.cancel(), ..Verdict::default() };
             }
+            // Held, Windows repeats the press: only the first opens the panel, or it would open and close.
+            Key::A | Key::S | Key::N if self.held.contains(&key) => {
+                return Verdict { swallow: true, ..Verdict::default() };
+            }
             Key::A | Key::S | Key::N if plain_win && dock_on && panels_on => {
                 self.swallowed_since_win = true;
-                if !self.held.contains(&key) {
-                    self.held.push(key);
-                }
+                self.held.push(key);
                 // A panel takes over from a Win+T walk.
                 return Verdict { swallow: true, event: self.cancel(), mask: false, panel: Panel::of(key) };
             }
@@ -267,6 +277,11 @@ pub fn idle_too_long() -> bool {
     timed_out(LAST_NAV.load(Ordering::Relaxed), now_ms())
 }
 
+fn key_down(vk: VIRTUAL_KEY) -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    unsafe { GetAsyncKeyState(vk.0 as i32) < 0 }
+}
+
 fn win_physically_down() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
     [VK_LWIN, VK_RWIN].into_iter().any(|k| unsafe { GetAsyncKeyState(k.0 as i32) } < 0)
@@ -303,14 +318,20 @@ unsafe extern "system" fn on_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> L
             let key = key_of(info.vkCode);
             // Only the letters of a shortcut need to know: the fullscreen check reads the window in
             // front, so it isn't made per key.
+            // Without Win down, a letter is only typing, and costs nothing more here.
             let shortcut = matches!(key, Key::T | Key::A | Key::S | Key::N) && down;
-            let dock_on = shortcut
+            let win_down = shortcut && win_physically_down();
+            let dock_on = win_down
                 && win_t_allowed(events::LOCKED.load(Ordering::Relaxed), events::FULLSCREEN.load(Ordering::Relaxed), events::front_is_fullscreen());
             let verdict = {
                 let mut nav = lock(&NAV);
                 // A Win whose release went unseen, as when the session locked, isn't held any more.
-                if shortcut && !win_physically_down() {
+                if shortcut && !win_down {
                     nav.forget_held();
+                }
+                // Win+Shift+S must stay Windows' screenshot even if a modifier's release went unseen.
+                if win_down {
+                    nav.sync_modifiers(key_down(VK_SHIFT), key_down(VK_CONTROL), key_down(VK_MENU));
                 }
                 let verdict = nav.on_key(key, down, dock_on, PANEL_KEYS.load(Ordering::Relaxed));
                 NAVIGATING.store(nav.navigating(), Ordering::Relaxed);
@@ -685,5 +706,35 @@ mod tests {
         nav.forget_held();
         let v = win_and(&mut nav, Key::A, true, true);
         assert_eq!(v.panel, Some(Panel::Quick));
+    }
+
+    #[test]
+    fn holding_win_a_doesnt_open_and_close_the_panel_over_and_over() {
+        let mut nav = KeyNav::default();
+        nav.on_key(Key::Win, true, true, true);
+        assert_eq!(nav.on_key(Key::A, true, true, true).panel, Some(Panel::Quick));
+        // Held, Windows repeats the press.
+        let repeat = nav.on_key(Key::A, true, true, true);
+        assert_eq!((repeat.swallow, repeat.panel), (true, None));
+        assert!(nav.on_key(Key::A, false, true, true).swallow);
+    }
+
+    #[test]
+    fn the_modifiers_windows_reports_win_over_the_ones_seen() {
+        // Ctrl's release went to an elevated Task Manager, unseen.
+        let mut nav = KeyNav::default();
+        nav.on_key(Key::Ctrl, true, true, true);
+        nav.sync_modifiers(false, false, false);
+        nav.on_key(Key::Win, true, true, true);
+        assert_eq!(nav.on_key(Key::A, true, true, true).panel, Some(Panel::Quick));
+
+        // Shift still held, though forgotten: Win+Shift+S stays Windows' screenshot.
+        let mut nav = KeyNav::default();
+        nav.on_key(Key::Shift, true, true, true);
+        nav.forget_held();
+        nav.sync_modifiers(true, false, false);
+        nav.on_key(Key::Win, true, true, true);
+        let v = nav.on_key(Key::S, true, true, true);
+        assert_eq!((v.swallow, v.panel), (false, None));
     }
 }
