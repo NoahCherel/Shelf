@@ -167,6 +167,7 @@ fn register_appbar(dock: &WebviewWindow) {
             }
             appbar::register(raw, reserved_rect(m, h, l.edge), l.edge);
             *on = Some(m);
+            super::boot::note_reserved();
         }
         None => {
             appbar::unregister(raw);

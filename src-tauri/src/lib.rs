@@ -255,6 +255,7 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
+            shell::boot::setup_began();
             diag::remember(app.handle());
             search::refresh_apps();
             apps::previews::prepare(app.handle())?;

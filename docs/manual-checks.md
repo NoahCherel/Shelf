@@ -207,6 +207,18 @@ These need a real pointer, and closing or switching real windows.
 
 - [ ] **Show in screenshots:** with it on, the dock appears in a Win+Shift+S capture and in screen sharing, on a solid background. With it off, the glass comes back and the dock leaves captures.
 
+## Screens
+
+- [ ] **Pick a screen:** with a second screen plugged in, Settings › Dock › Screen lists both, the main one marked "(main)". Pick the other one: the dock, its glass and its cards move there, and the Windows taskbar comes back on the screen the dock left, sliding away by itself.
+- [ ] **Unplug it, then plug it back:** the dock waits on the main screen meanwhile, Screen shows "Unplugged screen", and the dock goes back once it's plugged in again.
+- [ ] **Two scales:** with one screen at 100 % and the other at 125 % or 150 %, the dock has the right size on each, and so do the cards and previews opened from it.
+- [ ] **Drag the dock on the second screen:** let it go in the top half, then the bottom half, then near each end: it settles on that screen's edge, where you let it go.
+- [ ] **Follow pointer:** choose it, then hold the pointer half a second at the bottom of the other screen: the dock moves there. Passing through the edge on the way elsewhere doesn't move it, and nothing moves during a game or a drag.
+
+## Starting with Windows
+
+- [ ] **How soon the edge is reserved (F-023):** turn Float over windows off, run `setx SHELF_DIAG 1` once, restart Windows, then open `diag.log` beside Shelf's data. Its "edge reserved" line gives three numbers: sign-in to Shelf starting, starting to setup, setup to reserving. The correction depends on which one is long; send me the line. Then `setx SHELF_DIAG ""` turns the trace off again.
+
 ## A day of use
 
 - [ ] Does the Claude tile stay right while Claude Code runs?
