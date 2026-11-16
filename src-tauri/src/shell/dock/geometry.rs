@@ -59,6 +59,14 @@ pub fn resting_on(monitor: Rect, scale: f64, layout: DockLayout) -> Rect {
     dock_rect(monitor, scale, layout.width, layout.bar, layout.gap, layout.edge, layout.along)
 }
 
+/// Where a dock let go at `window` settles: the nearer edge, and its place along it.
+pub fn settle(window: Rect, monitor: Rect) -> (Edge, f64) {
+    let edge = if window.y + window.h / 2 < monitor.y + monitor.h / 2 { Edge::Top } else { Edge::Bottom };
+    let room = monitor.w - window.w;
+    let along = if room > 0 { ((window.x - monitor.x) as f64 / room as f64).clamp(0.0, 1.0) } else { 0.5 };
+    (edge, along)
+}
+
 /// The strip of the screen to keep clear (left, top, right, bottom).
 pub fn reserved_rect(monitor: Rect, height: i32, edge: Edge) -> (i32, i32, i32, i32) {
     let (left, right) = (monitor.x, monitor.x + monitor.w);
@@ -179,6 +187,24 @@ mod tests {
         let r = resting_on(side, 1.5, FIRST_LAYOUT);
         assert!(r.x >= 1920, "{r:?}");
         assert_eq!(r.h, 83);
+    }
+
+    #[test]
+    fn letting_go_on_a_second_screen_reads_that_screen() {
+        let side = Rect { x: 1920, y: 200, w: 1920, h: 1080 };
+        let window = Rect { x: 1920 + 560, y: 200 + 1000, w: 800, h: 72 };
+        assert_eq!(settle(window, side), (Edge::Bottom, 0.5));
+    }
+
+    #[test]
+    fn letting_go_in_the_top_half_moves_to_the_top() {
+        let side = Rect { x: 1920, y: 200, w: 1920, h: 1080 };
+        assert_eq!(settle(Rect { x: 1920, y: 300, w: 800, h: 72 }, side).0, Edge::Top);
+    }
+
+    #[test]
+    fn a_window_as_wide_as_the_screen_sits_in_the_middle() {
+        assert_eq!(settle(Rect { x: 0, y: 1000, w: 1920, h: 72 }, FHD).1, 0.5);
     }
 
     #[test]

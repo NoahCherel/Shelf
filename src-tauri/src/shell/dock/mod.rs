@@ -432,6 +432,23 @@ pub fn dock_drag(app: AppHandle, dx: f64, dy: f64) -> Result<(), String> {
     dock.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())
 }
 
+#[derive(serde::Serialize)]
+pub struct Settled {
+    edge: &'static str,
+    along: f64,
+}
+
+/// Where the dock would settle if let go now, read from the window itself and the screen it's on,
+/// so a dock on another screen settles on that one. Moves nothing: the page saves this first.
+#[tauri::command]
+pub fn dock_drag_settle(app: AppHandle) -> Result<Settled, String> {
+    let dock = app.get_webview_window("dock").ok_or("dock window missing")?;
+    let (monitor, _) = monitor().ok_or("no monitor")?;
+    let (pos, size) = (dock.outer_position().map_err(|e| e.to_string())?, dock.outer_size().map_err(|e| e.to_string())?);
+    let (edge, along) = settle(Rect { x: pos.x, y: pos.y, w: size.width as i32, h: size.height as i32 }, monitor);
+    Ok(Settled { edge: if edge == Edge::Top { "top" } else { "bottom" }, along })
+}
+
 /// Let go: it goes back to where its layout says.
 #[tauri::command]
 pub fn dock_drag_end(app: AppHandle) -> Result<(), String> {
