@@ -59,7 +59,12 @@ fn error_chain(e: &reqwest::Error) -> String {
 /// A refused certificate is also a connection error to reqwest, so it's looked for first.
 fn failure_text(connect: bool, timeout: bool, chain: &str) -> String {
     let lower = chain.to_lowercase();
-    if lower.contains("certificate") || lower.contains("revocation") {
+    // The certificate wasn't refused: the server that vouches for it couldn't be reached, as when
+    // the PC wakes before its network is fully up.
+    let check_unreachable = lower.contains("revocation server was offline") || lower.contains("revocation_offline");
+    if check_unreachable {
+        "offline".into()
+    } else if lower.contains("certificate") || lower.contains("revocation") {
         "certificate".into()
     } else if connect || timeout {
         "offline".into()
@@ -126,6 +131,14 @@ mod failure_tests {
         let chain = "error trying to connect: The revocation function was unable to check revocation for the certificate.";
         assert_eq!(failure_text(true, false, chain), "certificate");
         assert_eq!(failure_text(true, false, "CRYPT_E_NO_REVOCATION_CHECK"), "certificate");
+    }
+
+    #[test]
+    fn a_revocation_server_out_of_reach_is_offline() {
+        // Right after waking, the network can be half up: the certificate isn't refused, its check couldn't run.
+        let chain = "error trying to connect: The revocation function was unable to check revocation because the revocation server was offline.";
+        assert_eq!(failure_text(true, false, chain), "offline");
+        assert_eq!(failure_text(true, false, "CRYPT_E_REVOCATION_OFFLINE"), "offline");
     }
 
     #[test]
