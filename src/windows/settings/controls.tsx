@@ -1,6 +1,6 @@
 import { saveStartImage, shrinkImage } from "../../core/startImage";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { appVersion } from "../../core/tauri";
+import { appVersion, invoke, listen } from "../../core/tauri";
 import { Switch } from "../../design/parts/Switch";
 import { useSettings } from "../../core/settings";
 import { ACCENTS, readPath, writePath, type RowDef, type SectionDef } from "./schema";
@@ -113,6 +113,45 @@ function AccentRow({ row }: { row: RowDef }) {
   );
 }
 
+interface Screen {
+  id: string;
+  name: string;
+  primary: boolean;
+}
+
+/** Windows' screens, read again whenever they change. */
+function ScreenRow({ row }: { row: Extract<RowDef, { kind: "screen" }> }) {
+  const [value, save] = useValue<string | null>(row.key);
+  const [screens, setScreens] = useState<Screen[]>([]);
+  useEffect(() => {
+    const read = () => invoke<Screen[] | null>("displays_list").then((list) => setScreens(list ?? []), () => {});
+    read();
+    const off = listen("displays-changed", read);
+    return () => void off.then((stop) => stop());
+  }, []);
+  const current = value ?? screens.find((s) => s.primary)?.id ?? "";
+  // A chosen screen that's unplugged stays chosen, so the dock goes back when it returns.
+  const away = value !== null && screens.length > 0 && !screens.some((s) => s.id === value);
+  return (
+    <select
+      className="field"
+      aria-label={row.label}
+      value={current}
+      onChange={(e) => {
+        save(e.target.value);
+        row.onChange?.(e.target.value as never);
+      }}
+    >
+      {screens.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.primary ? `${s.name} (main)` : s.name}
+        </option>
+      ))}
+      {away && <option value={value}>Unplugged screen</option>}
+    </select>
+  );
+}
+
 function VersionRow() {
   const [version, setVersion] = useState("");
   useEffect(() => {
@@ -154,6 +193,8 @@ function Control({ row }: { row: RowDef }) {
       return <TextRow row={row} />;
     case "accent":
       return <AccentRow row={row} />;
+    case "screen":
+      return <ScreenRow row={row} />;
     case "version":
       return <VersionRow />;
     case "action":

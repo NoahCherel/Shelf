@@ -31,6 +31,10 @@ export interface SettingsData {
   autoHide: boolean;
   /** With auto-hide: stays up while the desktop is in front. */
   showOnDesktop: boolean;
+  /** The dock sits on one chosen screen, or moves to the screen whose edge the pointer is held at. */
+  display: "single" | "follow";
+  /** The chosen screen's id, which survives unplugging it; null for the main screen. */
+  displayMonitor: string | null;
   /** An app's name in a bubble when hovering it. */
   hoverNames: boolean;
   /** The dock shows in screenshots and screen sharing, at the cost of the glass. */
@@ -67,6 +71,8 @@ export function defaults(): SettingsData {
     spacing: 4,
     autoHide: false,
     showOnDesktop: false,
+    display: "single",
+    displayMonitor: null,
     narrowWidth: null,
     hoverNames: true,
     visibleInCaptures: false,
@@ -105,6 +111,8 @@ export function sanitize(raw: unknown): SettingsData {
     spacing: typeof raw.spacing === "number" && Number.isFinite(raw.spacing) ? Math.min(SPACING_MAX, Math.max(0, raw.spacing)) : d.spacing,
     autoHide: bool(raw.autoHide, d.autoHide),
     showOnDesktop: bool(raw.showOnDesktop, d.showOnDesktop),
+    display: oneOf(raw.display, ["single", "follow"] as const, d.display),
+    displayMonitor: typeof raw.displayMonitor === "string" ? raw.displayMonitor : null,
     hoverNames: bool(raw.hoverNames, d.hoverNames),
     visibleInCaptures: bool(raw.visibleInCaptures, d.visibleInCaptures),
     previews: bool(raw.previews, d.previews),

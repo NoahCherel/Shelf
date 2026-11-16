@@ -137,6 +137,7 @@ pub fn run() {
             shell::dock::dock_drag_end,
             shell::dock::dock_drag_settle,
             shell::dock::set_dock_behaviour,
+            shell::dock::set_dock_display,
             shell::card::open_card,
             shell::card::fit_card,
             shell::card::card_current,

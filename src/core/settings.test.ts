@@ -126,3 +126,17 @@ it("keeps the glass unless asked to show in captures", () => {
   expect(sanitize({ visibleInCaptures: true }).visibleInCaptures).toBe(true);
   expect(sanitize({ visibleInCaptures: "yes" }).visibleInCaptures).toBe(false);
 });
+
+it("keeps a known display mode and a screen id", () => {
+  const s = sanitize({ display: "follow", displayMonitor: "\\?\DISPLAY#X" });
+  expect(s.display).toBe("follow");
+  expect(s.displayMonitor).toBe("\\?\DISPLAY#X");
+});
+
+it("falls back to one screen on the main display", () => {
+  const s = sanitize({ display: "tv", displayMonitor: 3 });
+  expect(s.display).toBe("single");
+  expect(s.displayMonitor).toBeNull();
+  expect(defaults().display).toBe("single");
+  expect(defaults().displayMonitor).toBeNull();
+});

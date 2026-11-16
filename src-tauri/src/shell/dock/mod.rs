@@ -383,6 +383,22 @@ pub fn start(app: &AppHandle, busy: fn(&AppHandle) -> bool) -> Result<(), Box<dy
     Ok(())
 }
 
+/// Which screen the dock sits on, from Settings: `mode` is "single" or "follow", `monitor` the
+/// chosen screen's id, or None for the main one.
+#[tauri::command]
+pub fn set_dock_display(mode: String, monitor: Option<String>) -> Result<(), String> {
+    let mode = DisplayMode::from_name(Some(&mode));
+    // A return to Follow starts from the chosen screen, not where the pointer last took it.
+    if std::mem::replace(&mut *lock(&DOCK.display_mode), mode) != mode {
+        *lock(&DOCK.followed) = None;
+    }
+    *lock(&DOCK.chosen_display) = monitor;
+    if let Some(tx) = DOCK.events.get() {
+        let _ = tx.send(ShellEvent::DisplayChange);
+    }
+    Ok(())
+}
+
 /// Auto-hide and its desktop option, from Settings.
 #[tauri::command]
 pub fn set_dock_behaviour(app: AppHandle, auto_hide: bool, show_on_desktop: bool) -> Result<(), String> {

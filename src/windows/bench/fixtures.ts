@@ -156,6 +156,7 @@ export function baseBackend(settings: Record<string, unknown>, layout: string[],
     }),
     secret_has: () => false,
     autostart_get: () => false,
+    displays_list: () => [{ id: "built-in", name: "Built-in display", primary: true }],
     audio_state: () => fakeAudio(),
     radios_state: () => [
       { kind: "wifi", on: true },
