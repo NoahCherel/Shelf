@@ -2,7 +2,23 @@
 //! does, and which are kept from the app in front, is decided here, with no Windows involved.
 //! Nothing is recorded: outside Win+T and the few keys that steer it, every key passes untouched.
 
+use crate::util::lock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Sender};
+use std::sync::{LazyLock, Mutex, OnceLock};
+
 use serde::Serialize;
+use tauri::{AppHandle, Emitter};
+use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    VIRTUAL_KEY, VK_DOWN, VK_ESCAPE, VK_LEFT, VK_LSHIFT, VK_LWIN, VK_RETURN, VK_RIGHT, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_TAB, VK_UP,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, GetMessageW, SetWindowsHookExW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+};
+
+use super::events;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Key {
@@ -131,6 +147,104 @@ impl KeyNav {
         }
         Verdict { swallow, ..Verdict::default() }
     }
+}
+
+static NAV: LazyLock<Mutex<KeyNav>> = LazyLock::new(|| Mutex::new(KeyNav::default()));
+/// A copy of whether it's navigating, read without the lock by the dock's other threads.
+static NAVIGATING: AtomicBool = AtomicBool::new(false);
+static EVENTS: OnceLock<Sender<NavEvent>> = OnceLock::new();
+/// No key has this code: pressed before Win is let go, it stops Windows opening Start.
+const MASK: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
+
+fn key_of(vk: u32) -> Key {
+    match VIRTUAL_KEY(vk as u16) {
+        VK_LWIN | VK_RWIN => Key::Win,
+        VK_SHIFT | VK_LSHIFT | VK_RSHIFT => Key::Shift,
+        VK_LEFT => Key::Left,
+        VK_RIGHT => Key::Right,
+        VK_UP => Key::Up,
+        VK_DOWN => Key::Down,
+        VK_TAB => Key::Tab,
+        VK_RETURN => Key::Enter,
+        VK_ESCAPE => Key::Escape,
+        VIRTUAL_KEY(0x54) => Key::T,
+        _ => Key::Other,
+    }
+}
+
+/// Windows drops a hook that's slow to answer, so this only decides and hands any news to another thread.
+unsafe extern "system" fn on_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code == HC_ACTION as i32 {
+        let info = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
+        // Keys Shelf sends itself, as for Start's quick menu, are none of this.
+        if (info.flags & LLKHF_INJECTED).0 == 0 {
+            let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
+            let dock_on = !events::FULLSCREEN.load(Ordering::Relaxed) && !events::LOCKED.load(Ordering::Relaxed);
+            let verdict = {
+                let mut nav = lock(&NAV);
+                let verdict = nav.on_key(key_of(info.vkCode), down, dock_on);
+                NAVIGATING.store(nav.navigating(), Ordering::Relaxed);
+                verdict
+            };
+            if let (Some(event), Some(tx)) = (verdict.event, EVENTS.get()) {
+                let _ = tx.send(event);
+            }
+            if verdict.mask {
+                crate::system::tap_keys(&[MASK]);
+            }
+            if verdict.swallow {
+                return LRESULT(1);
+            }
+        }
+    }
+    CallNextHookEx(None, code, wparam, lparam)
+}
+
+/// Starts watching for Win+T, except in the preview build.
+pub fn start(app: &AppHandle) {
+    if !crate::preview::current().hook_keys {
+        return;
+    }
+    let (tx, rx) = channel::<NavEvent>();
+    if EVENTS.set(tx).is_err() {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        for event in rx {
+            let _ = app.emit_to("dock", "keynav", event);
+        }
+    });
+    std::thread::spawn(|| unsafe {
+        let module = GetModuleHandleW(None).ok();
+        if SetWindowsHookExW(WH_KEYBOARD_LL, Some(on_key), module.map(Into::into), 0).is_err() {
+            crate::diag::note("the keyboard hook for Win+T could not be installed");
+            return;
+        }
+        // A low-level hook is called through this thread's message loop.
+        let mut msg = MSG::default();
+        while GetMessageW(&mut msg, None, 0, 0).as_bool() {}
+    });
+}
+
+pub fn navigating() -> bool {
+    NAVIGATING.load(Ordering::Relaxed)
+}
+
+/// Navigation ends from outside: a click elsewhere, a game, a locked screen.
+pub fn cancel() {
+    let event = lock(&NAV).cancel();
+    NAVIGATING.store(false, Ordering::Relaxed);
+    if let (Some(event), Some(tx)) = (event, EVENTS.get()) {
+        let _ = tx.send(event);
+    }
+}
+
+/// The page has nothing to walk through, as when no app is open.
+#[tauri::command]
+pub fn keynav_end() {
+    lock(&NAV).cancel();
+    NAVIGATING.store(false, Ordering::Relaxed);
 }
 
 #[cfg(test)]

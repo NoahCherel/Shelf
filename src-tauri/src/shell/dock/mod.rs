@@ -226,6 +226,9 @@ fn watch(app: AppHandle, rx: std::sync::mpsc::Receiver<ShellEvent>) {
         events::FULLSCREEN.store(state.fullscreen, Ordering::Relaxed);
         events::LOCKED.store(state.locked, Ordering::Relaxed);
         events::AUTOHIDDEN.store(state.autohidden, Ordering::Relaxed);
+        if state.fullscreen || state.locked {
+            super::keys::cancel();
+        }
         for action in actions {
             run_action(&app, action);
         }
@@ -306,6 +309,11 @@ fn followed_to(follow: &mut Follow, now: u64) -> Option<String> {
     follow.decide((p.x, p.y), &displays, &current, layout().edge, now)
 }
 
+fn mouse_pressed() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
+    [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON].into_iter().any(|b| unsafe { GetAsyncKeyState(b.0 as i32) } < 0)
+}
+
 fn following() -> bool {
     *lock(&DOCK.display_mode) == DisplayMode::Follow
 }
@@ -334,7 +342,11 @@ fn watch_pointer(app: AppHandle, tx: Sender<ShellEvent>) {
                 return;
             }
         }
-        let on = DOCK.auto_hide.load(Ordering::Relaxed) || following();
+        // During Win+T a click anywhere ends it, so arrows go back to the app in front.
+        if super::keys::navigating() && mouse_pressed() {
+            super::keys::cancel();
+        }
+        let on = DOCK.auto_hide.load(Ordering::Relaxed) || following() || super::keys::navigating();
         std::thread::sleep(Duration::from_millis(if on { 60 } else { 250 }));
     }
 }

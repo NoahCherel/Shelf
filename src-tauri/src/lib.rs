@@ -70,6 +70,7 @@ fn keeps_dock_up(app: &AppHandle) -> bool {
         || apps::start_is_open()
         || app.get_webview_window("picker").is_some()
         || app.get_webview_window("settings").is_some()
+        || shell::keys::navigating()
 }
 
 fn spawn_taskbar_watch() {
@@ -151,6 +152,7 @@ pub fn run() {
             shell::displays::displays_list,
             system::media::album_accent_follow,
             system::media::album_accent_current,
+            shell::keys::keynav_end,
             glass::glass_start,
             glass::glass_stop,
             glass::glass_frame,
@@ -264,6 +266,7 @@ pub fn run() {
             shell::dock::start(app.handle(), keeps_dock_up)?;
             apps::watch_foreground(app.handle());
             system::media::start(app.handle());
+            shell::keys::start(app.handle());
             build_tray(app.handle())?;
             shell::listen_for_quit(app.handle().clone());
             Ok(())
