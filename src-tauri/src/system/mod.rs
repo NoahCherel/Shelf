@@ -27,6 +27,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 
 const CPU_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+/// Where Task Manager's Startup apps tab notes an app turned off, without touching `Run`.
+const APPROVED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
 
 pub struct SysMonitor {
     sys: System,
@@ -108,22 +110,92 @@ fn reg() -> std::process::Command {
     cmd
 }
 
+/// Task Manager's mark: the first byte is odd when the app is turned off there. No mark means on.
+fn approved(data: Option<&[u8]>) -> bool {
+    data.and_then(|d| d.first()).is_none_or(|first| first & 1 == 0)
+}
+
+#[derive(Debug, PartialEq)]
+enum Step {
+    WriteRun,
+    DeleteRun,
+    /// Without Task Manager's mark, Windows treats the app as turned on.
+    ClearApproved,
+}
+
+/// Turning it on from Shelf must undo a "Disabled" set in Task Manager, or nothing would change.
+fn autostart_steps(on: bool) -> Vec<Step> {
+    vec![if on { Step::WriteRun } else { Step::DeleteRun }, Step::ClearApproved]
+}
+
+/// Task Manager's mark for Shelf, if there is one.
+fn approved_mark() -> Option<Vec<u8>> {
+    use windows::core::HSTRING;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_BINARY};
+    let (key, value) = (HSTRING::from(APPROVED_KEY), HSTRING::from("Shelf"));
+    let mut buf = [0u8; 64];
+    let mut len = buf.len() as u32;
+    let found = unsafe { RegGetValueW(HKEY_CURRENT_USER, &key, &value, RRF_RT_REG_BINARY, None, Some(buf.as_mut_ptr().cast()), Some(&mut len)) };
+    found.is_ok().then(|| buf[..len as usize].to_vec())
+}
+
 /// Read from Windows every time, so it reflects a change made in Task Manager's list.
 #[tauri::command(async)]
 pub fn autostart_get() -> bool {
-    reg().args(["query", RUN_KEY, "/v", "Shelf"]).status().is_ok_and(|s| s.success())
+    let listed = reg().args(["query", RUN_KEY, "/v", "Shelf"]).status().is_ok_and(|s| s.success());
+    listed && approved(approved_mark().as_deref())
 }
 
 #[tauri::command(async)]
 pub fn autostart_set(on: bool) -> Result<bool, String> {
     crate::preview::guard()?;
-    let mut cmd = reg();
-    if on {
-        let exe = std::env::current_exe().unwrap_or_default();
-        cmd.args(["add", RUN_KEY, "/v", "Shelf", "/t", "REG_SZ", "/f", "/d"])
-            .arg(format!("\"{}\"", exe.display()));
-    } else {
-        cmd.args(["delete", RUN_KEY, "/v", "Shelf", "/f"]);
+    let mut done = false;
+    for step in autostart_steps(on) {
+        let mut cmd = reg();
+        match step {
+            Step::WriteRun => {
+                let exe = std::env::current_exe().unwrap_or_default();
+                cmd.args(["add", RUN_KEY, "/v", "Shelf", "/t", "REG_SZ", "/f", "/d"]).arg(format!("\"{}\"", exe.display()));
+            }
+            Step::DeleteRun => {
+                cmd.args(["delete", RUN_KEY, "/v", "Shelf", "/f"]);
+            }
+            Step::ClearApproved => {
+                // Usually there is no mark to clear, so this one may fail.
+                let _ = cmd.args(["delete", &format!(r"HKCU\{APPROVED_KEY}"), "/v", "Shelf", "/f"]).status();
+                continue;
+            }
+        }
+        done = cmd.status().is_ok_and(|s| s.success());
     }
-    Ok(cmd.status().is_ok_and(|s| s.success()))
+    Ok(done)
+}
+
+#[cfg(test)]
+mod autostart_tests {
+    use super::*;
+
+    #[test]
+    fn task_manager_s_disabled_flag_reads_as_off() {
+        assert!(!approved(Some(&[3, 0, 0, 0])));
+        assert!(!approved(Some(&[7, 0, 0, 0])));
+    }
+
+    #[test]
+    fn an_enabled_or_missing_flag_reads_as_on() {
+        assert!(approved(None));
+        assert!(approved(Some(&[])));
+        assert!(approved(Some(&[2, 0, 0, 0])));
+        assert!(approved(Some(&[6, 0, 0, 0])));
+    }
+
+    #[test]
+    fn turning_on_clears_task_manager_s_flag() {
+        assert_eq!(autostart_steps(true), vec![Step::WriteRun, Step::ClearApproved]);
+    }
+
+    #[test]
+    fn turning_off_clears_it_too() {
+        assert_eq!(autostart_steps(false), vec![Step::DeleteRun, Step::ClearApproved]);
+    }
 }

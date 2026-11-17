@@ -15,7 +15,12 @@ function ToggleRow({ row }: { row: Extract<RowDef, { kind: "toggle" }> }) {
   const [external, setExternal] = useState(false);
   const source = row.external;
   useEffect(() => {
-    source?.read().then((on) => setExternal(Boolean(on)), () => {});
+    if (!source) return;
+    const read = () => void source.read().then((on) => setExternal(Boolean(on)), () => {});
+    read();
+    // It may have changed outside Shelf meanwhile, as in Task Manager's Startup apps.
+    window.addEventListener("focus", read);
+    return () => window.removeEventListener("focus", read);
   }, [source]);
   if (source) {
     const flip = () => {
@@ -26,7 +31,11 @@ function ToggleRow({ row }: { row: Extract<RowDef, { kind: "toggle" }> }) {
     };
     return <Switch label={row.label} on={external} onFlip={flip} />;
   }
-  return <Switch label={row.label} on={Boolean(saved)} onFlip={() => save(!saved)} />;
+  const flip = () => {
+    save(!saved);
+    row.onChange?.(!saved as never);
+  };
+  return <Switch label={row.label} on={Boolean(saved)} onFlip={flip} />;
 }
 
 function SliderRow({ row }: { row: Extract<RowDef, { kind: "slider" }> }) {

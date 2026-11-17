@@ -265,6 +265,26 @@ Needs Claude Code connected (Claude widget › Connect).
 - [ ] **The warning:** when the session or the week passes 80 %, a toast says so with when it resets, and its sound plays; again at 95 %. Details opens the Claude card.
 - [ ] **Once:** quitting and restarting Shelf at the same level doesn't warn again.
 
+## Startup and Task Manager
+
+Only in your own build: the preview can't change what starts with Windows.
+
+- [ ] **Turned off in Task Manager:** with Launch at startup on, open Task Manager › Startup apps and disable Shelf. Back in Shelf's Settings, the switch shows off.
+- [ ] **Turned back on from Shelf:** flip it on. Task Manager now shows Shelf enabled, and Shelf starts at the next sign-in.
+
+## Network back after sleep
+
+- [ ] **Wi-Fi off and on:** turn Wi-Fi off until a widget that goes online (GitHub, Stripe, weather) shows it can't connect, keeping its last numbers. Turn Wi-Fi back on: within about ten seconds it's up to date again.
+- [ ] **Behind a company proxy (if you have one):** widgets load through it. A refused certificate says that the network checks secure connections, rather than a raw error.
+
+## Win+A, Win+S, Win+N
+
+Only in your own build: the preview doesn't watch the keyboard.
+
+- [ ] **Opening:** Win+A opens Quick Settings over the dock, Win+S Search with its field ready to type in, Win+N Notifications. Pressing the same keys again closes it. Start doesn't open when Win is let go.
+- [ ] **Left to Windows:** Win+Shift+S still takes a screenshot. In a fullscreen game, the three do what Windows does. With Settings › General › Shortcuts turned off, they're Windows' again.
+- [ ] **Without the Status widget:** Win+A still opens Quick Settings, over the dock.
+
 ## Widget names
 
 - [ ] **Resting on a widget:** after about half a second, its name shows above it in the same bubble as the apps' names. It goes when the pointer leaves or the tile is clicked.

@@ -9,6 +9,7 @@ mod saved;
 mod state;
 
 pub use geometry::*;
+pub(crate) use saved::panel_keys;
 pub use state::*;
 use follow::Follow;
 use saved::{saved_behaviour, saved_display, saved_layout, saved_taskbar_mode};

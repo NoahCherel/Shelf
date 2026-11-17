@@ -4,7 +4,7 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 
 ## Bilan global en chiffres
 
-- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **75 / 90 faites** (F-081 pour les alertes seulement) — il reste **15 fonctionnalités** (ou compléments partiels), principalement les automatisations qui attendent leur widget, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement). Les sections 1.7 à 1.9 ont leur plan, `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (pas encore exécuté) : il couvre `F-073`, `F-074`, `F-077`, `F-080`, `F-081`, `F-087`, `F-088` et `Win+A/S/N`. `F-089` (32 bits) est écarté volontairement. `F-076`, `F-078`, `F-079`, `F-082`, `F-083` et `F-090` attendent leur widget (Calendar, abonnements, Todos, Screen Time).
+- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **77 / 90 faites** (F-081 pour les alertes seulement) — il reste **13 fonctionnalités** (ou compléments partiels), principalement les automatisations qui attendent leur widget, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement). Les sections 1.7 à 1.9 ont leur plan, `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (pas encore exécuté) : il couvre `F-073`, `F-074`, `F-077`, `F-080`, `F-081`, `F-087`, `F-088` et `Win+A/S/N`. `F-089` (32 bits) est écarté volontairement. `F-076`, `F-078`, `F-079`, `F-082`, `F-083` et `F-090` attendent leur widget (Calendar, abonnements, Todos, Screen Time).
 - **Panneaux système (Spécificité Shelf) :** Shelf possède déjà ses propres cartes natives **Sound**, **Wi-Fi**, **Bluetooth**, **Quick Settings**, **Search** et **Notifications** dans `src/panels/`, regroupées derrière la tuile `system-status` et la loupe d'`apps`.
 - **Catalogue de widgets :** **11 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **92 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
 
@@ -178,21 +178,23 @@ Dans `src/automations/`, `src-tauri/src/shell/toast.rs` et `src-tauri/src/system
 
 ---
 
-### 1.9. Plateforme (`F-084` à `F-090`) — 3 / 7 faits (et 2 partiels)
+### 1.9. Plateforme (`F-084` à `F-090`) — 5 / 7 faits (F-089 écarté, F-090 en attente)
 
 - ✅ `F-084` : Runtime de providers avec cache sur disque et pause en plein écran / hors vue
 - ✅ `F-085` : Stockage sécurisé des clés API via DPAPI (`secrets.rs`) et injection côté Rust (`net.rs`)
 - ✅ `F-086` : Windows 11 et Windows 10 (64-bit)
+- ✅ `F-087` : *Launch at startup* suit le Gestionnaire des tâches. `autostart_get` (`src-tauri/src/system/mod.rs`) lit aussi `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`, où l'onglet Démarrage note une app désactivée par un premier octet impair ; allumer ou éteindre depuis Shelf efface cette marque, et Settings relit l'état en reprenant le focus
+- ✅ `F-088` : Réseaux d'entreprise et réveil. `reqwest` suit le proxy réglé dans Windows (feature `system-proxy`) et le magasin de certificats de Windows (`native-tls`, où Zscaler pose sa racine) ; un certificat refusé donne un message clair au lieu d'une erreur brute. Après une erreur hors ligne, un widget réessaie à 5 s, 15 s, 30 s puis toutes les 60 s, et tout de suite quand Windows annonce le retour du réseau (`online`), en gardant ses dernières valeurs. **Limite :** les proxys par script PAC ne sont pas suivis
+- ✅ *(Lié aux panneaux)* : `Win+A`, `Win+S` et `Win+N` ouvrent les cartes Quick Settings, Search et Notifications de Shelf (une seconde fois les ferme), par le crochet de `Win+T` et `open-request`. Réglage *Shelf's panels on Win+A, Win+S, Win+N* (General › Shortcuts), activé par défaut. Laissés à Windows en plein écran et dès que Maj, Ctrl ou Alt sont tenus, pour que `Win+Maj+S` reste la capture d'écran
 
-**Ce qu'il reste à faire :**
+**Ce qui reste :**
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
-| **F-087** | P2 | **Démarrage automatique qui reflète l'état du Gestionnaire des tâches** : refléter si l'utilisateur a désactivé Shelf dans l'onglet Démarrage du Gestionnaire des tâches Windows | ⚠️ **Partiel** (`autostart_get()` dans `src-tauri/src/system/mod.rs` lit uniquement la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, mais **ne lit pas** la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run` où le Gestionnaire des tâches note l'état désactivé par un premier octet impair, `03` ou `07`. Shelf affiche donc « on » alors que Windows ne le lancera pas, et remettre l'interrupteur sur « on » n'efface pas cet octet) → 🗓️ **Prévu** (Task 7 : lecture de l'octet, effacé quand on allume ou éteint depuis Shelf, relu au retour du focus sur Settings) |
-| **F-088** | P3 | **Réseaux d'entreprise avec inspection TLS (Zscaler, etc.)** : tolérance explicite aux proxys d'inspection et réveil réseau différé après veille | ⚠️ **Partiel** (`reqwest` utilise `native-tls`, donc le magasin de certificats de Windows où Zscaler pose sa racine, et `provider.ts` garde le cache en mode `stale`. Mais `reqwest` est compilé sans ses features par défaut, donc sans `system-proxy` : le proxy réglé dans Windows est ignoré. Et après une erreur hors ligne, un provider attend `max(intervalMs, 60 s)`, soit jusqu'à 30 min, avant de réessayer) → 🗓️ **Prévu** (Task 8 : `system-proxy`, message clair pour un certificat refusé, relance à 5 s, 15 s, 30 s puis 60 s, et tout de suite au retour du réseau). **Limite :** les proxys par script PAC ne seront pas suivis |
 | **F-089** | P3 | **Build 32-bit** | ➖ **Écarté volontairement** (outil privé sur un PC 64 bits) |
-| **F-090** | P3 | **Raccourci global `Alt+T`** pour ouvrir la carte *Todos* depuis n'importe quelle application | ❌ **Absent** — ⏳ en attente de **W-016 Todos** (le crochet clavier de `shell/keys.rs` l'accueillera : une touche de plus dans `key_of` et la cible `widget:todos` d'`open-request`) |
-| *(Lié aux panneaux)* | — | **Raccourcis globaux `Win+A`, `Win+S`, `Win+N`** pour ouvrir les cartes Quick Settings, Search et Notifications de Shelf au lieu de celles de Windows | ❌ **Absent** → 🗓️ **Prévu** (Task 9 : par le crochet de `Win+T`, derrière le réglage *Shelf's panels on Win+A, Win+S, Win+N*, activé par défaut ; laissés à Windows en plein écran et dès que Maj, Ctrl ou Alt sont tenus, pour que `Win+Maj+S` reste la capture d'écran) |
+| **F-090** | P3 | **Raccourci global `Alt+T`** pour ouvrir la carte *Todos* depuis n'importe quelle application | ⏳ en attente de **W-016 Todos** (le crochet clavier de `shell/keys.rs` l'accueillera : une touche de plus dans `key_of` et la cible `widget:todos` d'`open-request`) |
+
+**À vérifier à la main :** `docs/manual-checks.md`, « Startup and Task Manager », « Network back after sleep » et « Win+A, Win+S, Win+N ».
 
 ---
 

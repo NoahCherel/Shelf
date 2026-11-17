@@ -225,11 +225,18 @@ export const SCHEMA: PageDef[] = [
         }),
         toggle("launchAtStartup", {
           label: "Launch at startup",
-          tip: "Starts Shelf when you sign in to Windows. This reads Windows' own list, so it stays right if you change it there.",
+          tip: "Starts Shelf when you sign in to Windows. This reads Windows' own list, including Task Manager's Startup apps, so it stays right if you change it there.",
           external: {
             read: () => invoke<boolean>("autostart_get"),
             write: (on) => invoke("autostart_set", { on }),
           },
+        }),
+      ]),
+      section("Shortcuts", [
+        toggle("panelKeys", {
+          label: "Shelf's panels on Win+A, Win+S, Win+N",
+          tip: "Win+A opens Quick Settings, Win+S Search and Win+N Notifications on the dock instead of Windows' own. In a fullscreen game, they stay Windows'.",
+          onChange: (on: never) => void invoke("set_panel_keys", { on }).catch(() => {}),
         }),
       ]),
       section("Weather", [
