@@ -303,11 +303,3 @@ it("rereads launch at startup when the window comes back", async () => {
   fireEvent.focus(window);
   await waitFor(() => expect(toggleEl.getAttribute("aria-checked")).toBe("false"));
 });
-
-it("turning panel keys off tells the hook", () => {
-  render(<SettingsWindow />);
-  open("General");
-  fireEvent.click(screen.getByRole("switch", { name: "Shelf's panels on Win+A, Win+S, Win+N" }));
-  expect(useSettings.getState().panelKeys).toBe(false);
-  expect(mockInvoke).toHaveBeenCalledWith("set_panel_keys", { on: false });
-});

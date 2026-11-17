@@ -17,11 +17,6 @@ pub fn saved_behaviour(settings: Option<&serde_json::Value>) -> (bool, bool) {
     (flag("autoHide"), flag("showOnDesktop"))
 }
 
-/// Win+A, Win+S and Win+N open Shelf's panels unless turned off in Settings.
-pub fn panel_keys(settings: Option<&serde_json::Value>) -> bool {
-    settings.and_then(|s| s["panelKeys"].as_bool()).unwrap_or(true)
-}
-
 pub fn saved_taskbar_mode(settings: Option<&serde_json::Value>) -> Mode {
     match settings.and_then(|s| s["taskbarMode"].as_str()) {
         Some("autohide") => Mode::Autohide,
@@ -49,13 +44,6 @@ pub fn saved_layout(settings: Option<&serde_json::Value>, base: DockLayout) -> D
 mod tests {
     use super::*;
     use crate::shell::dock::geometry::*;
-
-    #[test]
-    fn panel_keys_are_on_unless_turned_off() {
-        assert!(panel_keys(None));
-        assert!(panel_keys(Some(&serde_json::json!({}))));
-        assert!(!panel_keys(Some(&serde_json::json!({"panelKeys": false}))));
-    }
 
     #[test]
     fn the_saved_edge_is_used_from_the_first_placement_and_full_width_sits_on_the_edge() {
