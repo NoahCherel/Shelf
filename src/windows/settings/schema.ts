@@ -232,13 +232,6 @@ export const SCHEMA: PageDef[] = [
           },
         }),
       ]),
-      section("Shortcuts", [
-        toggle("panelKeys", {
-          label: "Shelf's panels on Win+A, Win+S, Win+N",
-          tip: "Win+A opens Quick Settings, Win+S Search and Win+N Notifications on the dock instead of Windows' own. In a fullscreen game, they stay Windows'.",
-          onChange: (on: never) => void invoke("set_panel_keys", { on }).catch(() => {}),
-        }),
-      ]),
       section("Weather", [
         text("weather.city", { label: "Weather city", tip: "Used by Clock & Weather, Today and the date card.", placeholder: "Add a city" }),
       ]),

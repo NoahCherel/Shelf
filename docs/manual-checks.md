@@ -277,14 +277,6 @@ Only in your own build: the preview can't change what starts with Windows.
 - [ ] **Wi-Fi off and on:** turn Wi-Fi off until a widget that goes online (GitHub, Stripe, weather) shows it can't connect, keeping its last numbers. Turn Wi-Fi back on: within about ten seconds it's up to date again.
 - [ ] **Behind a company proxy (if you have one):** widgets load through it. A refused certificate says that the network checks secure connections, rather than a raw error.
 
-## Win+A, Win+S, Win+N
-
-Only in your own build: the preview doesn't watch the keyboard.
-
-- [ ] **Opening:** Win+A opens Quick Settings over the dock, Win+S Search with its field ready to type in, Win+N Notifications. Pressing the same keys again closes it. Start doesn't open when Win is let go.
-- [ ] **Left to Windows:** Win+Shift+S still takes a screenshot. In a fullscreen game, the three do what Windows does. With Settings › General › Shortcuts turned off, they're Windows' again.
-- [ ] **Without the Status widget:** Win+A still opens Quick Settings, over the dock.
-
 ## Widget names
 
 - [ ] **Resting on a widget:** after about half a second, its name shows above it in the same bubble as the apps' names. It goes when the pointer leaves or the tile is clicked.

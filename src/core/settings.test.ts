@@ -168,9 +168,3 @@ it("ai limit alerts are on by default", () => {
   expect(sanitize({ automations: { aiLimits: false } }).automations).toEqual({ aiLimits: false });
   expect(sanitize({ automations: "off" }).automations).toEqual({ aiLimits: true });
 });
-
-it("keeps the panel keys choice", () => {
-  expect(defaults().panelKeys).toBe(true);
-  expect(sanitize({ panelKeys: false }).panelKeys).toBe(false);
-  expect(sanitize({ panelKeys: "no" }).panelKeys).toBe(true);
-});

@@ -52,8 +52,6 @@ export interface SettingsData {
   alertTone: AlertTone;
   /** One switch per automation. */
   automations: { aiLimits: boolean };
-  /** Win+A, Win+S and Win+N open Shelf's panels instead of Windows' own. */
-  panelKeys: boolean;
 }
 
 export const ALERT_TONES = ["none", "notify", "calendar", "chimes", "ding", "tada", "alarm"] as const;
@@ -94,7 +92,6 @@ export function defaults(): SettingsData {
     quietHours: { on: false, from: "22:00", to: "08:00" },
     alertTone: "notify",
     automations: { aiLimits: true },
-    panelKeys: true,
   };
 }
 
@@ -141,7 +138,6 @@ export function sanitize(raw: unknown): SettingsData {
     quietHours: { on: bool(quiet.on, d.quietHours.on), from: clock(quiet.from, d.quietHours.from), to: clock(quiet.to, d.quietHours.to) },
     alertTone: oneOf(raw.alertTone, ALERT_TONES, d.alertTone),
     automations: { aiLimits: bool(automations.aiLimits, d.automations.aiLimits) },
-    panelKeys: bool(raw.panelKeys, d.panelKeys),
   };
 }
 
