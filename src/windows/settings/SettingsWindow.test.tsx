@@ -240,3 +240,54 @@ it("offers one screen, all screens or following the pointer", () => {
   const modes = within(screen.getByRole("radiogroup", { name: "Displays" })).getAllByRole("radio").map((r) => r.textContent);
   expect(modes).toEqual(["One screen", "All screens", "Follow pointer"]);
 });
+
+describe("the Automations page", () => {
+  const sidebar = () => [...document.querySelectorAll(".side__row")].map((b) => b.textContent);
+
+  it("lists automations between General and About", () => {
+    render(<SettingsWindow />);
+    const rows = sidebar();
+    expect(rows.indexOf("Automations")).toBe(rows.indexOf("General") + 1);
+    expect(rows.indexOf("About")).toBe(rows.indexOf("Automations") + 1);
+  });
+
+  it("picking a sound plays it", () => {
+    render(<SettingsWindow />);
+    open("Automations");
+    fireEvent.change(screen.getByRole("combobox", { name: "Alert sound" }), { target: { value: "tada" } });
+    expect(useSettings.getState().alertTone).toBe("tada");
+    expect(mockInvoke).toHaveBeenCalledWith("play_tone", { name: "tada" });
+  });
+
+  it("the sound list offers Windows' own sounds and none", () => {
+    render(<SettingsWindow />);
+    open("Automations");
+    const names = [...screen.getByRole("combobox", { name: "Alert sound" }).querySelectorAll("option")].map((o) => o.textContent);
+    expect(names).toEqual(["None", "Notify", "Calendar", "Chimes", "Ding", "Tada", "Alarm"]);
+  });
+
+  it("quiet hour times are greyed out while off", () => {
+    render(<SettingsWindow />);
+    open("Automations");
+    expect(screen.getByLabelText("From").matches(":disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("switch", { name: "Quiet hours" }));
+    expect(useSettings.getState().quietHours.on).toBe(true);
+    expect(screen.getByLabelText("From").matches(":disabled")).toBe(false);
+  });
+
+  it("a time is saved as hours and minutes", () => {
+    render(<SettingsWindow />);
+    open("Automations");
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "06:30" } });
+    expect(useSettings.getState().quietHours.to).toBe("06:30");
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "" } });
+    expect(useSettings.getState().quietHours.to).toBe("06:30");
+  });
+
+  it("the AI limits switch turns the alert off", () => {
+    render(<SettingsWindow />);
+    open("Automations");
+    fireEvent.click(screen.getByRole("switch", { name: "AI limits" }));
+    expect(useSettings.getState().automations.aiLimits).toBe(false);
+  });
+});

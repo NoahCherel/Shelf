@@ -12,7 +12,7 @@ Every feature, numbered, for the implementation plan to trace back to. Prioritie
 
 **Status, 2026-11-16:** the [plan to finish 1.1 to 1.4](../superpowers/plans/2026-11-13-finir-1-1-a-1-4.md) adds F-017, F-018, F-019, F-026, the Album art half of F-035 and F-054, and measures F-023, whose correction waits on that measurement after a restart. End task (in F-046) stays left out by the owner's choice. The several-screen features were tested on a one-screen PC: the two-screen trials are in [manual checks](../manual-checks.md).
 
-**Status, 2026-11-16 (later):** the [plan for 1.7 to 1.9](../superpowers/plans/2026-11-16-finir-1-7-a-1-9.md) adds F-073 (toasts) and F-074 (widget names on hover).
+**Status, 2026-11-16 (later):** the [plan for 1.7 to 1.9](../superpowers/plans/2026-11-16-finir-1-7-a-1-9.md) adds F-073 (toasts), F-074 (widget names on hover), F-077 (Claude limit alerts), F-080 (quiet hours) and F-081 for alerts (the sound for timers, focus, calendar and to-dos comes with those widgets). F-076, F-078, F-079, F-082 and F-083 wait on their widgets.
 
 ## Dock
 

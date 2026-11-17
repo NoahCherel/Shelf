@@ -253,6 +253,18 @@ The preview can show one: `window.__TAURI_INTERNALS__.invoke("toast_show", { toa
 - [ ] **During a game:** a toast sent while a game is fullscreen waits, and shows within 30 seconds of leaving the game.
 - [ ] **Its button:** Details opens the widget's card over its tile.
 
+## Quiet hours and alert sound
+
+- [ ] **The sound:** Settings › Automations › Alert sound: picking one plays it. A toast then plays that sound; None keeps it silent.
+- [ ] **Quiet hours:** turn them on from now to a few minutes later. A toast sent meanwhile waits, and shows within 30 seconds of the end time.
+
+## AI limits
+
+Needs Claude Code connected (Claude widget › Connect).
+
+- [ ] **The warning:** when the session or the week passes 80 %, a toast says so with when it resets, and its sound plays; again at 95 %. Details opens the Claude card.
+- [ ] **Once:** quitting and restarting Shelf at the same level doesn't warn again.
+
 ## Widget names
 
 - [ ] **Resting on a widget:** after about half a second, its name shows above it in the same bubble as the apps' names. It goes when the pointer leaves or the tile is clicked.

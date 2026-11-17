@@ -3,6 +3,7 @@ import { syncLayout } from "../../core/layout";
 import { syncShell } from "../../core/shell";
 import { DockBar } from "./Bar";
 import { useOpenRequests } from "./useOpenRequests";
+import { useAutomations } from "../../automations/useAutomations";
 
 /** How long a broken dock waits before drawing itself again. */
 const RETRY_MS = 1000;
@@ -36,6 +37,7 @@ export function DockWindow() {
     syncShell();
   }, []);
   useOpenRequests();
+  useAutomations();
   return (
     <Recovering>
       <DockBar />

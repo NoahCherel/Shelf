@@ -136,6 +136,40 @@ interface Screen {
   primary: boolean;
 }
 
+/** A drop-down list, shared by the rows that pick one of several things. */
+function SelectField({ label, value, options, onPick }: { label: string; value: string; options: { value: string; label: string }[]; onPick: (value: string) => void }) {
+  return (
+    <select className="field" aria-label={label} value={value} onChange={(e) => onPick(e.target.value)}>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SelectRow({ row }: { row: Extract<RowDef, { kind: "select" }> }) {
+  const [value, save] = useValue<string>(row.key);
+  return (
+    <SelectField
+      label={row.label}
+      value={value}
+      options={row.options}
+      onPick={(next) => {
+        save(next);
+        row.onChange?.(next as never);
+      }}
+    />
+  );
+}
+
+/** An hour of the day, kept as "HH:MM". Clearing the field keeps the last time. */
+function TimeRow({ row }: { row: Extract<RowDef, { kind: "time" }> }) {
+  const [value, save] = useValue<string>(row.key);
+  return <input type="time" step={60} className="field" aria-label={row.label} value={value} onChange={(e) => /^\d\d:\d\d$/.test(e.target.value) && save(e.target.value)} />;
+}
+
 /** Windows' screens, read again whenever they change. */
 function ScreenRow({ row }: { row: Extract<RowDef, { kind: "screen" }> }) {
   const [value, save] = useValue<string | null>(row.key);
@@ -149,23 +183,18 @@ function ScreenRow({ row }: { row: Extract<RowDef, { kind: "screen" }> }) {
   const current = value ?? screens.find((s) => s.primary)?.id ?? "";
   // A chosen screen that's unplugged stays chosen, so the dock goes back when it returns.
   const away = value !== null && screens.length > 0 && !screens.some((s) => s.id === value);
+  const options = screens.map((s) => ({ value: s.id, label: s.primary ? `${s.name} (main)` : s.name }));
+  if (away) options.push({ value, label: "Unplugged screen" });
   return (
-    <select
-      className="field"
-      aria-label={row.label}
+    <SelectField
+      label={row.label}
       value={current}
-      onChange={(e) => {
-        save(e.target.value);
-        row.onChange?.(e.target.value as never);
+      options={options}
+      onPick={(next) => {
+        save(next);
+        row.onChange?.(next as never);
       }}
-    >
-      {screens.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.primary ? `${s.name} (main)` : s.name}
-        </option>
-      ))}
-      {away && <option value={value}>Unplugged screen</option>}
-    </select>
+    />
   );
 }
 
@@ -212,6 +241,10 @@ function Control({ row }: { row: RowDef }) {
       return <AccentRow row={row} />;
     case "screen":
       return <ScreenRow row={row} />;
+    case "select":
+      return <SelectRow row={row} />;
+    case "time":
+      return <TimeRow row={row} />;
     case "version":
       return <VersionRow />;
     case "action":

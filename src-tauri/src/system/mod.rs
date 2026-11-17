@@ -9,6 +9,7 @@ pub mod radios;
 pub mod settings_link;
 pub mod status;
 pub mod toggles;
+pub mod tone;
 pub mod tray;
 pub mod wifi;
 
