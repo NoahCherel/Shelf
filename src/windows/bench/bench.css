@@ -58,6 +58,14 @@ body,
   caret-color: transparent;
 }
 
+/* Where Rust puts it: at the screen's right, above the dock. */
+.bench__toast {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 340px;
+}
+
 .bench__previews {
   position: absolute;
   left: 420px;

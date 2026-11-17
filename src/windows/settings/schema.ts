@@ -190,7 +190,7 @@ export const SCHEMA: PageDef[] = [
         }),
       ]),
       section("Apps", [
-        toggle("hoverNames", { label: "Names on hover", tip: "Shows an app's name above its icon when the pointer rests on it." }),
+        toggle("hoverNames", { label: "Names on hover", tip: "Shows the name of an app or widget above it when the pointer rests on it." }),
         toggle("previews", { label: "Window previews", tip: "Shows pictures of an open app's windows when the pointer rests on it. Off, its name shows instead." }),
         { kind: "image", key: "startImage", label: "Start image", tip: "A picture of yours on the Start button, instead of the logo." },
       ]),

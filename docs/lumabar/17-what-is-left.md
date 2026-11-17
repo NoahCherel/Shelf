@@ -4,7 +4,7 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 
 ## Bilan global en chiffres
 
-- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **71 / 90 faites** — il reste **19 fonctionnalités** (ou compléments partiels), principalement les toasts, les automatisations, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement).
+- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **73 / 90 faites** — il reste **17 fonctionnalités** (ou compléments partiels), principalement les automatisations, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement). Les sections 1.7 à 1.9 ont leur plan, `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (pas encore exécuté) : il couvre `F-073`, `F-074`, `F-077`, `F-080`, `F-081`, `F-087`, `F-088` et `Win+A/S/N`. `F-089` (32 bits) est écarté volontairement. `F-076`, `F-078`, `F-079`, `F-082`, `F-083` et `F-090` attendent leur widget (Calendar, abonnements, Todos, Screen Time).
 - **Panneaux système (Spécificité Shelf) :** Shelf possède déjà ses propres cartes natives **Sound**, **Wi-Fi**, **Bluetooth**, **Quick Settings**, **Search** et **Notifications** dans `src/panels/`, regroupées derrière la tuile `system-status` et la loupe d'`apps`.
 - **Catalogue de widgets :** **11 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **92 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
 
@@ -138,42 +138,39 @@ Dans `src/windows/settings/schema.ts` :
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
 | **F-068** *(partiel)* | P3 | **Vérification de mise à jour, notice de mise à jour et formulaire de Feedback** (message, captures, rapport avec logs/config) dans `About` | ⚠️ **Partiel** (`About` affiche la version statique ; pas d'auto-updater ni de formulaire de feedback, conformément à G-17 pour un outil privé) |
-| *(Lié à F-076..081)* | P3 | **Onglet / Section `Automations`** (interrupteurs pour chaque automatisation et choix des sons d'alerte) | ❌ **Absent** |
+| *(Lié à F-076..081)* | P3 | **Onglet / Section `Automations`** (interrupteurs pour chaque automatisation et choix des sons d'alerte) | ❌ **Absent** → 🗓️ **Prévu** (plan 2026-11-16, Task 5 : page entre General et About, avec *AI limits*, *Alert sound* et *Quiet hours*) |
 
 ---
 
-### 1.7. Cartes et Interactions (`F-069` à `F-075`) — 5 / 7 faits
+### 1.7. Cartes et Interactions (`F-069` à `F-075`) — 7 / 7 faits
 
-Dans `src/windows/card/CardWindow.tsx` et `src/design/parts/Card.tsx` :
+Dans `src/windows/card/CardWindow.tsx`, `src/design/parts/Card.tsx`, `src-tauri/src/shell/toast.rs`, `src/windows/toast/` et `src/windows/dock/` :
 - ✅ `F-069` : Ouverture au-dessus (ou en-dessous) du widget avec glissement, sans jamais déborder de l'écran
 - ✅ `F-070` : Anatomie standard des cartes (en-tête, corps, pied de page, action)
 - ✅ `F-071` : Flux de connexion (`ConnectCard`), rafraîchissement, déconnexion et `Logout`
 - ✅ `F-072` : Menus clic droit spécifiques aux tuiles
+- ✅ `F-073` : Toasts. N'importe quelle page appelle `showToast` (`src/core/toast.ts`) ; la file Rust (`shell/toast.rs`) les garde pendant un plein écran ou une session verrouillée (et les heures calmes, F-080), jette ceux devenus faux (`expiresAt`) ou attendus plus de 24 h, et les montre un par un dans une fenêtre `toast` créée à la demande, à droite au-dessus du dock, sans prendre le focus. 8 secondes, temps suspendu sous le pointeur. Le bouton d'action passe par `open-request`, que seul le dock principal reçoit (`useOpenRequests`). **Coût mesuré :** environ +58 Mo pendant qu'un toast est à l'écran, rendus quand la fenêtre est détruite (accepté)
+- ✅ `F-074` : Le nom d'un widget dans la bulle des apps (`preview_tip`), après 600 ms de survol, sous le réglage *Names on hover*. `apps` et `system-status` nomment déjà chacune de leurs parties ; une app épinglée seule prend le nom affiché par sa tuile
 - ✅ `F-075` : Messages d'erreur en langage clair
 
-**Ce qu'il reste à faire :**
-
-| ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
-| --- | --- | --- | --- |
-| **F-073** | P2 | **Toasts** : petites fenêtres/bannières temporaires au-dessus du dock (pour les résumés Screen Time, les alertes de limite IA, les rappels de renouvellement, la pause musique avant réunion) | ❌ **Absent** |
-| **F-074** | P2 | **Tooltips de widgets** : étiquette flottante sombre au-dessus d'une tuile de widget au survol indiquant son nom | ⚠️ **Partiel** (la bulle native `preview_name` existe pour les icônes d'apps, mais pas comme tooltip générique sur toutes les tuiles de widgets) |
+**À vérifier à la main :** `docs/manual-checks.md`, « Toasts » et « Widget names ».
 
 ---
 
 ### 1.8. Automatisations (`F-076` à `F-083`) — 0 / 8 faits
 
-Aucune automatisation n'est encore implémentée dans Shelf :
+Aucune automatisation n'est encore implémentée dans Shelf. Le plan du 2026-11-16 (PR 2, `automations`) fait celles qui ne demandent aucun widget absent. Les autres attendent leur widget, qui trouvera prêts `toast_show` (prévenir), `play_tone` (sonner), `open-request` (ouvrir sa carte depuis un toast ou un raccourci) et la page *Automations* (son interrupteur).
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
-| **F-076** | P3 | **Pause musique avant les réunions** : met en pause le média en cours ~1 min avant un événement du calendrier | ❌ **Absent** |
-| **F-077** | P3 | **Alerte avant limite IA** : prévient par toast/son quand une limite d'usage IA approche de la saturation (ex. 80 %, 95 %) | ❌ **Absent** |
-| **F-078** | P3 | **Rappels de renouvellement** : rappelle avant le renouvellement d'un abonnement et demande si on en a toujours besoin | ❌ **Absent** |
-| **F-079** | P3 | **Demandes de review → To-Dos** : transforme automatiquement les demandes de review GitHub en tâches dans le widget Todos | ❌ **Absent** |
-| **F-080** | P3 | **Heures calmes (*Quiet hours*)** : suspend toutes les alertes et toasts pendant la plage horaire configurée | ❌ **Absent** |
-| **F-081** | P3 | **Sons d'alerte (*Alert tones*)** : choix d'un son pour les minuteurs, sessions Pomodoro, événements calendrier et rappels To-Do | ❌ **Absent** |
-| **F-082** | P3 | **Calendrier unifié** : la carte Calendrier regroupe sur une même grille les événements iCal, renouvellements d'abonnements, virements (*payouts* Stripe/etc.), échéances To-Do et heures de reset des limites IA | ❌ **Absent** |
-| **F-083** | P3 | **Résumés quotidiens et hebdomadaires Screen Time** : notification au-dessus du dock chaque jour (et bilan de la semaine le lundi) avec bouton *Details* | ❌ **Absent** |
+| **F-076** | P3 | **Pause musique avant les réunions** : met en pause le média en cours ~1 min avant un événement du calendrier | ❌ **Absent** — ⏳ en attente de **W-018 Calendar** |
+| **F-077** | P3 | **Alerte avant limite IA** : prévient par toast/son quand une limite d'usage IA approche de la saturation (ex. 80 %, 95 %) | ❌ **Absent** → 🗓️ **Prévu** (Task 6, pour Claude : 80 % puis 95 %, une fois par fenêtre de limite, mémoire gardée d'un démarrage à l'autre ; les autres IA suivront leurs widgets W-003 à W-010) |
+| **F-078** | P3 | **Rappels de renouvellement** : rappelle avant le renouvellement d'un abonnement et demande si on en a toujours besoin | ❌ **Absent** — ⏳ en attente d'un **suivi d'abonnements** (aucun widget du catalogue ne le porte encore) |
+| **F-079** | P3 | **Demandes de review → To-Dos** : transforme automatiquement les demandes de review GitHub en tâches dans le widget Todos | ❌ **Absent** — ⏳ en attente de **W-016 Todos** (et d'un jeton GitHub `ghp_`) |
+| **F-080** | P3 | **Heures calmes (*Quiet hours*)** : suspend toutes les alertes et toasts pendant la plage horaire configurée | ❌ **Absent** → 🗓️ **Prévu** (Tasks 1, 4 et 5 : 22:00–08:00 par défaut, désactivé au départ ; les alertes retenues sortent à la fin) |
+| **F-081** | P3 | **Sons d'alerte (*Alert tones*)** : choix d'un son pour les minuteurs, sessions Pomodoro, événements calendrier et rappels To-Do | ❌ **Absent** → 🗓️ **Prévu pour les alertes** (Tasks 4 et 5 : un son de `%WINDIR%\Media` au choix). Minuteurs, Pomodoro, calendrier et To-Do y brancheront le leur avec W-013, W-014, W-016 et W-018 |
+| **F-082** | P3 | **Calendrier unifié** : la carte Calendrier regroupe sur une même grille les événements iCal, renouvellements d'abonnements, virements (*payouts* Stripe/etc.), échéances To-Do et heures de reset des limites IA | ❌ **Absent** — ⏳ en attente de **W-018 Calendar** |
+| **F-083** | P3 | **Résumés quotidiens et hebdomadaires Screen Time** : notification au-dessus du dock chaque jour (et bilan de la semaine le lundi) avec bouton *Details* | ❌ **Absent** — ⏳ en attente de **W-012 Screen Time** |
 
 ---
 
@@ -187,11 +184,11 @@ Aucune automatisation n'est encore implémentée dans Shelf :
 
 | ID | Priorité | Fonctionnalité Lumabar | État dans Shelf |
 | --- | --- | --- | --- |
-| **F-087** | P2 | **Démarrage automatique qui reflète l'état du Gestionnaire des tâches** : refléter si l'utilisateur a désactivé Shelf dans l'onglet Démarrage du Gestionnaire des tâches Windows | ⚠️ **Partiel** (`autostart_get()` dans `src-tauri/src/system/mod.rs` lit uniquement la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, mais **ne lit pas** la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run` où le Gestionnaire des tâches Windows stocke l'état désactivé `03`) |
-| **F-088** | P3 | **Réseaux d'entreprise avec inspection TLS (Zscaler, etc.)** : tolérance explicite aux proxys d'inspection et réveil réseau différé après veille | ⚠️ **Partiel** (`reqwest` utilise `native-tls` de Windows et `provider.ts` garde le cache en mode `stale`, mais sans gestion spécifique au-delà du magasin Windows) |
-| **F-089** | P3 | **Build 32-bit** | ❌ **Absent** (cible 64-bit uniquement) |
-| **F-090** | P3 | **Raccourci global `Alt+T`** pour ouvrir la carte *Todos* depuis n'importe quelle application | ❌ **Absent** (le crochet clavier de `Win+T` existe dans `shell/keys.rs` et peut l'accueillir ; il manque le widget *Todos*) |
-| *(Lié aux panneaux)* | — | **Raccourcis globaux `Win+A`, `Win+S`, `Win+N`** pour ouvrir les cartes Quick Settings, Search et Notifications de Shelf au lieu de celles de Windows | ❌ **Absent** (laissé à Windows ; le crochet clavier de `Win+T`, `shell/keys.rs`, peut maintenant les accueillir) |
+| **F-087** | P2 | **Démarrage automatique qui reflète l'état du Gestionnaire des tâches** : refléter si l'utilisateur a désactivé Shelf dans l'onglet Démarrage du Gestionnaire des tâches Windows | ⚠️ **Partiel** (`autostart_get()` dans `src-tauri/src/system/mod.rs` lit uniquement la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, mais **ne lit pas** la clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run` où le Gestionnaire des tâches note l'état désactivé par un premier octet impair, `03` ou `07`. Shelf affiche donc « on » alors que Windows ne le lancera pas, et remettre l'interrupteur sur « on » n'efface pas cet octet) → 🗓️ **Prévu** (Task 7 : lecture de l'octet, effacé quand on allume ou éteint depuis Shelf, relu au retour du focus sur Settings) |
+| **F-088** | P3 | **Réseaux d'entreprise avec inspection TLS (Zscaler, etc.)** : tolérance explicite aux proxys d'inspection et réveil réseau différé après veille | ⚠️ **Partiel** (`reqwest` utilise `native-tls`, donc le magasin de certificats de Windows où Zscaler pose sa racine, et `provider.ts` garde le cache en mode `stale`. Mais `reqwest` est compilé sans ses features par défaut, donc sans `system-proxy` : le proxy réglé dans Windows est ignoré. Et après une erreur hors ligne, un provider attend `max(intervalMs, 60 s)`, soit jusqu'à 30 min, avant de réessayer) → 🗓️ **Prévu** (Task 8 : `system-proxy`, message clair pour un certificat refusé, relance à 5 s, 15 s, 30 s puis 60 s, et tout de suite au retour du réseau). **Limite :** les proxys par script PAC ne seront pas suivis |
+| **F-089** | P3 | **Build 32-bit** | ➖ **Écarté volontairement** (outil privé sur un PC 64 bits) |
+| **F-090** | P3 | **Raccourci global `Alt+T`** pour ouvrir la carte *Todos* depuis n'importe quelle application | ❌ **Absent** — ⏳ en attente de **W-016 Todos** (le crochet clavier de `shell/keys.rs` l'accueillera : une touche de plus dans `key_of` et la cible `widget:todos` d'`open-request`) |
+| *(Lié aux panneaux)* | — | **Raccourcis globaux `Win+A`, `Win+S`, `Win+N`** pour ouvrir les cartes Quick Settings, Search et Notifications de Shelf au lieu de celles de Windows | ❌ **Absent** → 🗓️ **Prévu** (Task 9 : par le crochet de `Win+T`, derrière le réglage *Shelf's panels on Win+A, Win+S, Win+N*, activé par défaut ; laissés à Windows en plein écran et dès que Maj, Ctrl ou Alt sont tenus, pour que `Win+Maj+S` reste la capture d'écran) |
 
 ---
 

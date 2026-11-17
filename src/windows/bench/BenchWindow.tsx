@@ -6,6 +6,7 @@ import { DockWindow } from "../dock/DockWindow";
 import { PickerWindow } from "../picker/PickerWindow";
 import { PreviewStrip } from "../preview/PreviewWindow";
 import { SettingsWindow } from "../settings/SettingsWindow";
+import { ToastWindow } from "../toast/ToastWindow";
 import { paintWallpaper, scenes, type Scene } from "./scenes";
 import "./bench.css";
 
@@ -57,6 +58,11 @@ function SceneView({ scene }: { scene: Scene }) {
       <canvas className="bench__scene" ref={wallpaper} />
       {scene.view === "picker" && <PickerWindow />}
       {scene.view === "settings" && <SettingsWindow />}
+      {scene.view === "toast" && (
+        <div className="bench__toast">
+          <ToastWindow />
+        </div>
+      )}
       {scene.dock && (
         <div className="bench__dock">
           <DockWindow />

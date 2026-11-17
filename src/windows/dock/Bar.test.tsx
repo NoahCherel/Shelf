@@ -1,8 +1,9 @@
-import { beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react";
 import { DockBar, reportSize } from "./Bar";
 import { useLayout } from "../../core/layout";
-import { useShell } from "../../core/shell";
+import { usePicker, useShell } from "../../core/shell";
+import { useSettings } from "../../core/settings";
 
 vi.mock("../../core/tauri", () => ({
   invoke: vi.fn(async () => null),
@@ -19,7 +20,8 @@ vi.mock("../../core/registry", () => {
     sample: "s",
     Tile: () => <div data-testid={`tile-${id}`} />,
   });
-  const widgets = [def("apps", "Apps"), def("clock", "Clock"), def("battery", "Battery")];
+  const pin = { ...def("pin:app:code", "code"), Tile: () => <button type="button" aria-label="Visual Studio Code" /> };
+  const widgets = [def("apps", "Apps"), def("clock", "Clock"), def("battery", "Battery"), def("system-status", "Status"), pin];
   return { widgets, byId: (id: string) => widgets.find((w) => w.id === id) };
 });
 
@@ -95,4 +97,89 @@ it("tells Rust about auto-hide when it starts and whenever it changes", async ()
   act(() => useSettings.setState({ autoHide: true }));
   expect(invoke).toHaveBeenCalledWith("set_dock_behaviour", { autoHide: true, showOnDesktop: false });
   act(() => useSettings.setState({ autoHide: false }));
+});
+
+describe("a widget's name on hover", () => {
+  const tips = async () => {
+    const { invoke } = await import("../../core/tauri");
+    return vi.mocked(invoke).mock.calls.filter(([c]) => c === "preview_tip").map(([, a]) => (a as { text: string }).text);
+  };
+  const slot = (c: HTMLElement, id: string) => c.querySelector<HTMLElement>(`[data-widget-id="${id}"]`)!;
+
+  afterEach(() => vi.useRealTimers());
+
+  beforeEach(async () => {
+    const { invoke } = await import("../../core/tauri");
+    vi.mocked(invoke).mockClear();
+    vi.useFakeTimers();
+    useSettings.setState({ hoverNames: true });
+    usePicker.setState({ open: false });
+    useLayout.setState({ ids: ["clock", "apps", "system-status", "pin:app:code"] });
+  });
+
+  it("names a widget after the pointer rests on it", async () => {
+    const { container } = render(<DockBar />);
+    fireEvent.pointerEnter(slot(container, "clock"));
+    act(() => vi.advanceTimersByTime(599));
+    expect(await tips()).toEqual([]);
+    act(() => vi.advanceTimersByTime(1));
+    expect(await tips()).toEqual(["Clock"]);
+  });
+
+  it("leaving before the delay shows nothing", async () => {
+    const { container } = render(<DockBar />);
+    fireEvent.pointerEnter(slot(container, "clock"));
+    act(() => vi.advanceTimersByTime(300));
+    fireEvent.pointerLeave(slot(container, "clock"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(await tips()).toEqual([]);
+  });
+
+  it("leaving takes the name down", async () => {
+    const { invoke } = await import("../../core/tauri");
+    const { container } = render(<DockBar />);
+    fireEvent.pointerEnter(slot(container, "clock"));
+    act(() => vi.advanceTimersByTime(600));
+    fireEvent.pointerLeave(slot(container, "clock"));
+    expect(invoke).toHaveBeenCalledWith("preview_leave");
+  });
+
+  it("apps and status name their own parts", async () => {
+    const { container } = render(<DockBar />);
+    for (const id of ["apps", "system-status"]) {
+      fireEvent.pointerEnter(slot(container, id));
+      act(() => vi.advanceTimersByTime(1000));
+      fireEvent.pointerLeave(slot(container, id));
+    }
+    expect(await tips()).toEqual([]);
+  });
+
+  it("no names while the picker is open or with names on hover off", async () => {
+    usePicker.setState({ open: true });
+    const { container, unmount } = render(<DockBar />);
+    fireEvent.pointerEnter(slot(container, "clock"));
+    act(() => vi.advanceTimersByTime(1000));
+    unmount();
+    usePicker.setState({ open: false });
+    useSettings.setState({ hoverNames: false });
+    const again = render(<DockBar />);
+    fireEvent.pointerEnter(slot(again.container, "clock"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(await tips()).toEqual([]);
+  });
+
+  it("a pinned app is named as its tile shows it", async () => {
+    const { container } = render(<DockBar />);
+    fireEvent.pointerEnter(slot(container, "pin:app:code"));
+    act(() => vi.advanceTimersByTime(600));
+    expect(await tips()).toEqual(["Visual Studio Code"]);
+  });
+
+  it("pressing a tile cancels its name", async () => {
+    const { container } = render(<DockBar />);
+    fireEvent.pointerEnter(slot(container, "clock"));
+    fireEvent.pointerDown(slot(container, "clock"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(await tips()).toEqual([]);
+  });
 });

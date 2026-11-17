@@ -222,6 +222,11 @@ pub fn run() {
             apps::pin_widget::pin_widget_open,
             apps::pin_widget::pick_folder,
             apps::previews::preview_hint,
+            apps::previews::preview_tip,
+            shell::toast::toast_show,
+            shell::toast::toast_current,
+            shell::toast::toast_fit,
+            shell::toast::toast_done,
             claude_usage,
             claude_connect,
             diag::diag_note,
@@ -268,6 +273,7 @@ pub fn run() {
             apps::watch_foreground(app.handle());
             system::media::start(app.handle());
             shell::keys::start(app.handle());
+            shell::toast::start(app.handle());
             build_tray(app.handle())?;
             shell::listen_for_quit(app.handle().clone());
             Ok(())

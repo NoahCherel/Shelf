@@ -86,6 +86,12 @@ it("shows the name it's told once known", async () => {
   expect(await screen.findByRole("button", { name: "Paint" })).toBeTruthy();
 });
 
+it("leaves its name to the dock's bubble, with no native tooltip as well", async () => {
+  backend({ pin_widget_info: { name: "Paint", gone: false } });
+  tile("pin:app:paint");
+  expect((await screen.findByRole("button", { name: "Paint" })).hasAttribute("title")).toBe(false);
+});
+
 it("offers every installed app and adds one to the dock", async () => {
   backend({ search_apps: [{ id: "app:{GUID}\\a.exe", name: "Alpha", kind: "app" }, { id: "app:b", name: "Beta", kind: "app" }] });
   render(<WidgetChoices query="" />);

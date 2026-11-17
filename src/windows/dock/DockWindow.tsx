@@ -2,6 +2,7 @@ import { Component, useEffect, type ReactNode } from "react";
 import { syncLayout } from "../../core/layout";
 import { syncShell } from "../../core/shell";
 import { DockBar } from "./Bar";
+import { useOpenRequests } from "./useOpenRequests";
 
 /** How long a broken dock waits before drawing itself again. */
 const RETRY_MS = 1000;
@@ -34,6 +35,7 @@ export function DockWindow() {
     syncLayout();
     syncShell();
   }, []);
+  useOpenRequests();
   return (
     <Recovering>
       <DockBar />
