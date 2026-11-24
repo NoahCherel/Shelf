@@ -14,4 +14,6 @@ export const STORE = {
   startImage: "start-image",
   /** What the automations already warned about. */
   automations: "automations",
+  deepseekHistory: "deepseek-history",
+  glmHistory: "glm-history",
 } as const;

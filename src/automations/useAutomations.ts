@@ -8,7 +8,10 @@ import { useProvider } from "../core/useProvider";
 import { windowLabel } from "../core/windowLabel";
 import { chatgptProvider } from "../providers/chatgpt";
 import { claudeProvider } from "../providers/claude";
+import { cursorProvider } from "../providers/cursor";
 import { geminiProvider } from "../providers/gemini";
+import { glmProvider } from "../providers/glm";
+import { grokProvider } from "../providers/grok";
 import { limitAlerts, limitToast, providerLimitAlerts, providerLimitToast, type Warned } from "./aiLimits";
 
 /** The Claude widget whose card a limit toast opens: the full one first. */
@@ -30,10 +33,16 @@ export function useAutomations(): void {
   const dockIds = useLayout((s) => s.ids);
   const hasChatGpt = dockIds.includes("chatgpt-usage");
   const hasGemini = dockIds.includes("gemini-usage");
+  const hasGrok = dockIds.includes("grok-usage");
+  const hasGlm = dockIds.includes("glm-usage");
+  const hasCursor = dockIds.includes("cursor-usage");
 
   const { data, status } = useProvider(aiLimits ? claudeProvider : undefined);
   const chatgpt = useProvider(aiLimits && hasChatGpt ? chatgptProvider : undefined);
   const gemini = useProvider(aiLimits && hasGemini ? geminiProvider : undefined);
+  const grok = useProvider(aiLimits && hasGrok ? grokProvider : undefined);
+  const glm = useProvider(aiLimits && hasGlm ? glmProvider : undefined);
+  const cursor = useProvider(aiLimits && hasCursor ? cursorProvider : undefined);
   const [warned, setWarned] = useState<Warned | null>(null);
   /** Sent, not shown yet. */
   const pending = useRef<Warned>({});
@@ -110,4 +119,56 @@ export function useAutomations(): void {
       showToast(providerLimitToast(alert, now, "gemini-usage"));
     }
   }, [aiLimits, hasGemini, gemini.status, gemini.data, warned]);
+
+  useEffect(() => {
+    if (!aiLimits || !hasGrok || grok.status !== "ready" || !grok.data || warned === null) return;
+    const now = Date.now();
+    const out = providerLimitAlerts(
+      "Grok",
+      [{ key: "grok-credits", label: "credits", win: grok.data.credits, dayReset: true }],
+      { ...warned, ...pending.current },
+      now,
+    );
+    for (const alert of out.alerts) {
+      pending.current[alert.key] = out.warned[alert.key];
+      showToast(providerLimitToast(alert, now, "grok-usage"));
+    }
+  }, [aiLimits, hasGrok, grok.status, grok.data, warned]);
+
+  useEffect(() => {
+    if (!aiLimits || !hasGlm || glm.status !== "ready" || !glm.data || warned === null) return;
+    const now = Date.now();
+    const out = providerLimitAlerts(
+      "GLM",
+      [
+        { key: "glm-session", label: "session", win: glm.data.session },
+        { key: "glm-weekly", label: "weekly limit", win: glm.data.weekly, dayReset: true },
+        { key: "glm-mcp", label: "MCP limit", win: glm.data.mcp, dayReset: true },
+      ],
+      { ...warned, ...pending.current },
+      now,
+    );
+    for (const alert of out.alerts) {
+      pending.current[alert.key] = out.warned[alert.key];
+      showToast(providerLimitToast(alert, now, "glm-usage"));
+    }
+  }, [aiLimits, hasGlm, glm.status, glm.data, warned]);
+
+  useEffect(() => {
+    if (!aiLimits || !hasCursor || cursor.status !== "ready" || !cursor.data || warned === null) return;
+    const now = Date.now();
+    const out = providerLimitAlerts(
+      "Cursor",
+      [
+        { key: "cursor-auto", label: "Auto limit", win: cursor.data.auto, dayReset: true },
+        { key: "cursor-api", label: "API limit", win: cursor.data.api, dayReset: true },
+      ],
+      { ...warned, ...pending.current },
+      now,
+    );
+    for (const alert of out.alerts) {
+      pending.current[alert.key] = out.warned[alert.key];
+      showToast(providerLimitToast(alert, now, "cursor-usage"));
+    }
+  }, [aiLimits, hasCursor, cursor.status, cursor.data, warned]);
 }

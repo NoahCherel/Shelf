@@ -6,6 +6,8 @@ import chart from "../stripe-chart/index";
 import github from "../github-activity/index";
 import claude from "../claude-usage/index";
 import plan from "../claude-plan-usage/index";
+import deepseek from "../deepseek-balance/index";
+import glm from "../glm-usage/index";
 
 vi.mock("../../core/tauri", () => ({ invoke: vi.fn(async () => null), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
@@ -37,4 +39,12 @@ it("Claude tiles log out by disconnecting the status line", () => {
     logout(def).onClick();
     expect(mockInvoke).toHaveBeenCalledWith("claude_connect", { on: false });
   }
+});
+
+it("DeepSeek and GLM log out by forgetting their keys", () => {
+  logout(deepseek).onClick();
+  expect(mockInvoke).toHaveBeenCalledWith("secret_delete", { id: "deepseek" });
+  mockInvoke.mockClear();
+  logout(glm).onClick();
+  expect(mockInvoke).toHaveBeenCalledWith("secret_delete", { id: "glm" });
 });

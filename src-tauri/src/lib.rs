@@ -3,10 +3,13 @@
 mod apps;
 mod chatgpt_usage;
 mod claude_usage;
+mod cursor_usage;
 mod diag;
 mod gemini_usage;
 mod glass;
+mod grok_usage;
 mod net;
+mod opencode_usage;
 mod preview;
 mod search;
 mod secrets;
@@ -41,6 +44,21 @@ fn chatgpt_usage() -> serde_json::Value {
 #[tauri::command(async)]
 fn gemini_usage(force: Option<bool>) -> serde_json::Value {
     gemini_usage::read_usage(force.unwrap_or(false))
+}
+
+#[tauri::command(async)]
+fn grok_usage(force: Option<bool>) -> serde_json::Value {
+    grok_usage::read_usage(force.unwrap_or(false))
+}
+
+#[tauri::command(async)]
+fn opencode_usage() -> serde_json::Value {
+    opencode_usage::read_usage()
+}
+
+#[tauri::command]
+async fn cursor_usage(client: tauri::State<'_, reqwest::Client>, force: Option<bool>) -> Result<serde_json::Value, String> {
+    Ok(cursor_usage::read_usage(&client, force.unwrap_or(false)).await)
 }
 
 #[tauri::command]
@@ -244,6 +262,9 @@ pub fn run() {
             claude_connect,
             chatgpt_usage,
             gemini_usage,
+            grok_usage,
+            opencode_usage,
+            cursor_usage,
             diag::diag_note,
             quit,
         ])
