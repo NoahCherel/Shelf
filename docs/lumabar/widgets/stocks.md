@@ -4,8 +4,6 @@
 
 ### Stock
 
-> One ticker's price and daily change. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Stocks [S: widgets] |
@@ -23,8 +21,6 @@
 
 ### Stock Chart
 
-> One ticker with its intraday line. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Stocks [S: widgets] |
@@ -41,8 +37,6 @@
 | **Buildable here?** | Yes, with a free key [I] |
 
 ### Stock Watchlist
-
-> Three tickers at a glance. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

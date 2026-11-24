@@ -77,7 +77,7 @@ function BatteryTile({ data }: TileProps<SystemData>) {
 export default defineWidget<SystemData>({
   id: "battery",
   name: "Battery",
-  description: "Charge level as a filling gauge, with the charging state.",
+  description: "Battery level as a gauge that fills up, and whether it's charging.",
   category: "system",
   width: 1,
   sample: { cpu: 0, memory: 0, battery: { percent: 86, charging: true } },

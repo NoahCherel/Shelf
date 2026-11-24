@@ -34,7 +34,7 @@ function StripeChartTile({ data }: TileProps<StripeData>) {
 export default defineWidget<StripeData>({
   id: "stripe-chart",
   name: "Stripe Chart",
-  description: "Your Stripe revenue as a line.",
+  description: "A line chart of your Stripe revenue.",
   category: "finance",
   width: 3.12,
   sample: STRIPE_SAMPLE,

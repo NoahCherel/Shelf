@@ -4,8 +4,6 @@
 
 ### Day Timeline
 
-> Your whole day on one line: hours by kind of app, focus rounds, meetings, sunrise and sunset. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Productivity [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes, after Screen Time, Pomodoro, Calendar and Weather exist; app-kind classification needs defining [I] |
 
 ### Screen Time
-
-> Today's time in front of the PC, hour by hour - and every app's, by day and by week. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Pomodoro
 
-> Focus rounds and breaks you start and skip from the bar. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Productivity [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Timer
-
-> A countdown that starts in one click. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### Stopwatch
 
-> Start, pause and lap from the bar; the card keeps every lap. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Productivity [S: widgets] |
@@ -98,8 +88,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Todos
-
-> Your next open task with a progress ring; tick it off from the dock. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -118,8 +106,6 @@
 
 ### Notes
 
-> Your latest note, one click from editing. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Productivity [S: widgets] |
@@ -137,8 +123,6 @@
 
 ### Calendar
 
-> Your next event and how soon it starts. Google, Outlook and iCloud events sit next to renewals and payouts. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Productivity [S: widgets] |
@@ -155,8 +139,6 @@
 | **Buildable here?** | Yes; existing Shelf iCal parser is a starting point [I] |
 
 ### Currency
-
-> Convert between currencies at current rates. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

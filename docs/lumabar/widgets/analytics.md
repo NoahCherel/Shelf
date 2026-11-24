@@ -4,8 +4,6 @@
 
 ### DataFast Chart
 
-> Your site's daily visitors over 14 days, with the week's total and its change. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Analytics [S: widgets] |
@@ -23,8 +21,6 @@
 
 ### Plausible
 
-> Visitors this week from Plausible, with the trend. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Analytics [S: widgets] |
@@ -41,8 +37,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### Dub
-
-> Clicks on your Dub links this week. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

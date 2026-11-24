@@ -4,8 +4,6 @@
 
 ### System Stats
 
-> CPU and RAM as two live rings. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes; Shelf already reads CPU and RAM [I] |
 
 ### Tray
-
-> Your tray icons in a grid, one click away - right-click works as in the taskbar. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Language
 
-> The current keyboard layout; click to switch. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Temperature
-
-> CPU temperature as a gauge, with CPU and memory load beside it. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### CPU
 
-> Processor load as a ring. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -98,8 +88,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### RAM
-
-> Memory in use as a ring. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -118,8 +106,6 @@
 
 ### Network
 
-> Download and upload speed with a live chart. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -136,8 +122,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Battery
-
-> Charge level as a filling gauge, with the charging state. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -156,8 +140,6 @@
 
 ### Quick Toggles
 
-> Wi-Fi, Bluetooth, mobile hotspot and airplane mode. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -174,8 +156,6 @@
 | **Buildable here?** | Partly: each toggle needs checking without admin rights [I] |
 
 ### Brightness
-
-> A slider for the display's brightness. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -194,8 +174,6 @@
 
 ### Theme Toggle
 
-> Switch Windows between light and dark mode. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -212,8 +190,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Month Progress
-
-> How much of the month is behind you. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -232,8 +208,6 @@
 
 ### Day Progress
 
-> How much of today is behind you. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | System [S: widgets] |
@@ -250,8 +224,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Year Progress
-
-> The year as a grid of dots, filling up. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

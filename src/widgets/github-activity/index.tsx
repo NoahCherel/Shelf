@@ -118,7 +118,7 @@ const SAMPLE: GithubData = {
 export default defineWidget<GithubData>({
   id: "github-activity",
   name: "GitHub Activity",
-  description: "Your contribution grid and streak.",
+  description: "Your GitHub contributions as a grid, with your current streak.",
   category: "online-mail",
   width: 2.67,
   sample: SAMPLE,

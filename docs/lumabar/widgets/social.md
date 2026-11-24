@@ -4,8 +4,6 @@
 
 ### X Profile
 
-> Followers on your X account. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Social [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Harder: Lumabar ships its own X client; yours would need creating [I] |
 
 ### TikTok
-
-> Followers on your TikTok profile. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### YouTube
 
-> Subscribers on your YouTube channel, via your own API key. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Social [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### Instagram
-
-> Followers on your Instagram account, with an official token. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

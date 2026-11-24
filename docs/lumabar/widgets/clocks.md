@@ -4,8 +4,6 @@
 
 ### Clock
 
-> Large, readable time with its seconds and the date, in 12- or 24-hour format. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Flip Clock
-
-> Split-flap digits that turn over every minute. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### World Clocks
 
-> Three small analog faces for the cities you work with. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Analog Classic
-
-> A white analog face with a sweeping second hand. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### Analog Classic Dark
 
-> The same classic face, in black. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -98,8 +88,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### 7 Days
-
-> This week as a strip of days, with today's temperature. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -118,8 +106,6 @@
 
 ### World Clock
 
-> Three cities in a list, each with its hour difference from yours. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -136,8 +122,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### World Time
-
-> One more city in big digits, with its offset. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -156,8 +140,6 @@
 
 ### Today
 
-> Weekday, date, time and weather in a single tile. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -174,8 +156,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Date
-
-> The full date, set large. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -194,8 +174,6 @@
 
 ### Day Number
 
-> Today's date as a calendar page. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -212,8 +190,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Analog Minimal
-
-> Hands and hour ticks on a dark face, nothing else. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -232,8 +208,6 @@
 
 ### Segment Clock
 
-> The time as a seven-segment display, under the weekday and date. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Clocks [S: widgets] |
@@ -250,8 +224,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Clock & Weather
-
-> Time, date and temperature as three colour blocks in one square tile. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

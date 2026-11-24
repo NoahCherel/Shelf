@@ -28,7 +28,7 @@ function ClaudeUsageTile({ data }: TileProps<ClaudeData>) {
 export default defineWidget<ClaudeData>({
   id: "claude-usage",
   name: "Claude Usage",
-  description: "Your Claude session limit and when it resets.",
+  description: "How much of your Claude session you've used, and when it refills.",
   category: "ai",
   width: 2.74,
   sample: CLAUDE_SAMPLE,

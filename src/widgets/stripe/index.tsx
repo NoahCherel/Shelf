@@ -19,7 +19,7 @@ function StripeTile({ data }: TileProps<StripeData>) {
 export default defineWidget<StripeData>({
   id: "stripe",
   name: "Stripe",
-  description: "Net revenue over the last 30 days from Stripe.",
+  description: "What Stripe brought in, net, over the past 30 days.",
   category: "finance",
   width: 2.35,
   sample: STRIPE_SAMPLE,

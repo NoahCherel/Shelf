@@ -4,8 +4,6 @@
 
 ### Resend
 
-> Emails sent this week and how many were delivered. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Developer [S: widgets] |
@@ -23,8 +21,6 @@
 
 ### Linear
 
-> Issues assigned to you and what's in progress. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Developer [S: widgets] |
@@ -41,8 +37,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### Supabase
-
-> API requests on your project, and its health. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

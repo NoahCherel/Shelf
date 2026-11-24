@@ -36,7 +36,7 @@ function ClockWeatherTile({ data, preview }: TileProps<number>) {
 export default defineWidget<number>({
   id: "clock-and-weather",
   name: "Clock & Weather",
-  description: "Time, date and temperature as three colour blocks in one square tile.",
+  description: "A square tile split into time, date and temperature blocks.",
   category: "clocks",
   width: 1,
   sample: new Date(2026, 9, 11, 17, 49).getTime(),
