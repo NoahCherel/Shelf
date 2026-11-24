@@ -20,8 +20,10 @@ export interface OpenCodeModel {
 export interface OpenCodeData {
   session: OpenCodeBucket;
   weekly: OpenCodeBucket;
+  allTime?: OpenCodeBucket;
   topModel: OpenCodeModel | null;
   models: OpenCodeModel[];
+  allTimeModels?: OpenCodeModel[];
   dailyTokens: number[];
   updatedMs: number;
 }
@@ -30,8 +32,10 @@ interface RawOpenCodeUsage {
   connected: boolean;
   session: OpenCodeBucket | null;
   weekly: OpenCodeBucket | null;
+  all_time?: OpenCodeBucket | null;
   top_model: OpenCodeModel | null;
   models?: OpenCodeModel[];
+  all_time_models?: OpenCodeModel[];
   daily_tokens?: number[];
 }
 
@@ -69,8 +73,10 @@ export const opencodeProvider: Provider<OpenCodeData> = {
     return {
       session: raw.session ?? EMPTY_BUCKET,
       weekly: raw.weekly ?? EMPTY_BUCKET,
+      allTime: raw.all_time ?? undefined,
       topModel: raw.top_model ?? null,
       models: raw.models ?? [],
+      allTimeModels: raw.all_time_models ?? [],
       dailyTokens: raw.daily_tokens ?? [],
       updatedMs: Math.floor(now / 60_000) * 60_000,
     };

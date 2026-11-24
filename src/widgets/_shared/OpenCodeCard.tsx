@@ -43,7 +43,7 @@ export function OpenCodeCard({ data, status }: TileProps<OpenCodeData>) {
       <Row label="Tokens" detail={`${data.weekly.messages} responses`} value={tokensText(data.weekly.tokens)} />
       <Row label="Cost" detail={`cache ${tokensText(data.weekly.cache)}`} value={formatCostUsd(data.weekly.cost)} />
 
-      {data.models.length > 0 && (
+      {data.models.length > 0 ? (
         <>
           <h2 className="card__section">MODELS (7D)</h2>
           {data.models.map((m, i) => (
@@ -51,10 +51,26 @@ export function OpenCodeCard({ data, status }: TileProps<OpenCodeData>) {
               key={m.name}
               label={m.name}
               detail={i === 0 ? "most used" : undefined}
-              value={`${tokensText(m.tokens)} · ${formatCostUsd(m.cost)}`}
+              value={`${tokensText(m.tokens)} · ${m.cost > 0 ? formatCostUsd(m.cost) : "Free"}`}
             />
           ))}
         </>
+      ) : (
+        data.allTime &&
+        data.allTime.tokens > 0 && (
+          <>
+            <h2 className="card__section">ALL TIME</h2>
+            <Row label="Tokens" detail={`${data.allTime.messages} responses`} value={tokensText(data.allTime.tokens)} />
+            {(data.allTimeModels ?? []).map((m, i) => (
+              <Row
+                key={m.name}
+                label={m.name}
+                detail={i === 0 ? "most used" : undefined}
+                value={`${tokensText(m.tokens)} · ${m.cost > 0 ? formatCostUsd(m.cost) : "Free"}`}
+              />
+            ))}
+          </>
+        )
       )}
 
       {daily.some((v) => v > 0) && daily.length >= 2 && (
