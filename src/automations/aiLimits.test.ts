@@ -1,4 +1,4 @@
-import { limitAlerts, limitToast, type Warned } from "./aiLimits";
+import { limitAlerts, limitToast, providerLimitAlerts, providerLimitToast, type Warned } from "./aiLimits";
 import type { ClaudeData } from "../providers/claude";
 
 const NOW = new Date(2026, 10, 16, 14, 0).getTime();
@@ -76,4 +76,22 @@ it("words the toast for each window", () => {
 
 it("no details button without a Claude widget", () => {
   expect(limitToast({ window: "session", percent: 80, resetsAt: RESET }, NOW, null).action).toBeUndefined();
+});
+
+it("handles ChatGPT and Gemini provider alerts with distinct keys", () => {
+  const out = providerLimitAlerts(
+    "ChatGPT",
+    [
+      { key: "chatgpt-session", label: "session", win: { percent: 84, resetsAt: RESET } },
+      { key: "chatgpt-weekly", label: "weekly limit", win: { percent: 40, resetsAt: WEEK_RESET }, dayReset: true },
+    ],
+    {},
+    NOW,
+  );
+  expect(out.alerts).toHaveLength(1);
+  expect(providerLimitToast(out.alerts[0], NOW, "chatgpt-usage")).toMatchObject({
+    id: "ai-limit-chatgpt-session",
+    title: "ChatGPT session at 84%",
+    action: { label: "Details", target: "widget:chatgpt-usage" },
+  });
 });

@@ -11,9 +11,16 @@ export interface LimitWindow {
   resetsAt: number | null;
 }
 
+export interface ModelUsage {
+  name: string;
+  tokens: number;
+}
+
 export interface ClaudeData {
   session: LimitWindow | null;
   weekly: LimitWindow | null;
+  topModel?: ModelUsage | null;
+  models?: ModelUsage[];
   updatedMs: number;
 }
 
@@ -31,6 +38,11 @@ export const CLAUDE_SAMPLE: ClaudeData = {
       return Date.now() + 4 * 86_400_000;
     },
   },
+  topModel: { name: "Sonnet 4.5", tokens: 1_420_000 },
+  models: [
+    { name: "Sonnet 4.5", tokens: 1_420_000 },
+    { name: "Opus 4.6", tokens: 480_000 },
+  ],
   updatedMs: 0,
 };
 
@@ -42,6 +54,8 @@ interface RawWindow {
 interface RawUsage {
   connected: boolean;
   usage: { five_hour?: RawWindow; seven_day?: RawWindow } | null;
+  top_model?: ModelUsage | null;
+  models?: ModelUsage[];
 }
 
 /** A window that has already reset starts again from zero, even if Claude Code hasn't run since to report it. */
@@ -75,13 +89,25 @@ export function resetDayText(ms: number): string {
   return `${d.getDate()} ${d.toLocaleDateString("en-GB", { weekday: "short" })}`;
 }
 
+export function tokensText(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k`;
+  return String(Math.max(0, Math.round(tokens)));
+}
+
 export const claudeProvider: Provider<ClaudeData> = {
   id: "claude",
   intervalMs: 30_000,
   needsSetup: async () => !(await invoke<RawUsage>("claude_usage")).connected,
   fetch: async () => {
-    const { usage } = await invoke<RawUsage>("claude_usage");
+    const { usage, top_model, models } = await invoke<RawUsage>("claude_usage");
     const now = Date.now();
-    return { session: toWindow(usage?.five_hour, now), weekly: toWindow(usage?.seven_day, now), updatedMs: Math.floor(now / 60_000) * 60_000 };
+    return {
+      session: toWindow(usage?.five_hour, now),
+      weekly: toWindow(usage?.seven_day, now),
+      topModel: top_model ?? null,
+      models: models ?? [],
+      updatedMs: Math.floor(now / 60_000) * 60_000,
+    };
   },
 };

@@ -4,9 +4,10 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 
 ## Bilan global en chiffres
 
-- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **76 / 90 faites** (F-081 pour les alertes seulement) — il reste **14 fonctionnalités** (ou compléments partiels), principalement les automatisations qui attendent leur widget, les raccourcis `Alt+T` / `Win+A/S/N` et la plateforme. Les sections 1.1 à 1.4 sont terminées depuis le lot du 2026-11-16 (voir `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md`), sauf `F-023` (mesure en place, correction après un redémarrage) et `F-046` *End task* (écarté volontairement). Les sections 1.7 à 1.9 ont leur plan, `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (pas encore exécuté) : il couvre `F-073`, `F-074`, `F-077`, `F-080`, `F-081`, `F-087`, `F-088` et `Win+A/S/N`. `F-089` (32 bits) est écarté volontairement. `F-076`, `F-078`, `F-079`, `F-082`, `F-083` et `F-090` attendent leur widget (Calendar, abonnements, Todos, Screen Time).
+- **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **78 / 90 faites**. Sur les 12 autres : **5 partielles** (`F-023` mesure faite et correction en attente d'un redémarrage, `F-046` sans *End task*, `F-060` sans points « Nouveau », `F-068` sans mise à jour ni feedback, `F-081` pour les alertes seulement), **1 écartée** (`F-089`, build 32 bits) et **6 en attente de leur widget** (`F-076` et `F-082` Calendar, `F-078` suivi d'abonnements, `F-079` et `F-090` Todos, `F-083` Screen Time). Hors catalogue, les raccourcis `Win+A/S/N` ont été essayés puis écartés (voir 1.9).
+- **Lots terminés :** 1.1 à 1.4 avec `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md` (PR #11) ; 1.7 à 1.9 avec `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (PR #12 toasts, #13 automatisations, #14 plateforme, puis #15 qui retire `Win+A/S/N`). Ce qu'il reste à essayer à la main est dans `docs/manual-checks.md`.
 - **Panneaux système (Spécificité Shelf) :** Shelf possède déjà ses propres cartes natives **Sound**, **Wi-Fi**, **Bluetooth**, **Quick Settings**, **Search** et **Notifications** dans `src/panels/`, regroupées derrière la tuile `system-status` et la loupe d'`apps`.
-- **Catalogue de widgets :** **11 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **92 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
+- **Catalogue de widgets :** **13 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **90 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
 
 ---
 
@@ -212,14 +213,14 @@ Dans `src/automations/`, `src-tauri/src/shell/toast.rs` et `src-tauri/src/system
 
 ---
 
-### 2.1. Catégorie : AI (10 widgets — 2 faits, 8 manquants)
+### 2.1. Catégorie : AI (10 widgets — 4 faits, 6 manquants)
 
 | ID | P | Widget | État dans Shelf | Ce qu'il faut faire |
 | --- | --- | --- | --- | --- |
-| **W-001** | P1 | **Claude Usage** | ✅ **Fait** (`src/widgets/claude-usage/`) | *(Note : la carte `ClaudeCard` de Shelf s'appuie sur le flux status-line local `G-05` et affiche Session + Weekly + projection de rythme, sans la ligne `Opus`, la section `SUBSCRIPTION` ni le graphique de tendance v1.2.10 de Lumabar)* |
-| **W-002** | P1 | **Claude Plan Usage** | ⚠️ **Fait (partiel)** (`src/widgets/claude-plan-usage/`) | La tuile affiche 2 lignes (`Session` et `Weekly`). Dans Lumabar, une **3e ligne** affiche le modèle le plus utilisé et ses tokens lus depuis les logs locaux de Claude Code |
-| **W-003** | P2 | **ChatGPT Usage** | ❌ **Manquant** | Tuile d'usage ChatGPT / Codex CLI (jauges de limites) + carte de détail |
-| **W-004** | P2 | **Gemini Usage** | ❌ **Manquant** | Tuile d'usage Gemini / Antigravity / Gemini CLI + carte de détail |
+| **W-001** | P1 | **Claude Usage** | ✅ **Fait** (`src/widgets/claude-usage/`) | *(Note : la carte `ClaudeCard` de Shelf s'appuie sur le flux status-line local `G-05` et affiche Session + Weekly + projection de rythme + modèles 7j)* |
+| **W-002** | P1 | **Claude Plan Usage** | ✅ **Fait** (`src/widgets/claude-plan-usage/`) | Session, Weekly + 3e ligne avec le modèle le plus utilisé et ses tokens lus depuis les logs JSONL locaux de Claude Code (`~/.claude/projects`, sans toucher aux identifiants) |
+| **W-003** | P2 | **ChatGPT Usage** | ✅ **Fait** (`src/widgets/chatgpt-usage/`) | Limites Codex CLI (Session 5h + Weekly) lues depuis les logs locaux `~/.codex/sessions/**/*.jsonl` (`rate_limits`), carte avec badge de plan et courbe d'évolution (sans toucher aux identifiants) |
+| **W-004** | P2 | **Gemini Usage** | ✅ **Fait** (`src/widgets/gemini-usage/`) | Quotas Antigravity (`Session` 5h + `Weekly` 7j, groupes Gemini & Claude/GPT) lus via la commande officielle `agy -p "/usage" --output-format json`, cache local et courbe d'évolution (sans toucher aux identifiants OAuth) |
 | **W-005** | P2 | **Grok Usage** | ❌ **Manquant** | Tuile d'usage Grok CLI + carte de détail |
 | **W-006** | P2 | **DeepSeek Balance** | ❌ **Manquant** | Tuile solde API DeepSeek (`GET /user/balance` avec clé `sk-`) + suivi des dépenses |
 | **W-007** | P2 | **GLM Usage** | ❌ **Manquant** | Tuile d'usage Z.ai / BigModel Coding Plan avec clé API |
@@ -236,13 +237,13 @@ Dans `src/automations/`, `src-tauri/src/shell/toast.rs` et `src-tauri/src/system
 | ID | P | Widget | État dans Shelf | Ce qu'il faut faire |
 | --- | --- | --- | --- | --- |
 | **W-011** | P2 | **Day Timeline** | ❌ **Manquant** | Frise horaire de la journée avec curseur de l'heure actuelle et blocs d'événements |
-| **W-012** | P1 | **Screen Time** | ❌ **Manquant** | Suivi du temps passé par app active (et sites web), tuile résumé + grande carte à 2 colonnes (graphique horaire Jour/Semaine, focus le plus long, changements d'apps, liste des apps les plus utilisées, épinglage d'app) |
-| **W-013** | P2 | **Pomodoro** | ❌ **Manquant** | Minuteur de sessions focus/pause sur le dock + carte de contrôle et réglages de durée |
-| **W-014** | P2 | **Timer** | ❌ **Manquant** | Compte à rebours rapide avec contrôles |
+| **W-012** | P1 | **Screen Time** | ❌ **Manquant** | Débloque `F-083` (résumés quotidiens et hebdomadaires, par `showToast`). Suivi du temps passé par app active (et sites web), tuile résumé + grande carte à 2 colonnes (graphique horaire Jour/Semaine, focus le plus long, changements d'apps, liste des apps les plus utilisées, épinglage d'app) |
+| **W-013** | P2 | **Pomodoro** | ❌ **Manquant** | Son de fin de session par `play_tone` (`F-081`). Minuteur de sessions focus/pause sur le dock + carte de contrôle et réglages de durée |
+| **W-014** | P2 | **Timer** | ❌ **Manquant** | Son de fin par `play_tone` (`F-081`). Compte à rebours rapide avec contrôles |
 | **W-015** | P2 | **Stopwatch** | ❌ **Manquant** | Chronomètre avec tours (*laps*) |
-| **W-016** | P2 | **Todos** | ❌ **Manquant** | Tuile compteur de tâches + carte liste de tâches éditable avec dates d'échéance |
+| **W-016** | P2 | **Todos** | ❌ **Manquant** | Débloque `F-079` (reviews GitHub → tâches) et `F-090` (`Alt+T`, par le crochet de `shell/keys.rs` et `open-request`). Tuile compteur de tâches + carte liste de tâches éditable avec dates d'échéance |
 | **W-017** | P2 | **Notes** | ❌ **Manquant** | Tuile bloc-notes rapide + carte d'édition locale |
-| **W-018** | P1 | **Calendar** | ❌ **Manquant** | Tuile prochain événement + grande carte Calendrier (flux iCal Google/Outlook/iCloud, grille mensuelle avec logos des sources, liste des événements du jour, création d'événement local) |
+| **W-018** | P1 | **Calendar** | ❌ **Manquant** | Débloque `F-076` (pause musique avant réunion) et `F-082` (calendrier unifié). Tuile prochain événement + grande carte Calendrier (flux iCal Google/Outlook/iCloud, grille mensuelle avec logos des sources, liste des événements du jour, création d'événement local) |
 | **W-019** | P2 | **Currency** | ❌ **Manquant** | Convertisseur / taux de change entre deux devises sur le dock + carte de conversion |
 
 ---

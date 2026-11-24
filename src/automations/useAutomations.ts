@@ -6,8 +6,10 @@ import { invoke, listen } from "../core/tauri";
 import { showToast } from "../core/toast";
 import { useProvider } from "../core/useProvider";
 import { windowLabel } from "../core/windowLabel";
+import { chatgptProvider } from "../providers/chatgpt";
 import { claudeProvider } from "../providers/claude";
-import { limitAlerts, limitToast, type Warned } from "./aiLimits";
+import { geminiProvider } from "../providers/gemini";
+import { limitAlerts, limitToast, providerLimitAlerts, providerLimitToast, type Warned } from "./aiLimits";
 
 /** The Claude widget whose card a limit toast opens: the full one first. */
 function claudeOnDock(): string | null {
@@ -15,7 +17,7 @@ function claudeOnDock(): string | null {
   return ["claude-usage", "claude-plan-usage"].find((id) => ids.includes(id)) ?? null;
 }
 
-const LIMIT_TOAST = /^ai-limit-(session|weekly)$/;
+const LIMIT_TOAST = /^ai-limit-(.+)$/;
 
 /**
  * The automations, run by the main dock only. A warning counts as given once its toast has shown:
@@ -25,7 +27,13 @@ const LIMIT_TOAST = /^ai-limit-(session|weekly)$/;
 export function useAutomations(): void {
   const main = windowLabel() === "dock";
   const aiLimits = useSettings((s) => s.automations.aiLimits) && main;
+  const dockIds = useLayout((s) => s.ids);
+  const hasChatGpt = dockIds.includes("chatgpt-usage");
+  const hasGemini = dockIds.includes("gemini-usage");
+
   const { data, status } = useProvider(aiLimits ? claudeProvider : undefined);
+  const chatgpt = useProvider(aiLimits && hasChatGpt ? chatgptProvider : undefined);
+  const gemini = useProvider(aiLimits && hasGemini ? geminiProvider : undefined);
   const [warned, setWarned] = useState<Warned | null>(null);
   /** Sent, not shown yet. */
   const pending = useRef<Warned>({});
@@ -38,8 +46,8 @@ export function useAutomations(): void {
       () => live && setWarned({}),
     );
     const off = listen<string>("toast-shown", (id) => {
-      const name = LIMIT_TOAST.exec(id)?.[1] as keyof Warned | undefined;
-      const given = name && pending.current[name];
+      const name = LIMIT_TOAST.exec(id)?.[1];
+      const given = name ? pending.current[name] : undefined;
       if (!name || !given) return;
       delete pending.current[name];
       setWarned((now) => {
@@ -66,4 +74,40 @@ export function useAutomations(): void {
       showToast(limitToast(alert, now, details));
     }
   }, [aiLimits, status, data, warned]);
+
+  useEffect(() => {
+    if (!aiLimits || !hasChatGpt || chatgpt.status !== "ready" || !chatgpt.data || warned === null) return;
+    const now = Date.now();
+    const out = providerLimitAlerts(
+      "ChatGPT",
+      [
+        { key: "chatgpt-session", label: "session", win: chatgpt.data.session },
+        { key: "chatgpt-weekly", label: "weekly limit", win: chatgpt.data.weekly, dayReset: true },
+      ],
+      { ...warned, ...pending.current },
+      now,
+    );
+    for (const alert of out.alerts) {
+      pending.current[alert.key] = out.warned[alert.key];
+      showToast(providerLimitToast(alert, now, "chatgpt-usage"));
+    }
+  }, [aiLimits, hasChatGpt, chatgpt.status, chatgpt.data, warned]);
+
+  useEffect(() => {
+    if (!aiLimits || !hasGemini || gemini.status !== "ready" || !gemini.data || warned === null) return;
+    const now = Date.now();
+    const out = providerLimitAlerts(
+      "Antigravity",
+      [
+        { key: "gemini-session", label: "session", win: gemini.data.session },
+        { key: "gemini-weekly", label: "weekly limit", win: gemini.data.weekly, dayReset: true },
+      ],
+      { ...warned, ...pending.current },
+      now,
+    );
+    for (const alert of out.alerts) {
+      pending.current[alert.key] = out.warned[alert.key];
+      showToast(providerLimitToast(alert, now, "gemini-usage"));
+    }
+  }, [aiLimits, hasGemini, gemini.status, gemini.data, warned]);
 }

@@ -22,15 +22,38 @@
   gap: calc(var(--T) * 0.12);
 }
 
+.plan__rows--three {
+  gap: calc(var(--T) * 0.065);
+}
+
 .plan__row {
   display: grid;
   grid-template-columns: calc(var(--T) * 1.08) 1fr calc(var(--T) * 0.6) calc(var(--T) * 0.68);
   align-items: center;
 }
 
+.plan__row--model {
+  grid-template-columns: 1fr auto calc(var(--T) * 0.68);
+  gap: calc(var(--T) * 0.08);
+}
+
 .plan__label {
   font-size: var(--fs-label);
   font-weight: 700;
+}
+
+.plan__model {
+  font-size: var(--fs-second);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan__tag {
+  color: var(--muted);
+  font-size: var(--fs-second);
+  white-space: nowrap;
 }
 
 .plan__reset {
@@ -40,8 +63,15 @@
   white-space: nowrap;
 }
 
-.plan__value {
+.plan__value,
+.plan__tokens {
   font-size: var(--fs-label);
   font-weight: 700;
   text-align: right;
+}
+
+.plan__tokens {
+  font-size: var(--fs-second);
+  font-weight: 600;
+  color: var(--muted);
 }

@@ -5,9 +5,12 @@
 //! there before and passes its output through. Shelf never reads Claude's login
 //! tokens; those are only meant for Claude Code and Anthropic's own apps.
 
-use std::io::{Read, Write};
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -248,12 +251,243 @@ pub fn set_connected(on: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// What the frontend shows: whether the hook is on, and the last saved limits.
+// ------------------------------------------------- local session log stats
+
+const LOG_WINDOW_SECS: u64 = 7 * 86_400;
+
+/// Minimal ISO-8601 UTC timestamp parser (`YYYY-MM-DDTHH:MM:SS...`) -> Unix seconds.
+pub(crate) fn parse_iso_epoch_secs(s: &str) -> Option<u64> {
+    let bytes = s.as_bytes();
+    if bytes.len() < 19 || bytes[4] != b'-' || bytes[7] != b'-' || bytes[13] != b':' || bytes[16] != b':' {
+        return None;
+    }
+    let y: i64 = s.get(0..4)?.parse().ok()?;
+    let m: i64 = s.get(5..7)?.parse().ok()?;
+    let d: i64 = s.get(8..10)?.parse().ok()?;
+    let hh: i64 = s.get(11..13)?.parse().ok()?;
+    let mm: i64 = s.get(14..16)?.parse().ok()?;
+    let ss: i64 = s.get(17..19)?.parse().ok()?;
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) || hh > 23 || mm > 59 || ss > 60 {
+        return None;
+    }
+    // Howard Hinnant's civil_from_days inverse.
+    let y_adj = y - if m <= 2 { 1 } else { 0 };
+    let era = y_adj.div_euclid(400);
+    let yoe = y_adj - era * 400;
+    let doy = (153 * (m + if m > 2 { -3 } else { 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    let secs = days * 86_400 + hh * 3_600 + mm * 60 + ss;
+    u64::try_from(secs).ok()
+}
+
+struct CachedLogFile {
+    modified: SystemTime,
+    len: u64,
+    entries: Vec<(Option<u64>, Option<String>, String, u64)>,
+}
+
+fn log_cache() -> &'static Mutex<HashMap<PathBuf, CachedLogFile>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, CachedLogFile>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn parse_jsonl_entries(path: &Path) -> Vec<(Option<u64>, Option<String>, String, u64)> {
+    let Ok(file) = std::fs::File::open(path) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for line in BufReader::new(file).lines().map_while(Result::ok) {
+        if !line.contains("\"usage\"") {
+            continue;
+        }
+        let Ok(val) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        let msg = val.get("message").unwrap_or(&val);
+        let Some(model) = msg.get("model").and_then(Value::as_str) else {
+            continue;
+        };
+        if model.is_empty() || model == "<synthetic>" {
+            continue;
+        }
+        let Some(usage) = msg.get("usage") else {
+            continue;
+        };
+        let tokens = extract_usage_tokens(usage);
+        if tokens == 0 {
+            continue;
+        }
+        let ts = val
+            .get("timestamp")
+            .and_then(Value::as_str)
+            .and_then(parse_iso_epoch_secs);
+        let key = val
+            .get("requestId")
+            .and_then(Value::as_str)
+            .or_else(|| msg.get("id").and_then(Value::as_str))
+            .map(str::to_owned);
+        out.push((ts, key, format_model_name(model), tokens));
+    }
+    out
+}
+
+/// Shortens a Claude model ID (e.g. `claude-sonnet-4-5-20250929`) for the tile.
+fn format_model_name(raw: &str) -> String {
+    let stripped = raw.strip_prefix("claude-").unwrap_or(raw);
+    let mut parts: Vec<&str> = stripped.split('-').collect();
+    // Drop trailing 8-digit release date (e.g. 20250929).
+    if parts
+        .last()
+        .is_some_and(|p| p.len() == 8 && p.bytes().all(|b| b.is_ascii_digit()))
+    {
+        parts.pop();
+    }
+    if parts.is_empty() {
+        return raw.to_string();
+    }
+    let cap = |s: &str| {
+        let mut c = s.chars();
+        match c.next() {
+            Some(first) => first.to_uppercase().to_string() + c.as_str(),
+            None => String::new(),
+        }
+    };
+    let is_num = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    // Family-first: ["sonnet", "4", "5"] -> "Sonnet 4.5"
+    if !is_num(parts[0]) {
+        let family = cap(parts[0]);
+        let ver: Vec<&str> = parts[1..].iter().copied().take_while(|p| is_num(p)).collect();
+        return if ver.is_empty() {
+            family
+        } else {
+            format!("{family} {}", ver.join("."))
+        };
+    }
+    // Version-first: ["3", "5", "sonnet"] -> "Sonnet 3.5"
+    let ver: Vec<&str> = parts.iter().copied().take_while(|p| is_num(p)).collect();
+    let rest = &parts[ver.len()..];
+    if let Some(family) = rest.first() {
+        format!("{} {}", cap(family), ver.join("."))
+    } else {
+        raw.to_string()
+    }
+}
+
+fn collect_jsonl_files(dir: &Path, cutoff: SystemTime, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_jsonl_files(&path, cutoff, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+            let recent = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .map(|t| t >= cutoff)
+                .unwrap_or(true);
+            if recent {
+                out.push(path);
+            }
+        }
+    }
+}
+
+fn extract_usage_tokens(usage: &Value) -> u64 {
+    let field = |k: &str| usage.get(k).and_then(Value::as_u64).unwrap_or(0);
+    field("input_tokens")
+        + field("output_tokens")
+        + field("cache_creation_input_tokens")
+        + field("cache_read_input_tokens")
+}
+
+/// Reads Claude Code's local session logs (no login files) to find the most-used
+/// model over the last 7 days and its token count. Unchanged files are served
+/// from an in-memory mtime/size cache so polling stays cheap.
+fn scan_models_in(dirs: &[PathBuf], now: SystemTime) -> Vec<(String, u64)> {
+    let cutoff = now.checked_sub(Duration::from_secs(LOG_WINDOW_SECS)).unwrap_or(UNIX_EPOCH);
+    let cutoff_secs = cutoff.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let mut files = Vec::new();
+    for dir in dirs {
+        collect_jsonl_files(&dir.join("projects"), cutoff, &mut files);
+    }
+    // Deduplicate streaming assistant chunks by message/request id.
+    let mut by_req: HashMap<String, (String, u64)> = HashMap::new();
+    let mut anon_totals: HashMap<String, u64> = HashMap::new();
+
+    let mut cache = log_cache().lock().unwrap_or_else(|e| e.into_inner());
+    for path in &files {
+        let Ok(meta) = std::fs::metadata(path) else {
+            continue;
+        };
+        let modified = meta.modified().unwrap_or(UNIX_EPOCH);
+        let len = meta.len();
+        let cached = cache
+            .get(path)
+            .is_some_and(|c| c.modified == modified && c.len == len);
+        if !cached {
+            let entries = parse_jsonl_entries(path);
+            cache.insert(path.clone(), CachedLogFile { modified, len, entries });
+        }
+        if let Some(file_cache) = cache.get(path) {
+            for (ts, key, name, tokens) in &file_cache.entries {
+                if ts.is_some_and(|t| t < cutoff_secs) {
+                    continue;
+                }
+                if let Some(k) = key {
+                    let entry = by_req.entry(k.clone()).or_insert_with(|| (name.clone(), 0));
+                    if *tokens > entry.1 {
+                        *entry = (name.clone(), *tokens);
+                    }
+                } else {
+                    *anon_totals.entry(name.clone()).or_insert(0) += *tokens;
+                }
+            }
+        }
+    }
+    // Prune stale entries for deleted/old files so the cache stays bounded.
+    let keep: std::collections::HashSet<&PathBuf> = files.iter().collect();
+    cache.retain(|k, _| keep.contains(k));
+    drop(cache);
+
+    let mut totals = anon_totals;
+    for (_, (name, tokens)) in by_req {
+        *totals.entry(name).or_insert(0) += tokens;
+    }
+    let mut list: Vec<(String, u64)> = totals.into_iter().collect();
+    list.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    list
+}
+
+/// What the frontend shows: whether the hook is on, the last saved limits, and
+/// the most-used model from local session logs.
 pub fn read_usage() -> Value {
     let usage = std::fs::read_to_string(usage_file())
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok());
-    json!({ "connected": is_connected(), "usage": usage })
+    let connected = is_connected();
+    let models = if connected {
+        scan_models_in(&config_dirs(), SystemTime::now())
+    } else {
+        Vec::new()
+    };
+    let top_model = models
+        .first()
+        .map(|(name, tokens)| json!({ "name": name, "tokens": tokens }));
+    let models_json: Vec<Value> = models
+        .into_iter()
+        .take(5)
+        .map(|(name, tokens)| json!({ "name": name, "tokens": tokens }))
+        .collect();
+    json!({
+        "connected": connected,
+        "usage": usage,
+        "top_model": top_model,
+        "models": models_json,
+    })
 }
 
 #[cfg(test)]
@@ -413,5 +647,54 @@ mod tests {
             .collect();
         assert!(is_statusline_call(&args));
         assert_eq!(chain_from_args(&args).as_deref(), Some(tricky));
+    }
+
+    #[test]
+    fn formats_claude_model_names() {
+        assert_eq!(format_model_name("claude-sonnet-4-5-20250929"), "Sonnet 4.5");
+        assert_eq!(format_model_name("claude-opus-4-6"), "Opus 4.6");
+        assert_eq!(format_model_name("claude-3-5-sonnet-20241022"), "Sonnet 3.5");
+        assert_eq!(format_model_name("claude-haiku-4-5-20251001"), "Haiku 4.5");
+    }
+
+    #[test]
+    fn scans_top_model_and_deduplicates_requests() {
+        let root = std::env::temp_dir().join(format!("shelf-claude-logs-{}", std::process::id()));
+        let proj = root.join("projects").join("demo");
+        std::fs::create_dir_all(&proj).unwrap();
+        let log = [
+            json!({
+                "requestId": "req_1",
+                "message": { "model": "claude-sonnet-4-5-20250929", "usage": { "input_tokens": 100, "output_tokens": 20 } }
+            }),
+            // Duplicate streaming chunk with higher output_tokens replaces the earlier one.
+            json!({
+                "requestId": "req_1",
+                "message": { "model": "claude-sonnet-4-5-20250929", "usage": { "input_tokens": 100, "output_tokens": 80 } }
+            }),
+            json!({
+                "requestId": "req_2",
+                "message": { "model": "claude-opus-4-6", "usage": { "input_tokens": 500, "output_tokens": 100, "cache_read_input_tokens": 400 } }
+            }),
+            json!({
+                "requestId": "req_3",
+                "message": { "model": "<synthetic>", "usage": { "input_tokens": 9999 } }
+            }),
+            // Old entry (> 7 days ago) inside a recently modified file must be skipped.
+            json!({
+                "timestamp": "2020-01-01T00:00:00Z",
+                "requestId": "req_old",
+                "message": { "model": "claude-haiku-4-5-20251001", "usage": { "input_tokens": 50000 } }
+            }),
+        ]
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+        std::fs::write(proj.join("session.jsonl"), log).unwrap();
+
+        let models = scan_models_in(&[root.clone()], SystemTime::now());
+        assert_eq!(models, vec![("Opus 4.6".into(), 1000), ("Sonnet 4.5".into(), 180)]);
+        let _ = std::fs::remove_dir_all(root);
     }
 }

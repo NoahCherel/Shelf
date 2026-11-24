@@ -1,8 +1,10 @@
 //! App wiring. Everything Windows-specific lives in its own module.
 
 mod apps;
+mod chatgpt_usage;
 mod claude_usage;
 mod diag;
+mod gemini_usage;
 mod glass;
 mod net;
 mod preview;
@@ -29,6 +31,16 @@ fn claude_usage() -> serde_json::Value {
 fn claude_connect(on: bool) -> Result<(), String> {
     preview::guard()?;
     claude_usage::set_connected(on)
+}
+
+#[tauri::command(async)]
+fn chatgpt_usage() -> serde_json::Value {
+    chatgpt_usage::read_usage()
+}
+
+#[tauri::command(async)]
+fn gemini_usage(force: Option<bool>) -> serde_json::Value {
+    gemini_usage::read_usage(force.unwrap_or(false))
 }
 
 #[tauri::command]
@@ -230,6 +242,8 @@ pub fn run() {
             shell::toast::toast_done,
             claude_usage,
             claude_connect,
+            chatgpt_usage,
+            gemini_usage,
             diag::diag_note,
             quit,
         ])

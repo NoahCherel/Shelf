@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, vi } from "vitest";
 import { invoke } from "../core/tauri";
-import { claudeProvider, durationText, pace, resetDayText, toWindow, WEEK_MS, SESSION_MS } from "./claude";
+import { claudeProvider, durationText, pace, resetDayText, tokensText, toWindow, WEEK_MS, SESSION_MS } from "./claude";
 
 vi.mock("../core/tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
@@ -58,6 +58,13 @@ describe("text", () => {
     expect(SESSION_MS).toBe(5 * 3_600_000);
     expect(WEEK_MS).toBe(7 * 86_400_000);
   });
+
+  it("shortens token counts", () => {
+    expect(tokensText(1_420_000)).toBe("1.4M");
+    expect(tokensText(2_000_000)).toBe("2M");
+    expect(tokensText(820_400)).toBe("820k");
+    expect(tokensText(450)).toBe("450");
+  });
 });
 
 describe("provider", () => {
@@ -93,8 +100,12 @@ describe("provider", () => {
 });
 
 describe("the repo", () => {
-  // Built up so this file doesn't match itself. Anthropic's terms keep those tokens for Claude Code.
-  const FORBIDDEN = [".credentials", ".json"].join("");
+  // Built up so this file doesn't match itself. Shelf never reads other tools' login files (G-05).
+  const FORBIDDEN = [
+    [".credentials", ".json"].join(""),
+    ["oauth_creds", ".json"].join(""),
+    [".codex/auth", ".json"].join(""),
+  ];
 
   function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
@@ -103,11 +114,11 @@ describe("the repo", () => {
     });
   }
 
-  it("never touches Claude's login file", () => {
+  it("never touches AI tools' login files", () => {
     const offenders = [...files("src"), ...files("src-tauri/src")].filter((path) =>
       readFileSync(path, "utf8")
         .split("\n")
-        .some((line) => line.includes(FORBIDDEN) && !line.trimStart().startsWith("//")),
+        .some((line) => FORBIDDEN.some((f) => line.includes(f)) && !line.trimStart().startsWith("//")),
     );
     expect(offenders).toEqual([]);
   });

@@ -5,7 +5,7 @@ import type { TileProps } from "../../core/widget";
 import { Bar } from "../../design/parts/Bar";
 import { Card } from "../../design/parts/Card";
 import { Row } from "../../design/parts/Row";
-import { claudeProvider, durationText, pace, resetDayText, SESSION_MS, WEEK_MS, type ClaudeData, type LimitWindow } from "../../providers/claude";
+import { claudeProvider, durationText, pace, resetDayText, SESSION_MS, tokensText, WEEK_MS, type ClaudeData, type LimitWindow } from "../../providers/claude";
 import { ClaudeLogo } from "./ClaudeLogo";
 
 const HOW = "Shelf reads the limits Claude Code hands its status line, and never your Claude login. They update while Claude Code is running.";
@@ -61,6 +61,14 @@ export function ClaudeCard({ data, status }: TileProps<ClaudeData>) {
       <h2 className="card__section">USAGE</h2>
       <Limit label="Session" win={data?.session ?? null} lengthMs={SESSION_MS} resets={(ms) => durationText(ms - Date.now())} />
       <Limit label="Weekly" win={data?.weekly ?? null} lengthMs={WEEK_MS} resets={resetDayText} />
+      {data?.topModel && (
+        <>
+          <h2 className="card__section">MODELS (7D)</h2>
+          {(data.models?.length ? data.models : [data.topModel]).map((m, i) => (
+            <Row key={m.name} label={m.name} detail={i === 0 ? "most used" : undefined} value={`${tokensText(m.tokens)} tokens`} />
+          ))}
+        </>
+      )}
     </Card>
   );
 }

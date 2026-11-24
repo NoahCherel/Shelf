@@ -57,6 +57,15 @@ describe("Claude Plan Usage tile", () => {
     expect(screen.queryByText("most used")).toBeNull();
   });
 
+  it("shows the third row with most-used model and tokens when present", () => {
+    const withModel: ClaudeData = { ...DATA, topModel: { name: "Sonnet 4.5", tokens: 1_420_000 } };
+    const { container } = render(<T data={withModel} status="ready" />);
+    expect(container.querySelectorAll(".plan__row").length).toBe(3);
+    expect(screen.getByText("Sonnet 4.5")).toBeTruthy();
+    expect(screen.getByText("most used")).toBeTruthy();
+    expect(screen.getByText("1.4M")).toBeTruthy();
+  });
+
   it("is the wide one", () => {
     expect(plan.width).toBe(5.06);
     expect(usage.width).toBe(2.74);
@@ -72,6 +81,22 @@ describe("card", () => {
     expect(screen.getByText("Weekly")).toBeTruthy();
     const levels = [...container.querySelectorAll("[data-level]")].map((b) => b.getAttribute("data-level"));
     expect(levels).toEqual(["good", "warn"]);
+  });
+
+  it("lists 7-day models when topModel is present", () => {
+    const withModels: ClaudeData = {
+      ...DATA,
+      topModel: { name: "Sonnet 4.5", tokens: 1_420_000 },
+      models: [
+        { name: "Sonnet 4.5", tokens: 1_420_000 },
+        { name: "Opus 4.6", tokens: 480_000 },
+      ],
+    };
+    render(<C data={withModels} status="ready" />);
+    expect(screen.getByText("MODELS (7D)")).toBeTruthy();
+    expect(screen.getByText("Sonnet 4.5")).toBeTruthy();
+    expect(screen.getByText("1.4M tokens")).toBeTruthy();
+    expect(screen.getByText("480k tokens")).toBeTruthy();
   });
 
   it("turns full at 90", () => {
