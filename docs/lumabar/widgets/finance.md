@@ -4,8 +4,6 @@
 
 ### Total Revenue
 
-> Every connected store's last 30 days added up, with a monthly goal and its pace. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes, once a store is connected [I] |
 
 ### Polar
-
-> Net revenue over the last 30 days from Polar. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Polar Chart
 
-> Your Polar revenue as a 14-day line. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes, with a token [I] |
 
 ### Stripe
-
-> Net revenue over the last 30 days from Stripe. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### Stripe Chart
 
-> Your Stripe revenue as a line. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -98,8 +88,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### Dodo Payments
-
-> Net revenue from Dodo Payments. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -118,8 +106,6 @@
 
 ### Dodo Chart
 
-> Your Dodo Payments revenue as a line. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -136,8 +122,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### Shopify
-
-> Your store's net sales over the last 30 days. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -156,8 +140,6 @@
 
 ### Shopify Chart
 
-> This week's Shopify sales and how they moved, over 14 days. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -174,8 +156,6 @@
 | **Buildable here?** | Yes, with an app [I] |
 
 ### Lemon Squeezy
-
-> Revenue after tax and refunds over 30 days. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -194,8 +174,6 @@
 
 ### Lemon Squeezy Chart
 
-> This week's Lemon Squeezy revenue over a 14-day line. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -212,8 +190,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### Paddle
-
-> What you earned from Paddle transactions over 30 days. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -232,8 +208,6 @@
 
 ### Paddle Chart
 
-> This week's Paddle revenue over a 14-day line. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -251,8 +225,6 @@
 
 ### Gumroad
 
-> What you kept from Gumroad sales, after the fee. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Finance [S: widgets] |
@@ -269,8 +241,6 @@
 | **Buildable here?** | Yes, with a token [I] |
 
 ### Gumroad Chart
-
-> This week's Gumroad sales over a 14-day line. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

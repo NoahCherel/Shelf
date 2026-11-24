@@ -14,7 +14,7 @@ const sampleEntry = (name: string, open: boolean): AppEntry => ({
 export default defineWidget<AppEntry[]>({
   id: "apps",
   name: "Apps",
-  description: "Start, your pinned apps and every open window.",
+  description: "The Start button, pinned apps and open windows.",
   category: "apps-files",
   width: (data) => 0.96 * ((data?.length ?? 0) + 2),
   sample: ["Browser", "Files", "Mail", "Terminal", "Code"].map((name, i) => sampleEntry(name, i % 2 === 0)),

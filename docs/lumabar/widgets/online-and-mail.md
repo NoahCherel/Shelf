@@ -4,8 +4,6 @@
 
 ### Metric
 
-> A live number, such as BTC/USD. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Online & Mail [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes, with a chosen price API [I] |
 
 ### Wallpaper Gallery
-
-> Browse and set new wallpapers. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Gmail
 
-> Unread mail in your inbox. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Online & Mail [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes, with your own client [I] |
 
 ### GitHub Activity
-
-> Your contribution grid and streak. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### GitHub
 
-> Unread GitHub notifications. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Online & Mail [S: widgets] |
@@ -99,8 +89,6 @@
 
 ### GitHub Overview
 
-> Notifications, open pull requests and stars. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Online & Mail [S: widgets] |
@@ -117,8 +105,6 @@
 | **Buildable here?** | Yes, with a token [I] |
 
 ### LeetCode Stats
-
-> Problems solved and your streak. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

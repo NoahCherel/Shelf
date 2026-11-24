@@ -27,7 +27,7 @@ function SystemStatsTile({ data }: TileProps<SystemData>) {
 export default defineWidget<SystemData>({
   id: "system-stats",
   name: "System Stats",
-  description: "CPU and RAM as two live rings.",
+  description: "Live CPU and memory load as two rings.",
   category: "system",
   width: 2.14,
   sample: { cpu: 9, memory: 69, battery: null },

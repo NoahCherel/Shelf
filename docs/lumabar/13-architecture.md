@@ -49,7 +49,7 @@ All run in one WebView2 environment, sharing the renderer where possible [S: cha
 export default defineWidget({
   id: "stripe-chart",
   name: "Stripe Chart",
-  description: "Your Stripe revenue as a line.",
+  description: "A line chart of your Stripe revenue.",
   category: "finance",
   shape: { width: 3.1 },            // in tile heights; square is 1
   tile: StripeChartTile,            // draws from { data, status, theme }

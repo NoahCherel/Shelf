@@ -29,8 +29,7 @@ function entry(w) {
   const lines = [
     `### ${baseName(w)}`,
     "",
-    `> ${w.description} [S: widgets]`,
-    "",
+    // Lumabar's own description isn't quoted: its wording is protected; the fields below say what the widget does.
     "| Field | Detail |",
     "| --- | --- |",
     `| **Category** | ${w.section} [S: widgets] |`,

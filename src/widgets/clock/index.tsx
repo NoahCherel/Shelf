@@ -28,7 +28,7 @@ function ClockTile({ data }: TileProps<number>) {
 export default defineWidget<number>({
   id: "clock",
   name: "Clock",
-  description: "Large, readable time with its seconds and the date, in 12- or 24-hour format.",
+  description: "A big clock with seconds and today's date, 12- or 24-hour.",
   category: "clocks",
   width: 2.24,
   sample: new Date(2026, 9, 11, 17, 43, 59).getTime(),

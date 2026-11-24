@@ -4,8 +4,6 @@
 
 ### Now Playing
 
-> Cover art, title and full controls for the current track. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Media & Audio [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes; Shelf has transport control. Art and progress need adding [I] |
 
 ### Audio Output
-
-> Volume for your current speakers or headphones. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Now Playing (compact)
 
-> Title, artist and play/pause in a smaller card. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Media & Audio [S: widgets] |
@@ -61,8 +55,6 @@
 
 ### Now Playing Mini
 
-> One round play button with the track's progress. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Media & Audio [S: widgets] |
@@ -79,8 +71,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Now Playing Bar
-
-> The track with a progress bar and skip. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

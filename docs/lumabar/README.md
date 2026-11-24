@@ -1,6 +1,6 @@
 # Lumabar study
 
-A complete written study of [Lumabar](https://lumabar.xyz), version 1.2.13, made before rebuilding Shelf. **This is a private reference for a private tool.** Don't publish it, or anything built to copy it.
+A written study of [Lumabar](https://lumabar.xyz)'s public pages, as of version 1.2.13, made before building Shelf as a free, open-source alternative. Facts are summarised and cited; the captures of Lumabar's site (`_evidence/`) stay out of the repo, and none of its code, images or copy is reused in Shelf.
 
 No product code came out of this study. The build plan is in [`docs/superpowers/plans/`](../superpowers/plans/).
 

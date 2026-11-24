@@ -4,8 +4,6 @@
 
 ### Weather
 
-> Temperature now, with today's high and low. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Weather [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes; Shelf uses Open-Meteo [I] |
 
 ### Weather Details
-
-> Wind, rain and the day's range. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Weather Forecast
 
-> The next four days. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Weather [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Today & Forecast
-
-> Today next to the next three days. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### Weather Status
 
-> The conditions in words, with your city. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Weather [S: widgets] |
@@ -99,8 +89,6 @@
 
 ### Hourly
 
-> The next six hours. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Weather [S: widgets] |
@@ -117,8 +105,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Sunrise & Sunset
-
-> Where the sun is between sunrise and sunset. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

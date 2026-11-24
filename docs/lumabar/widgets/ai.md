@@ -4,8 +4,6 @@
 
 ### Claude Usage
 
-> Your Claude session limit and when it resets. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | AI [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes, differently: use Claude Code's status line `rate_limits`, already working in Shelf, not the login token (G-05). Plan, charge dates and Opus row have no source there [I] |
 
 ### Claude Plan Usage
-
-> Session and weekly Claude limits, plus your most-used model. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### ChatGPT Usage
 
-> Your ChatGPT plan's Codex limits: the 5-hour and weekly windows. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | AI [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Decide per vendor: the tile needs that vendor's saved login, and each vendor's rules must allow it (see G-05) [I] |
 
 ### Gemini Usage
-
-> Gemini CLI quota for Pro and Flash. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### Grok Usage
 
-> SuperGrok credit use, from your own sign-in. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | AI [S: widgets] |
@@ -98,8 +88,6 @@
 | **Buildable here?** | Decide per vendor: the tile needs that vendor's saved login, and each vendor's rules must allow it (see G-05) [I] |
 
 ### DeepSeek Balance
-
-> Your DeepSeek balance, with today's and this week's spend. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -118,8 +106,6 @@
 
 ### GLM Usage
 
-> Z.ai / Zhipu GLM Coding Plan limits. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | AI [S: widgets] |
@@ -136,8 +122,6 @@
 | **Buildable here?** | Yes, with a key [I] |
 
 ### OpenCode Usage
-
-> OpenCode usage for the current session, from its local history. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -156,8 +140,6 @@
 
 ### OpenCode Plan Usage
 
-> OpenCode tokens this session and this week, and your top model. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | AI [S: widgets] |
@@ -174,8 +156,6 @@
 | **Buildable here?** | Yes, if OpenCode is installed [I] |
 
 ### Cursor Usage
-
-> Cursor spend and tokens. [S: widgets]
 
 | Field | Detail |
 | --- | --- |

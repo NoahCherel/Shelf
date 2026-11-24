@@ -2,7 +2,9 @@
 name = "shelf"
 version = "0.1.0"
 edition = "2021"
-description = "A personal widget dock for Windows"
+description = "An open-source widget dock that replaces the Windows taskbar"
+license = "MIT"
+repository = "https://github.com/NoahCherel/Shelf"
 
 [lib]
 name = "shelf_lib"

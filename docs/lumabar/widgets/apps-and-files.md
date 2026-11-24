@@ -4,8 +4,6 @@
 
 ### Apps
 
-> Start, your pinned apps and every open window. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Apps & Files [S: widgets] |
@@ -22,8 +20,6 @@
 | **Buildable here?** | Yes, large: the biggest widget. Live previews, jump lists and Store app handling each need work [I] |
 
 ### Recently Opened
-
-> The apps and files you used last. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -42,8 +38,6 @@
 
 ### Recycle Bin
 
-> What the bin holds, and a click to empty it. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Apps & Files [S: widgets] |
@@ -60,8 +54,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Search
-
-> Search the web, or type a folder path to open it. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -80,8 +72,6 @@
 
 ### Commands
 
-> Type a word to launch an app or an action. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Apps & Files [S: widgets] |
@@ -98,8 +88,6 @@
 | **Buildable here?** | Yes; command list is a Gap [I] |
 
 ### Storage
-
-> Free space on your drive, with a usage bar. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
@@ -118,8 +106,6 @@
 
 ### Recent Screenshots
 
-> Your newest screenshots as thumbnails. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Apps & Files [S: widgets] |
@@ -137,8 +123,6 @@
 
 ### Downloads
 
-> The latest file in Downloads, one click to open. [S: widgets]
-
 | Field | Detail |
 | --- | --- |
 | **Category** | Apps & Files [S: widgets] |
@@ -155,8 +139,6 @@
 | **Buildable here?** | Yes [I] |
 
 ### Screenshot Capture
-
-> Capture the screen, a window or a region. [S: widgets]
 
 | Field | Detail |
 | --- | --- |
