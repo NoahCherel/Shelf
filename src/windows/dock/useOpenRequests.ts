@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { byId } from "../../core/byId";
+import { folderContaining, useLayout } from "../../core/layout";
 import { listen } from "../../core/tauri";
 import { windowLabel } from "../../core/windowLabel";
 import { openPanel, PANEL_WIDTH, type PanelId } from "../../panels/open";
@@ -26,7 +27,10 @@ function open(target: string): void {
     return;
   }
   if (kind === "widget") {
-    const tile = document.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(id)}"]`);
+    const parent = folderContaining(id, useLayout.getState().folders);
+    const tile =
+      document.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(id)}"]`) ??
+      (parent ? document.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(parent)}"]`) : null);
     const def = byId(id);
     if (tile && def) openWidgetCard(def, tile);
   }

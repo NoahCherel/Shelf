@@ -12,7 +12,10 @@ type View = () => Promise<ComponentType>;
 // Each window only loads the code for its own view.
 const views: Record<string, View> = {
   dock: () => import("./windows/dock/DockWindow").then((m) => m.DockWindow),
-  card: () => import("./windows/card/CardWindow").then((m) => m.CardWindow),
+  card: () => {
+    syncLayout();
+    return import("./windows/card/CardWindow").then((m) => m.CardWindow);
+  },
   preview: () => import("./windows/preview/PreviewWindow").then((m) => m.PreviewWindow),
   toast: () => import("./windows/toast/ToastWindow").then((m) => m.ToastWindow),
   picker: () => {

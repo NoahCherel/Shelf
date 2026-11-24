@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
+import { canPutInFolder, isFolderId } from "../../core/folderId";
 import { DRAG_DISTANCE } from "../../core/gestures";
 import { useLayout } from "../../core/layout";
 import { arrange, fractionAt } from "./arrange";
+
+const WIDGET_HOLD_MS = 350;
+const FOLDER_HOLD_MS = 150;
 
 /** On a full-width dock: where the slot sits, and how to start moving it. */
 export interface Free {
@@ -22,6 +26,10 @@ export function useFreePlacement(full: boolean, ids: string[], locked: boolean) 
   const positions = useLayout((s) => s.positions);
   const [size, setSize] = useState<{ width: number; gap: number; items: Record<string, number> }>({ width: 0, gap: 0, items: {} });
   const [moving, setMoving] = useState<{ id: string; left: number } | null>(null);
+  const [folderTarget, setFolderTarget] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const holdOver = useRef<string | null>(null);
+  const armedTarget = useRef<string | null>(null);
 
   const measure = useCallback(() => {
     const el = row.current;
@@ -61,26 +69,66 @@ export function useFreePlacement(full: boolean, ids: string[], locked: boolean) 
     const width = size.items[id] ?? 0;
     const leftAt = (x: number) => Math.min(Math.max(0, size.width - width), Math.max(0, base + x - startX));
     let moved = false;
+    const clearHold = () => {
+      clearTimeout(holdTimer.current);
+      holdOver.current = null;
+      armedTarget.current = null;
+      setFolderTarget(null);
+    };
+    const rowLeft = row.current?.getBoundingClientRect().left ?? 0;
+    const findOver = (clientX: number): string | null => {
+      if (!canPutInFolder(id)) return null;
+      const x = clientX - rowLeft;
+      for (const other of ids) {
+        if (other === id || other === "apps") continue;
+        const oLeft = lefts[other];
+        const oWidth = size.items[other];
+        if (oLeft === undefined || !oWidth) continue;
+        const pad = isFolderId(other) ? 0 : oWidth * 0.15;
+        if (x >= oLeft + pad && x <= oLeft + oWidth - pad) return other;
+      }
+      return null;
+    };
     const move = (ev: globalThis.PointerEvent) => {
       if (!moved && Math.abs(ev.clientX - startX) < DRAG_DISTANCE) return;
       // Only now: taking the pointer at the press would send the click to the slot, not the button inside it.
       if (!moved) el.setPointerCapture?.(ev.pointerId);
       moved = true;
-      setMoving({ id, left: leftAt(ev.clientX) });
+      const nextLeft = leftAt(ev.clientX);
+      setMoving({ id, left: nextLeft });
+      const over = findOver(ev.clientX);
+      if (!over) {
+        if (holdOver.current || armedTarget.current) clearHold();
+      } else if (holdOver.current !== over) {
+        clearHold();
+        holdOver.current = over;
+        const delay = isFolderId(over) ? FOLDER_HOLD_MS : WIDGET_HOLD_MS;
+        holdTimer.current = setTimeout(() => {
+          armedTarget.current = over;
+          setFolderTarget(over);
+        }, delay);
+      }
     };
     const cancel = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      clearHold();
       setMoving(null);
     };
     const up = (ev: globalThis.PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointercancel", cancel);
+      const target = armedTarget.current;
+      clearHold();
       setMoving(null);
       if (!moved) return;
-      const left = leftAt(ev.clientX);
-      const order = [...ids].sort((a, b) => (a === id ? left : (lefts[a] ?? 0)) - (b === id ? left : (lefts[b] ?? 0)));
-      useLayout.getState().place(id, fractionAt(left, width, size.width), order);
+      if (target) {
+        useLayout.getState().groupWidgets(id, target);
+      } else {
+        const left = leftAt(ev.clientX);
+        const order = [...ids].sort((a, b) => (a === id ? left : (lefts[a] ?? 0)) - (b === id ? left : (lefts[b] ?? 0)));
+        useLayout.getState().place(id, fractionAt(left, width, size.width), order);
+      }
       // The click that follows letting go isn't a click on the widget.
       const swallow = (click: Event) => {
         click.stopPropagation();
@@ -98,6 +146,7 @@ export function useFreePlacement(full: boolean, ids: string[], locked: boolean) 
 
   return {
     row,
+    folderTarget,
     free: (id: string): Free | undefined =>
       full ? { left: moving?.id === id ? moving.left : (lefts[id] ?? last.current[id] ?? 0), moving: moving?.id === id, grab: grab(id) } : undefined,
   };

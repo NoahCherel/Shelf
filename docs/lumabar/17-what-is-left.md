@@ -7,7 +7,7 @@ Ce document compare, fonctionnalité par fonctionnalité (**F-001 à F-090**) et
 - **Fonctionnalités socle (Barre, Styles, Apps, Cartes, Réglages, Automatisations, Plateforme) :** **78 / 90 faites**. Sur les 12 autres : **5 partielles** (`F-023` mesure faite et correction en attente d'un redémarrage, `F-046` sans *End task*, `F-060` sans points « Nouveau », `F-068` sans mise à jour ni feedback, `F-081` pour les alertes seulement), **1 écartée** (`F-089`, build 32 bits) et **6 en attente de leur widget** (`F-076` et `F-082` Calendar, `F-078` suivi d'abonnements, `F-079` et `F-090` Todos, `F-083` Screen Time). Hors catalogue, les raccourcis `Win+A/S/N` ont été essayés puis écartés (voir 1.9).
 - **Lots terminés :** 1.1 à 1.4 avec `docs/superpowers/plans/2026-11-13-finir-1-1-a-1-4.md` (PR #11) ; 1.7 à 1.9 avec `docs/superpowers/plans/2026-11-16-finir-1-7-a-1-9.md` (PR #12 toasts, #13 automatisations, #14 plateforme, puis #15 qui retire `Win+A/S/N`). Ce qu'il reste à essayer à la main est dans `docs/manual-checks.md`.
 - **Panneaux système (Spécificité Shelf) :** Shelf possède déjà ses propres cartes natives **Sound**, **Wi-Fi**, **Bluetooth**, **Quick Settings**, **Search** et **Notifications** dans `src/panels/`, regroupées derrière la tuile `system-status` et la loupe d'`apps`.
-- **Catalogue de widgets :** **13 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, et les widgets dynamiques d'apps/dossiers `pin:*`) sont présents dans `src/widgets/`. Il reste **90 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
+- **Catalogue de widgets :** **19 / 103 widgets du catalogue** (+ 1 widget propre à Shelf `system-status`, les widgets dynamiques d'apps/dossiers `pin:*` et les dossiers de widgets `folder:*`) sont présents dans `src/widgets/`. Il reste **84 widgets du catalogue** (+ **5 widgets hors-catalogue G-14**) à créer.
 
 ---
 
@@ -112,8 +112,9 @@ Dans `src/windows/picker/` :
 - ✅ `F-057` : Vraies tuiles dans le sélecteur ; clic pour ajouter ou retirer
 - ✅ `F-058` : Badges `−` sur le dock pendant que le sélecteur est ouvert
 - ✅ `F-059` : Glisser pour réordonner les widgets
-- ✅ `F-060` *(en partie)* : Coches (`Check marks`) sur les widgets déjà présents dans la barre
+- ✅ `F-060` *(en partie)* : Coches (`Check marks`) sur les widgets déjà présents dans la barre (y compris rangés dans un dossier)
 - ✅ `F-061` : Affichage de données d'exemple tant qu'un compte n'est pas connecté
+- ✅ `F-061b` : **Dossiers de widgets** (façon macOS/iOS) : glisser-maintenir un widget sur un autre (ou via clic droit *New folder* / *Move to*) pour les regrouper dans une tuile carrée à grille 2×2 ; clic pour ouvrir la carte dossier avec tuiles live, titre éditable, navigation vers les cartes de détail avec bouton retour, sortie vers le dock et dégroupage (`src/core/folderWidget.tsx`, `src/widgets/_shared/FolderCard.tsx`)
 
 **Ce qu'il reste à faire :**
 
@@ -213,7 +214,7 @@ Dans `src/automations/`, `src-tauri/src/shell/toast.rs` et `src-tauri/src/system
 
 ---
 
-### 2.1. Catégorie : AI (10 widgets — 4 faits, 6 manquants)
+### 2.1. Catégorie : AI (10 widgets — 10 faits, 0 manquant)
 
 | ID | P | Widget | État dans Shelf | Ce qu'il faut faire |
 | --- | --- | --- | --- | --- |
@@ -221,12 +222,12 @@ Dans `src/automations/`, `src-tauri/src/shell/toast.rs` et `src-tauri/src/system
 | **W-002** | P1 | **Claude Plan Usage** | ✅ **Fait** (`src/widgets/claude-plan-usage/`) | Session, Weekly + 3e ligne avec le modèle le plus utilisé et ses tokens lus depuis les logs JSONL locaux de Claude Code (`~/.claude/projects`, sans toucher aux identifiants) |
 | **W-003** | P2 | **ChatGPT Usage** | ✅ **Fait** (`src/widgets/chatgpt-usage/`) | Limites Codex CLI (Session 5h + Weekly) lues depuis les logs locaux `~/.codex/sessions/**/*.jsonl` (`rate_limits`), carte avec badge de plan et courbe d'évolution (sans toucher aux identifiants) |
 | **W-004** | P2 | **Gemini Usage** | ✅ **Fait** (`src/widgets/gemini-usage/`) | Quotas Antigravity (`Session` 5h + `Weekly` 7j, groupes Gemini & Claude/GPT) lus via la commande officielle `agy -p "/usage" --output-format json`, cache local et courbe d'évolution (sans toucher aux identifiants OAuth) |
-| **W-005** | P2 | **Grok Usage** | ❌ **Manquant** | Tuile d'usage Grok CLI + carte de détail |
-| **W-006** | P2 | **DeepSeek Balance** | ❌ **Manquant** | Tuile solde API DeepSeek (`GET /user/balance` avec clé `sk-`) + suivi des dépenses |
-| **W-007** | P2 | **GLM Usage** | ❌ **Manquant** | Tuile d'usage Z.ai / BigModel Coding Plan avec clé API |
-| **W-008** | P2 | **OpenCode Usage** | ❌ **Manquant** | Tuile d'usage local OpenCode (tokens/coût depuis l'historique local hors-ligne) |
-| **W-009** | P2 | **OpenCode Plan Usage** | ❌ **Manquant** | Variante jauge de plan pour OpenCode |
-| **W-010** | P2 | **Cursor Usage** | ❌ **Manquant** | Tuile d'usage des requêtes/limites Cursor + carte de détail |
+| **W-005** | P2 | **Grok Usage** | ✅ **Fait** (`src/widgets/grok-usage/`) | Crédits Grok CLI via sous-processus `grok agent stdio` (ACP `_x.ai/billing`, sans lire `~/.grok/auth.json`), carte de détail, tendance et alertes 80 % / 95 % |
+| **W-006** | P2 | **DeepSeek Balance** | ✅ **Fait** (`src/widgets/deepseek-balance/`) | Solde API DeepSeek (`GET /user/balance` avec clé `sk-` chiffrée DPAPI) + suivi local des dépenses (Today, 7 days, runway, tendance) |
+| **W-007** | P2 | **GLM Usage** | ✅ **Fait** (`src/widgets/glm-usage/`) | Quotas Z.ai / BigModel Coding Plan (Session, Weekly, MCP, auto-détection plateforme, clé DPAPI) + alertes 80 % / 95 % |
+| **W-008** | P2 | **OpenCode Usage** | ✅ **Fait** (`src/widgets/opencode-usage/`) | Usage local OpenCode 100 % hors-ligne (`opencode.db` v1 `message` + v2 `session_message`, tokens/coût 5h/7j/all-time, modèles gratuits inclus) |
+| **W-009** | P2 | **OpenCode Plan Usage** | ✅ **Fait** (`src/widgets/opencode-plan-usage/`) | Variante jauge 3 lignes (Session, Weekly, top model) partageant la carte OpenCode |
+| **W-010** | P2 | **Cursor Usage** | ✅ **Fait** (`src/widgets/cursor-usage/`) | Quotas Cursor (`Auto` & `API`, cycle de facturation, dépenses on-demand) + alertes 80 % / 95 % |
 
 ---
 

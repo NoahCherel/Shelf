@@ -1,0 +1,260 @@
+/* Dock folder tile (1x1 macOS/iOS-style 2x2 real widget logos) */
+.wfolder {
+  padding: calc(var(--T) * 0.11);
+  position: relative;
+}
+
+.wfolder__grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--T) * 0.065);
+}
+
+.wfolder__cell {
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--T) * 0.11);
+  overflow: hidden;
+  display: block;
+}
+
+.wfolder__cell > * {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.wglyph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.wglyph svg {
+  display: block;
+  width: 72%;
+  height: 72%;
+}
+
+.wfolder__more {
+  position: absolute;
+  right: calc(var(--T) * 0.06);
+  bottom: calc(var(--T) * 0.06);
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+  font-size: calc(var(--T) * 0.15);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Native Shelf card styling for the opened folder */
+.wfolder-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  max-height: var(--card-max, 620px);
+  overflow: hidden;
+}
+
+.wfolder-card__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.wfolder-card__name {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  font: 700 15px/1.2 var(--font);
+  outline: none;
+  user-select: text;
+}
+
+.wfolder-card__name:hover,
+.wfolder-card__name:focus {
+  background: var(--track);
+}
+
+.wfolder-card__count {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--track);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wfolder-card__ungroup {
+  flex: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--track);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+  transition: filter 140ms;
+}
+
+.wfolder-card__ungroup:hover {
+  filter: brightness(1.2);
+}
+
+.wfolder-card__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--track) transparent;
+  /* Scale all child tiles proportionally from a single clean unit, never distorting aspect ratios. */
+  --T: 48px;
+  --tile-radius: calc(var(--T) * 0.24);
+  --rim-w: 1px;
+  --fs-hero: calc(var(--T) * 0.4);
+  --fs-large: calc(var(--T) * 0.32);
+  --fs-value: calc(var(--T) * 0.24);
+  --fs-label: calc(var(--T) * 0.17);
+  --fs-second: calc(var(--T) * 0.15);
+  --fs-micro: calc(var(--T) * 0.11);
+}
+
+.wfolder-card__item {
+  position: relative;
+  flex: none;
+  max-width: 100%;
+}
+
+.wfolder-card[data-dragging="true"] .wfolder-card__list {
+  overflow: hidden;
+}
+
+.wfolder-card__item[data-dragging="true"] {
+  z-index: 4;
+  opacity: 0.85;
+  cursor: grabbing;
+}
+
+.wfolder-card__item[data-pulling-out="true"] {
+  opacity: 0.32;
+}
+
+.wfolder-card__item[data-drop-target="true"] > .wfolder-card__tile {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wfolder-card[data-pulling-out="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.wfolder-card__pull-pill {
+  flex: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wfolder-card__tile {
+  cursor: pointer;
+  border-radius: var(--tile-radius);
+  transition: filter 140ms ease-out;
+}
+
+.wfolder-card__tile:hover {
+  filter: brightness(1.08);
+}
+
+/* Subtle floating controls on hover so widgets look completely clean at rest. */
+.wfolder-card__actions {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease-out;
+}
+
+.wfolder-card__item:hover .wfolder-card__actions,
+.wfolder-card__item:focus-within .wfolder-card__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wfolder-card__btn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 0 0 1px var(--hairline);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background 120ms, color 120ms, transform 120ms;
+}
+
+.wfolder-card__btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.wfolder-card__btn--danger:hover {
+  background: var(--error);
+  color: #ffffff;
+}
+
+/* Back bar when inspecting a child widget's detail card */
+.wfolder-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wfolder-detail__back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wfolder-detail__back:hover {
+  filter: brightness(1.15);
+}

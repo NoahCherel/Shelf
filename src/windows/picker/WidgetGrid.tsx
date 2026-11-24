@@ -1,10 +1,10 @@
 import type { WidgetDef } from "../../core/widget";
 import { widthOf } from "../../core/widget";
 import { CATEGORIES } from "../../core/categories";
-import { useLayout } from "../../core/layout";
+import { allWidgetIds, useLayout } from "../../core/layout";
 
 function Pick({ def }: { def: WidgetDef }) {
-  const inBar = useLayout((s) => s.ids.includes(def.id));
+  const inBar = useLayout((s) => allWidgetIds(s.ids, s.folders).includes(def.id));
   const { add, remove } = useLayout.getState();
   const C = def.Tile;
   const toggle = () => (inBar ? remove(def.id) : add(def.id));

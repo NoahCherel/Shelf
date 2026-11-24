@@ -1,9 +1,10 @@
 import { useComeAndGo } from "../../core/useComeAndGo";
 import { CARD } from "../../core/names";
 import React, { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
-import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors, type DragMoveEvent, type DragStartEvent } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { byId } from "../../core/byId";
+import { canPutInFolder, isFolderId } from "../../core/folderId";
 import { isPinId } from "../../core/pinId";
 import { useLayout } from "../../core/layout";
 import { useSettings, type SettingsData } from "../../core/settings";
@@ -36,10 +37,26 @@ export function reportSize(el: HTMLElement, gap: number, float: boolean, edge: E
   invoke("set_dock_width", { width, bar: Math.ceil(height), gap, float, edge, along }).catch(() => {});
 }
 
-export function handleDragEnd({ active, over }: { active: { id: unknown }; over: { id: unknown } | null }): void {
+/** How long a widget is held over another widget before dropping creates a folder. */
+const WIDGET_HOLD_MS = 350;
+/** Dropping onto an existing folder arms almost immediately. */
+const FOLDER_HOLD_MS = 150;
+/** While a widget is held over another to form/join a folder, neighbours stop sliding away. */
+const stayPut = () => null;
+
+export function handleDragEnd(
+  { active, over }: { active: { id: unknown }; over: { id: unknown } | null },
+  groupTarget?: string | null,
+): void {
+  const activeId = String(active.id);
+  const { ids, move, groupWidgets } = useLayout.getState();
+  if (groupTarget && groupTarget !== activeId && canPutInFolder(activeId) && groupTarget !== "apps") {
+    groupWidgets(activeId, groupTarget);
+    return;
+  }
   if (!over || active.id === over.id) return;
-  const { ids, move } = useLayout.getState();
-  move(ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+  const overId = String(over.id);
+  move(ids.indexOf(activeId), ids.indexOf(overId));
 }
 
 /** What a click on a widget's tile opens: its shared panel, or its own card over the tile. */
@@ -98,7 +115,19 @@ function useInView(el: HTMLElement | null): boolean {
   return shown;
 }
 
-function Slot({ def, free, arriving, leavingWidth }: { def: WidgetDef; free?: Free; arriving?: boolean; leavingWidth?: number }) {
+function Slot({
+  def,
+  free,
+  arriving,
+  leavingWidth,
+  folderTarget,
+}: {
+  def: WidgetDef;
+  free?: Free;
+  arriving?: boolean;
+  leavingWidth?: number;
+  folderTarget?: boolean;
+}) {
   const T = def.Tile;
   const [node, setNode] = useState<HTMLDivElement | null>(null);
   const { data, status, error, refresh } = useProvider(def.provider, def.sample, useInView(node));
@@ -133,6 +162,7 @@ function Slot({ def, free, arriving, leavingWidth }: { def: WidgetDef; free?: Fr
       data-locked={locked}
       data-dragging={isDragging}
       data-moving={free?.moving}
+      data-folder-target={folderTarget || undefined}
       style={{
         ...(free ? { left: free.left } : { transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined, transition }),
         ...(leaving ? ({ "--w": `${leavingWidth}px` } as React.CSSProperties) : {}),
@@ -228,6 +258,7 @@ function openMenu(e: MouseEvent<HTMLDivElement>) {
 
 export function DockBar() {
   const ids = useLayout((s) => s.ids);
+  useLayout((s) => s.folders);
   const fullscreen = useShell((s) => s.fullscreen);
   const locked = useShell((s) => s.locked);
   const style = useSettings((s) => s.style);
@@ -258,6 +289,87 @@ export function DockBar() {
   const placed = useFreePlacement(full, ids, lockDock && !pickerOpen);
   const coming = useComeAndGo(ids.length ? ids : null, (id) => id, (id) => placed.row.current?.querySelector(`[data-widget-id="${id}"]`)?.getBoundingClientRect().width ?? 0);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }));
+  const [folderTarget, setFolderTarget] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const holdOverId = useRef<string | null>(null);
+  const armedTarget = useRef<string | null>(null);
+  const restingRects = useRef<Map<string, { left: number; width: number }>>(new Map());
+  const dragStartX = useRef<number | null>(null);
+
+  const clearHold = useCallback(() => {
+    clearTimeout(holdTimer.current);
+    holdOverId.current = null;
+    armedTarget.current = null;
+    setFolderTarget(null);
+  }, []);
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
+
+  const onDragStart = useCallback(
+    (e: DragStartEvent) => {
+      clearHold();
+      const map = new Map<string, { left: number; width: number }>();
+      placed.row.current?.querySelectorAll<HTMLElement>(":scope > [data-widget-id]").forEach((el) => {
+        const wid = el.dataset.widgetId;
+        if (!wid) return;
+        const r = el.getBoundingClientRect();
+        map.set(wid, { left: r.left, width: r.width });
+      });
+      restingRects.current = map;
+      const ev = e.activatorEvent as PointerEvent | MouseEvent | undefined;
+      dragStartX.current = ev && "clientX" in ev ? ev.clientX : null;
+    },
+    [clearHold, placed.row],
+  );
+
+  const onDragMove = useCallback(
+    (e: DragMoveEvent) => {
+      const activeId = String(e.active.id);
+      if (!canPutInFolder(activeId)) return clearHold();
+      const translated = e.active.rect.current.translated;
+      const pointerX =
+        dragStartX.current !== null
+          ? dragStartX.current + e.delta.x
+          : translated
+            ? translated.left + translated.width / 2
+            : null;
+      if (pointerX === null) return clearHold();
+
+      let hit: string | null = null;
+      for (const [wid, rect] of restingRects.current) {
+        if (wid === activeId || wid === "apps") continue;
+        // Entire tile counts for an existing folder; middle 70% counts for creating a new folder.
+        const pad = isFolderId(wid) ? 0 : rect.width * 0.15;
+        if (pointerX >= rect.left + pad && pointerX <= rect.left + rect.width - pad) {
+          hit = wid;
+          break;
+        }
+      }
+      if (!hit) {
+        if (holdOverId.current || armedTarget.current) clearHold();
+        return;
+      }
+      if (holdOverId.current === hit) return;
+      clearHold();
+      holdOverId.current = hit;
+      const delay = isFolderId(hit) ? FOLDER_HOLD_MS : WIDGET_HOLD_MS;
+      holdTimer.current = setTimeout(() => {
+        armedTarget.current = hit;
+        setFolderTarget(hit);
+      }, delay);
+    },
+    [clearHold],
+  );
+
+  const onDragEnd = useCallback(
+    (event: { active: { id: unknown }; over: { id: unknown } | null }) => {
+      const target = armedTarget.current;
+      clearHold();
+      restingRects.current.clear();
+      dragStartX.current = null;
+      handleDragEnd(event, target);
+    },
+    [clearHold],
+  );
 
   // Keeps the window exactly as wide as the bar. The bar sizes itself to its content,
   // independent of the window, so this can't feed back into itself.
@@ -285,12 +397,13 @@ export function DockBar() {
       <GlassLayer active={glass} onUnavailable={onGlassUnavailable} />
       <div className="dock__scroll" ref={placed.row} onWheel={glide}>
       {!fullscreen && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragMove={onDragMove} onDragCancel={clearHold} onDragEnd={onDragEnd}>
+          <SortableContext items={ids} strategy={folderTarget ? stayPut : horizontalListSortingStrategy}>
             {coming.rows.map((id) => {
               const def = byId(id);
               const gone = coming.leaving.get(id);
-              return def ? <Slot key={id} def={def} free={placed.free(id)} arriving={coming.arrived.has(id)} leavingWidth={gone?.width} /> : null;
+              const target = folderTarget === id || placed.folderTarget === id;
+              return def ? <Slot key={id} def={def} free={placed.free(id)} arriving={coming.arrived.has(id)} leavingWidth={gone?.width} folderTarget={target} /> : null;
             })}
           </SortableContext>
         </DndContext>

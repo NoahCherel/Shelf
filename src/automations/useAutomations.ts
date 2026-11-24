@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLayout } from "../core/layout";
+import { allWidgetIds, useLayout } from "../core/layout";
 import { STORE } from "../core/names";
 import { useSettings } from "../core/settings";
 import { invoke, listen } from "../core/tauri";
@@ -16,8 +16,9 @@ import { limitAlerts, limitToast, providerLimitAlerts, providerLimitToast, type 
 
 /** The Claude widget whose card a limit toast opens: the full one first. */
 function claudeOnDock(): string | null {
-  const ids = useLayout.getState().ids;
-  return ["claude-usage", "claude-plan-usage"].find((id) => ids.includes(id)) ?? null;
+  const { ids, folders } = useLayout.getState();
+  const active = allWidgetIds(ids, folders);
+  return ["claude-usage", "claude-plan-usage"].find((id) => active.includes(id)) ?? null;
 }
 
 const LIMIT_TOAST = /^ai-limit-(.+)$/;
@@ -31,11 +32,13 @@ export function useAutomations(): void {
   const main = windowLabel() === "dock";
   const aiLimits = useSettings((s) => s.automations.aiLimits) && main;
   const dockIds = useLayout((s) => s.ids);
-  const hasChatGpt = dockIds.includes("chatgpt-usage");
-  const hasGemini = dockIds.includes("gemini-usage");
-  const hasGrok = dockIds.includes("grok-usage");
-  const hasGlm = dockIds.includes("glm-usage");
-  const hasCursor = dockIds.includes("cursor-usage");
+  const folders = useLayout((s) => s.folders);
+  const activeIds = allWidgetIds(dockIds, folders);
+  const hasChatGpt = activeIds.includes("chatgpt-usage");
+  const hasGemini = activeIds.includes("gemini-usage");
+  const hasGrok = activeIds.includes("grok-usage");
+  const hasGlm = activeIds.includes("glm-usage");
+  const hasCursor = activeIds.includes("cursor-usage");
 
   const { data, status } = useProvider(aiLimits ? claudeProvider : undefined);
   const chatgpt = useProvider(aiLimits && hasChatGpt ? chatgptProvider : undefined);

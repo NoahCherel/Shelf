@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CARD } from "../../core/names";
 import { refresh } from "../../core/provider";
 import { byId } from "../../core/byId";
+import { canPutInFolder } from "../../core/folderId";
+import { useLayout } from "../../core/layout";
 import { invoke, listen } from "../../core/tauri";
 import { useProvider } from "../../core/useProvider";
 import type { WidgetDef } from "../../core/widget";
@@ -60,10 +62,21 @@ function CardBody({ def }: { def: WidgetDef }) {
 }
 
 function MenuBody({ def }: { def: WidgetDef | undefined }) {
+  const folders = useLayout((s) => s.folders);
   const own = def?.menu?.({ refresh: () => def.provider && refresh(def.provider) }) ?? [];
+  const folderItems =
+    def && canPutInFolder(def.id)
+      ? [
+          ...Object.entries(folders).map(([fid, f]) => ({
+            label: `Move to "${f.name}"`,
+            onClick: () => useLayout.getState().groupWidgets(def.id, fid),
+          })),
+          { label: "New folder", onClick: () => void useLayout.getState().createFolderWith(def.id) },
+        ]
+      : [];
   return (
     <Fitted width={MENU_WIDTH}>
-      <Menu items={dockMenuItems(own)} />
+      <Menu items={dockMenuItems([...own, ...folderItems])} />
     </Fitted>
   );
 }

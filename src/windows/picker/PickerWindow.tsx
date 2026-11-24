@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLayout } from "../../core/layout";
+import { allWidgetIds, useLayout } from "../../core/layout";
 import { byCategory, widgets } from "../../core/registry";
 import { invoke } from "../../core/tauri";
 import type { Category, WidgetDef } from "../../core/widget";
@@ -16,7 +16,7 @@ function matches(def: WidgetDef, query: string): boolean {
 export function PickerWindow() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Category | "all">("all");
-  const inBar = useLayout((s) => s.ids.length);
+  const inBar = useLayout((s) => allWidgetIds(s.ids, s.folders).length);
 
   const groups = useMemo(() => {
     const out = new Map<string, WidgetDef[]>();

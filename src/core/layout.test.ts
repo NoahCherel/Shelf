@@ -1,6 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { invoke } from "./tauri";
-import { DEFAULT_LAYOUT, useLayout } from "./layout";
+import { allWidgetIds, DEFAULT_LAYOUT, folderContaining, useLayout } from "./layout";
 
 vi.mock("./tauri", () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 vi.mock("./registry", () => ({
@@ -13,7 +13,7 @@ const saved = () => mockInvoke.mock.calls.filter((c) => c[0] === "store_save").m
 beforeEach(() => {
   mockInvoke.mockReset();
   mockInvoke.mockResolvedValue(null);
-  useLayout.setState({ ids: ["apps", "clock"], positions: {} });
+  useLayout.setState({ ids: ["apps", "clock"], positions: {}, folders: {} });
 });
 
 describe("changes", () => {
@@ -120,5 +120,80 @@ describe("where widgets sit on a full-width dock", () => {
     expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["apps", "clock", "battery"], positions: { apps: 0, clock: 1 } } });
     useLayout.getState().remove("clock");
     expect(saved().at(-1)).toEqual({ name: "layout", value: { version: 2, ids: ["apps", "battery"], positions: { apps: 0 } } });
+  });
+});
+
+describe("widget folders", () => {
+  it("groups two widgets into a new folder, adds a third, and tracks allWidgetIds", () => {
+    useLayout.setState({ ids: ["apps", "clock", "battery", "github-activity"], positions: {}, folders: {} });
+    useLayout.getState().groupWidgets("battery", "clock");
+    const state1 = useLayout.getState();
+    const fid = state1.ids.find((id) => id.startsWith("folder:"))!;
+    expect(fid).toBeTruthy();
+    expect(state1.ids).toEqual(["apps", fid, "github-activity"]);
+    expect(state1.folders[fid].widgets).toEqual(["clock", "battery"]);
+    expect(allWidgetIds(state1.ids, state1.folders)).toEqual(["apps", "clock", "battery", "github-activity"]);
+    expect(folderContaining("battery", state1.folders)).toBe(fid);
+
+    // Adding a duplicate already inside a folder is ignored.
+    useLayout.getState().add("battery");
+    expect(useLayout.getState().ids).toEqual(["apps", fid, "github-activity"]);
+
+    // Dropping another widget onto the existing folder joins it.
+    useLayout.getState().groupWidgets("github-activity", fid);
+    expect(useLayout.getState().folders[fid].widgets).toEqual(["clock", "battery", "github-activity"]);
+    expect(useLayout.getState().ids).toEqual(["apps", fid]);
+  });
+
+  it("refuses to put apps inside a folder or nest folders", () => {
+    useLayout.setState({ ids: ["apps", "clock", "battery"], positions: {}, folders: {} });
+    useLayout.getState().groupWidgets("apps", "clock");
+    useLayout.getState().groupWidgets("clock", "apps");
+    expect(useLayout.getState().folders).toEqual({});
+  });
+
+  it("keeps a 1-widget folder (Option A), renames, moves back to dock, and ungroups", () => {
+    useLayout.setState({ ids: ["apps", "clock", "battery"], positions: {}, folders: {} });
+    const fid = useLayout.getState().createFolderWith("clock", "My Tools")!;
+    expect(useLayout.getState().folders[fid]).toEqual({ name: "My Tools", widgets: ["clock"] });
+
+    useLayout.getState().renameFolder(fid, "Utilities");
+    expect(useLayout.getState().folders[fid].name).toBe("Utilities");
+
+    useLayout.getState().groupWidgets("battery", fid);
+    useLayout.getState().removeFromFolder(fid, "battery", true, "before");
+    expect(useLayout.getState().folders[fid].widgets).toEqual(["clock"]);
+    expect(useLayout.getState().ids).toEqual(["apps", "battery", fid]);
+
+    // Move back into folder then out to the right ("after").
+    useLayout.getState().groupWidgets("battery", fid);
+    useLayout.getState().removeFromFolder(fid, "battery", true, "after");
+    expect(useLayout.getState().ids).toEqual(["apps", fid, "battery"]);
+
+    // Ungroup puts remaining widgets back in place.
+    useLayout.getState().ungroupFolder(fid);
+    expect(useLayout.getState().folders).toEqual({});
+    expect(useLayout.getState().ids).toEqual(["apps", "clock", "battery"]);
+  });
+
+  it("dissolves a folder automatically when its last widget is removed", () => {
+    useLayout.setState({ ids: ["apps", "clock"], positions: {}, folders: {} });
+    const fid = useLayout.getState().createFolderWith("clock")!;
+    useLayout.getState().remove("clock");
+    expect(useLayout.getState().folders).toEqual({});
+    expect(useLayout.getState().ids).toEqual(["apps"]);
+    expect(useLayout.getState().folders[fid]).toBeUndefined();
+  });
+
+  it("loads saved folders and drops unknown widgets cleanly", async () => {
+    mockInvoke.mockResolvedValue({
+      version: 2,
+      ids: ["apps", "folder:ai"],
+      positions: {},
+      folders: { "folder:ai": { name: "AI", widgets: ["clock", "missing-widget", "battery"] } },
+    });
+    await useLayout.getState().load();
+    expect(useLayout.getState().ids).toEqual(["apps", "folder:ai"]);
+    expect(useLayout.getState().folders["folder:ai"]).toEqual({ name: "AI", widgets: ["clock", "battery"] });
   });
 });
