@@ -13,6 +13,7 @@ Your apps, your system controls and the things you'd otherwise open an app to ch
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status: work in progress](https://img.shields.io/badge/status-work%20in%20progress-orange.svg)](#)
 
 <br />
 
@@ -21,6 +22,9 @@ Your apps, your system controls and the things you'd otherwise open an app to ch
 </div>
 
 ---
+
+> [!WARNING]
+> **Shelf is a work in progress.** It runs as a daily driver for its author, but there's no installer or release yet, some widgets and settings are still missing, and things may change or break between commits. Bug reports and ideas are very welcome.
 
 ## Why Shelf
 
